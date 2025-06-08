@@ -10,7 +10,7 @@ const UserSchema = new Schema(
       default: function () {
         return this._id.toString();
       },
-    },       
+    },
     userName: {
       type: String,
       required: [true, "Username is required"],
@@ -55,7 +55,6 @@ const UserSchema = new Schema(
         message: (props) => `${props.value} is not a valid phone number!`,
       },
     },
-    // Location information
     address: {
       street: { type: String },
       city: { type: String },
@@ -92,15 +91,19 @@ const UserSchema = new Schema(
       default: false,
     },
 
+    // Email Verification (Token and OTP-based)
     emailVerificationToken: String,
-    emailVerficationExpires: Date,
+    emailVerificationExpires: Date,
+    emailOTP: String,
+    emailOTPExpires: Date,
+
     passwordResetToken: String,
     passwordResetExpires: Date,
+
     emailVerified: {
       type: Boolean,
       default: false,
     },
-
 
     consentGiven: {
       type: Boolean,
@@ -140,8 +143,7 @@ const UserSchema = new Schema(
   },
   {
     timestamps: true,
-  },
-
+  }
 );
 
 // Pre-save hook to update lastUpdated field

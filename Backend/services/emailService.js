@@ -72,17 +72,16 @@ class EmailService {
     });
   }
 
-  async sendVerificationEmail(email, verificationToken, username) {
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
-    const html = `<p>Hello ${username},</p><p>Click <a href="${verificationUrl}">here</a> to verify your email address.</p>`;
-    const text = `Hello ${username},\n\nClick the following link to verify your email address: ${verificationUrl}`;
+ async sendEmailVerificationOTP(email, otp, username) {
+  const html = `<p>Hello ${username},</p><p>Your verification OTP is: <strong>${otp}</strong></p>`;
+  const text = `Hello ${username}, your verification OTP is: ${otp}`;
 
-    return this.sendEmail({
-      email,
-      subject: "Email Verification",
-      text,
-      html,
-    });
-  }
+  return this.sendEmail({
+    email,
+    subject: "Email Verification OTP",
+    text,
+    html,
+  });
+}
 }
 module.exports = new EmailService();

@@ -457,9 +457,8 @@ exports.sendVerificationEmail = catchAsync(async (req, res, next) => {
 }
 );
 
-/**
- * Verify email address using token
- */
+//Verify email address using token
+
 exports.verifyEmail = catchAsync(async (req, res, next) => {
   const { token } = req.params;
   const hashedToken = tokenUtils.hashToken(token);
@@ -478,6 +477,57 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
     status: "success",
     message: "Email verified successfully",
   });
-}
-);
+});
 
+// OTP-based email verification: SEND OTP
+exports.sendEmailVerificationOTP = catchAsync(async (req, res, next) => {
+  const { email } = req.body;
+  if (!email) return next(new AppError("Email is required", 400));
+
+  const user = await User.findOne({ email });
+  if (!user) return next(new AppError("User not found", 404));
+
+  const otp = tokenUtils.generateOTP();
+  const hashedOTP = tokenUtils.hashToken(otp);
+
+  user.emailOTP = hashedOTP;
+  user.emailOTPExpires = Date.now() + 10 * 60 * 1000; // valid for 10 minutes
+  await user.save({ validateBeforeSave: false });
+
+  await emailService.sendEmailVerificationOTP(email, otp, user.userName);
+
+  res.status(200).json({
+    status: "success",
+    message: "OTP sent to email",
+  });
+});
+
+// OTP-based email verification: VERIFY OTP
+exports.verifyEmailOTP = catchAsync(async (req, res, next) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return next(new AppError("Please provide both email and OTP", 400));
+  }
+
+  const hashedOTP = tokenUtils.hashToken(otp);
+  const user = await User.findOne({
+    email,
+    emailOTP: hashedOTP,
+    emailOTPExpires: { $gt: Date.now() }
+  });
+
+  if (!user) {
+    return next(new AppError("OTP is invalid or has expired", 400));
+  }
+
+  user.emailVerified = true;
+  user.emailOTP = undefined;
+  user.emailOTPExpires = undefined;
+  await user.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    status: "success",
+    message: "Email verified successfully",
+  });
+});

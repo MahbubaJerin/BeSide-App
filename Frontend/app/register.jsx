@@ -43,76 +43,77 @@ export default function RegisterScreen() {
   const border = useThemeColor({}, "primary");
 
   const handleRegister = async () => {
-    if (
-      !username || !email || !mobileNo || !password ||
-      !firstName || !lastName || !gender || !country || !countryCode
-    ) {
-      alert("Please fill out all required fields");
+  if (
+    !username || !email || !mobileNo || !password ||
+    !firstName || !lastName || !gender || !country || !countryCode
+  ) {
+    alert("Please fill out all required fields");
+    return;
+  }
+
+  try {
+    const registerResponse = await fetch("http://10.0.2.2:5000/api/v1/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userName: username,
+        email,
+        mobileNo,
+        password,
+        firstName,
+        lastName,
+        gender,
+        address: {
+          street,
+          city,
+          state,
+          postalCode,
+          country,
+          countryCode,
+        },
+      }),
+    });
+
+    const registerData = await registerResponse.json();
+
+    if (!registerResponse.ok) {
+      alert(registerData.message || "Registration failed");
       return;
     }
 
-    try {
-      const registerResponse = await fetch("http://10.0.2.2:5000/api/v1/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userName: username,
-          email,
-          mobileNo,
-          password,
-          firstName,
-          lastName,
-          gender,
-          address: {
-            street,
-            city,
-            state,
-            postalCode,
-            country,
-            countryCode,
-          },
-        }),
-      });
+    // Send OTP 
+    const otpResponse = await fetch("http://10.0.2.2:5000/api/v1/auth/send-email-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
 
-      const registerData = await registerResponse.json();
+    const otpData = await otpResponse.json();
 
-      if (!registerResponse.ok) {
-        alert(registerData.message || "Registration failed");
-        return;
-      }
-
-      const verifyResponse = await fetch("http://10.0.2.2:5000/api/v1/auth/send-verification-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const verifyData = await verifyResponse.json();
-
-      if (!verifyResponse.ok) {
-        alert(verifyData.message || "User registered but email verification failed");
-        return;
-      }
-
-      Alert.alert(
-        "Registration Successful",
-        "A verification email has been sent. Please verify your email before logging in.",
-        [
-          {
-            text: "OK",
-            onPress: () =>
-              router.push({
-                pathname: "/verifyEmail",
-                params: { email },
-              }),
-          },
-        ]
-      );
-    } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "Something went wrong during registration.");
+    if (!otpResponse.ok) {
+      alert(otpData.message || "User registered but OTP sending failed");
+      return;
     }
-  };
+
+    Alert.alert(
+      "Registration Successful",
+      "A verification OTP has been sent to your email. Please verify before logging in.",
+      [
+        {
+          text: "OK",
+          onPress: () =>
+            router.push({
+              pathname: "/verifyEmailOtp",
+              params: { email },
+            }),
+        },
+      ]
+    );
+  } catch (err) {
+    console.error(err);
+    Alert.alert("Error", "Something went wrong during registration.");
+  }
+};
 
   return (
     <KeyboardAvoidingView
