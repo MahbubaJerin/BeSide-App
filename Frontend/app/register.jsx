@@ -103,7 +103,7 @@ export default function RegisterScreen() {
           text: "OK",
           onPress: () =>
             router.push({
-              pathname: "/verifyEmailOtp",
+              pathname: "/verifyEmail",
               params: { email },
             }),
         },
