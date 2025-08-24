@@ -1,31 +1,69 @@
-import { useEffect, useRef } from "react";
-import { View, StyleSheet, Animated, Dimensions, Platform } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  View,
+  StyleSheet,
+  Animated,
+  Dimensions,
+  Platform,
+  LogBox,
+} from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedButton } from "@/components/ThemedButton";
 import { Typography } from "@/constants/Typography";
-import { LogBox } from "react-native";
+
 LogBox.ignoreLogs([
   "Support for defaultProps will be removed from function components",
 ]);
-
 
 const { height } = Dimensions.get("window");
 
 export default function WelcomeScreen() {
   const router = useRouter();
-
+  const [booting, setBooting] = useState(true);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Boot gate: first run -> onboarding; else if logged in -> home; else show welcome
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 1200,
-      useNativeDriver: true,
-    }).start();
+    (async () => {
+      try {
+        const firstRun = await AsyncStorage.getItem("firstRunDone");
+        const token = await AsyncStorage.getItem("token");
+
+        if (!firstRun) {
+          router.replace("/onboarding");
+          return;
+        }
+
+        if (token) {
+          router.replace("/home");
+          return;
+        }
+
+        // Show welcome screen if not first run and not logged in
+        setBooting(false);
+      } catch {
+        // If storage fails, just show welcome
+        setBooting(false);
+      }
+    })();
   }, []);
+
+  // Keep welcome animation (only when showing this screen)
+  useEffect(() => {
+    if (!booting) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [booting]);
+
+  if (booting) return null;
 
   return (
     <View style={styles.mainContainer}>

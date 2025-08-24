@@ -9,6 +9,7 @@ import {
   Alert,
   Image,
   Animated,
+  Text,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
@@ -31,6 +32,7 @@ import CompanionPreferencesModal from "./CompanionPreferencesModal";
 import PhotoUploadModal from "./PhotoUploadModal";
 
 const { width } = Dimensions.get("window");
+const DEBUG = __DEV__;
 
 // Import the placeholder image
 const placeholderImage = require("../assets/images/placeholder2.jpg");
@@ -112,7 +114,7 @@ const customMapStyle = [
   },
 ];
 
-// Hardcoded users for testing (from your code)
+// Hardcoded users for testing
 const hardcodedUsers = [
   {
     userName: "AliceSmith",
@@ -167,26 +169,39 @@ export default function HomeScreen() {
   const [endMarker, setEndMarker] = useState(null);
   const [nearbyUsers, setNearbyUsers] = useState(0);
   const [searchTimer, setSearchTimer] = useState(null);
+  const [mapReady, setMapReady] = useState(false); // DEBUG
   const loadingAnimation = useRef(new Animated.Value(0)).current;
   const mapRef = useRef(null);
   const [currentTripRequestId, setCurrentTripRequestId] = useState(null);
   const [showRadius, setShowRadius] = useState(false);
+
+  useEffect(() => {
+    console.log("[home.jsx] mount", { platform: Platform.OS, DEBUG });
+    return () => console.log("[home.jsx] unmount");
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       let locationSubscription;
 
       const load = async () => {
+        console.log("[home.jsx] load() start");
         const stored = await AsyncStorage.getItem("user");
         if (stored) {
-          setUser(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          setUser(parsed);
+          console.log("[home.jsx] user loaded", {
+            userName: parsed.userName,
+            isVerified: parsed.isVerified,
+          });
         } else {
+          console.log("[home.jsx] no stored user, redirect to /login");
           router.replace("/login");
         }
 
         const { status } = await Location.requestForegroundPermissionsAsync();
+        console.log("[home.jsx] location permission", status);
         if (status !== "granted") {
-          console.log("Location permission denied. Using fallback location.");
           Alert.alert(
             "Location Permission Denied",
             "Please enable location services in your device settings."
@@ -201,13 +216,13 @@ export default function HomeScreen() {
         }
 
         try {
-          console.log("Attempting to fetch current location...");
+          console.log("[home.jsx] fetching current location…");
           const location = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Highest,
             timeout: 10000,
             mayShowUserSettingsDialog: true,
           });
-          console.log("Initial location fetched:", location.coords);
+          console.log("[home.jsx] initial location", location.coords);
           setCurrentLocation({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
@@ -222,7 +237,7 @@ export default function HomeScreen() {
               distanceInterval: 10,
             },
             (newLocation) => {
-              console.log("Location updated:", newLocation.coords);
+              console.log("[home.jsx] watchPosition", newLocation.coords);
               setCurrentLocation({
                 latitude: newLocation.coords.latitude,
                 longitude: newLocation.coords.longitude,
@@ -232,7 +247,7 @@ export default function HomeScreen() {
             }
           );
         } catch (error) {
-          console.error("Error fetching location:", error.message);
+          console.error("[home.jsx] getCurrentPosition error", error);
           Alert.alert("Location Error", "Using fallback location.");
           setCurrentLocation({
             latitude: -33.8688,
@@ -247,6 +262,7 @@ export default function HomeScreen() {
 
       return () => {
         if (locationSubscription) {
+          console.log("[home.jsx] removing location watcher");
           locationSubscription.remove();
         }
       };
@@ -255,6 +271,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (isSearching) {
+      console.log("[home.jsx] start loading animation");
       Animated.loop(
         Animated.sequence([
           Animated.timing(loadingAnimation, {
@@ -280,17 +297,22 @@ export default function HomeScreen() {
   };
 
   const handleFindCompanion = async () => {
+    console.log("[home.jsx] handleFindCompanion");
     const storedUser = await AsyncStorage.getItem("user");
     const token = await AsyncStorage.getItem("token");
     if (!storedUser || !token) {
+      console.log("[home.jsx] missing stored user or token");
       router.replace("/login");
       return;
     }
     const parsed = JSON.parse(storedUser);
     if (parsed.isVerified) {
-      // Create trip request first
       try {
-        const API_URL = Platform.OS === "android" ? "http://10.0.2.2:5000" : "http://localhost:5000";
+        const API_URL =
+          Platform.OS === "android"
+            ? "http://10.0.2.2:5000"
+            : "http://localhost:5000";
+        console.log("[home.jsx] createTripReq", { API_URL });
         const response = await fetch(`${API_URL}/api/v1/trip/createTripReq`, {
           method: "POST",
           headers: {
@@ -303,15 +325,16 @@ export default function HomeScreen() {
               userName: parsed.userName,
               userImage: parsed.userImage || "default.jpg",
             },
-            destination: "Placeholder", // Will be updated later
-            destinationType: "By Walk", // Will be updated later
+            destination: "Placeholder",
+            destinationType: "By Walk",
             date: new Date(),
-            time: "12:00", // Will be updated later
-            genderPreference: "any", // Will be updated later
+            time: "12:00",
+            genderPreference: "any",
           }),
         });
 
         const result = await response.json();
+        console.log("[home.jsx] createTripReq result", result?.status);
         if (result.status === "success") {
           setCurrentTripRequestId(result.data.tripRequest.tripReqId);
           setConsentVisible(true);
@@ -319,6 +342,7 @@ export default function HomeScreen() {
           throw new Error(result.message || "Failed to create trip request");
         }
       } catch (error) {
+        console.error("[home.jsx] createTripReq error", error);
         Alert.alert("Error", error.message || "Failed to create trip request.");
         return;
       }
@@ -328,6 +352,10 @@ export default function HomeScreen() {
   };
 
   const handlePhotoSubmit = async (url) => {
+    console.log("[home.jsx] handlePhotoSubmit", {
+      hasUrl: !!url,
+      currentTripRequestId,
+    });
     if (!currentTripRequestId) {
       Alert.alert("Error", "No active trip request found.");
       return;
@@ -342,9 +370,11 @@ export default function HomeScreen() {
         return;
       }
 
-      const user = JSON.parse(storedUser);
-      const API_URL = Platform.OS === "android" ? "http://10.0.2.2:5000" : "http://localhost:5000";
-      
+      const API_URL =
+        Platform.OS === "android"
+          ? "http://10.0.2.2:5000"
+          : "http://localhost:5000";
+
       const formData = new FormData();
       formData.append("photo", {
         uri: url,
@@ -352,6 +382,7 @@ export default function HomeScreen() {
         name: `selfie-${Date.now()}.jpg`,
       });
 
+      console.log("[home.jsx] uploading selfie…", { API_URL });
       const response = await fetch(
         `${API_URL}/api/v1/trip/upload-photo/${currentTripRequestId}`,
         {
@@ -364,6 +395,7 @@ export default function HomeScreen() {
       );
 
       const result = await response.json();
+      console.log("[home.jsx] upload selfie result", result?.status);
       if (result.status === "success") {
         setPhotoUrl(result.data.photoUrl);
         setPhotoUploadVisible(false);
@@ -372,33 +404,49 @@ export default function HomeScreen() {
         throw new Error(result.message || "Failed to upload photo");
       }
     } catch (error) {
+      console.error("[home.jsx] upload selfie error", error);
       Alert.alert("Error", error.message || "Failed to upload photo.");
     }
   };
 
   const handlePreferencesSubmit = async (preferences) => {
+    console.log("[home.jsx] handlePreferencesSubmit", preferences);
     try {
       setStartMarker(preferences.startCoordinates);
       setEndMarker(preferences.destinationCoordinates);
 
       // Draw 500m radius circle and generate dummy users
       setShowRadius(true);
-      const users = generateDummyUsers(preferences.startCoordinates, 500, 3 + Math.floor(Math.random() * 3)); // 3-5 users
+      const users = generateDummyUsers(
+        preferences.startCoordinates,
+        500,
+        3 + Math.floor(Math.random() * 3)
+      ); // 3-5 users
       setDummyUsers(users);
       setNearbyUsers(users.length);
+      console.log("[home.jsx] dummy users generated", users.length);
 
       // Generate route coordinates using Google Directions API
       const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${preferences.startCoordinates.latitude},${preferences.startCoordinates.longitude}&destination=${preferences.destinationCoordinates.latitude},${preferences.destinationCoordinates.longitude}&mode=driving&key=AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw`;
+      console.log(
+        "[home.jsx] directions fetch",
+        url.replace(/key=.*$/, "key=REDACTED")
+      );
       const response = await fetch(url);
       const data = await response.json();
+      console.log("[home.jsx] directions routes", data?.routes?.length || 0);
       if (data.routes && data.routes[0]) {
         const points = data.routes[0].overview_polyline.points;
         const coords = decodePolyline(points);
-        const validCoords = coords.filter(coord => 
-          coord.latitude >= -90 && coord.latitude <= 90 &&
-          coord.longitude >= -180 && coord.longitude <= 180
+        const validCoords = coords.filter(
+          (coord) =>
+            coord.latitude >= -90 &&
+            coord.latitude <= 90 &&
+            coord.longitude >= -180 &&
+            coord.longitude <= 180
         );
         setRouteCoordinates(validCoords);
+        console.log("[home.jsx] route coordinates", validCoords.length);
         if (validCoords.length > 0) {
           mapRef.current?.fitToCoordinates(validCoords, {
             edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
@@ -407,10 +455,11 @@ export default function HomeScreen() {
         }
         startSearching();
       } else {
-        Alert.alert('Error', 'No route found between the selected locations');
+        Alert.alert("Error", "No route found between the selected locations");
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to fetch route information');
+      console.error("[home.jsx] directions error", error);
+      Alert.alert("Error", "Failed to fetch route information");
     }
   };
 
@@ -421,14 +470,22 @@ export default function HomeScreen() {
     }));
   };
 
-  const generateDummyUsers = (centerLocation, radiusMeters = 500, numUsers = 4) => {
+  const generateDummyUsers = (
+    centerLocation,
+    radiusMeters = 500,
+    numUsers = 4
+  ) => {
     const users = [];
     const earthRadius = 6371000; // meters
     for (let i = 0; i < numUsers; i++) {
       const angle = Math.random() * 2 * Math.PI;
       const distance = Math.random() * radiusMeters;
-      const deltaLat = (distance * Math.cos(angle)) / earthRadius * (180 / Math.PI);
-      const deltaLng = (distance * Math.sin(angle)) / (earthRadius * Math.cos(centerLocation.latitude * Math.PI / 180)) * (180 / Math.PI);
+      const deltaLat =
+        ((distance * Math.cos(angle)) / earthRadius) * (180 / Math.PI);
+      const deltaLng =
+        ((distance * Math.sin(angle)) /
+          (earthRadius * Math.cos((centerLocation.latitude * Math.PI) / 180))) *
+        (180 / Math.PI);
       users.push({
         id: `dummy-${i}`,
         coordinate: {
@@ -441,6 +498,7 @@ export default function HomeScreen() {
   };
 
   const startSearching = () => {
+    console.log("[home.jsx] startSearching");
     setIsSearching(true);
     const timer = setInterval(() => {
       const newCount = Math.floor(Math.random() * 3) + 2; // 2-4 users
@@ -448,11 +506,13 @@ export default function HomeScreen() {
       if (startMarker) {
         setDummyUsers(generateDummyUsers(startMarker, 500, newCount));
       }
+      console.log("[home.jsx] tick nearby users", newCount);
     }, 3000);
     setSearchTimer(timer);
   };
 
   const cancelSearch = () => {
+    console.log("[home.jsx] cancelSearch");
     if (searchTimer) {
       clearInterval(searchTimer);
     }
@@ -479,6 +539,7 @@ export default function HomeScreen() {
   };
 
   const handleSendRequest = async (selectedUser) => {
+    console.log("[home.jsx] handleSendRequest to", selectedUser?.userName);
     if (!consent.noTouch || !consent.respectful || !consent.safety) {
       Alert.alert("Error", "Please complete the consent form first.");
       setConsentVisible(true);
@@ -492,17 +553,22 @@ export default function HomeScreen() {
 
     try {
       const storedUser = await AsyncStorage.getItem("user");
-      if (!storedUser) {
+      const token = await AsyncStorage.getItem("token"); // ensure token present
+      if (!storedUser || !token) {
         Alert.alert("Error", "User not logged in.");
         router.replace("/login");
         return;
       }
 
-      const user = JSON.parse(storedUser);
+      const parsedUser = JSON.parse(storedUser);
       const API_URL =
         Platform.OS === "android"
           ? "http://10.0.2.2:5000"
           : "http://localhost:5000";
+      console.log("[home.jsx] sendRequest", {
+        receiver: selectedUser.userName,
+        API_URL,
+      });
 
       const response = await fetch(
         `${API_URL}/api/v1/trip-request/sendRequest`,
@@ -510,14 +576,14 @@ export default function HomeScreen() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${user.token}`,
+            Authorization: `Bearer ${token}`, // use token from storage
           },
           body: JSON.stringify({
-            senderId: user._id,
+            senderId: parsedUser._id,
             receiverId: selectedUser.userName,
             consent: consent,
             preferences: {
-              gender: user.genderPreference || "any",
+              gender: parsedUser.genderPreference || "any",
             },
             photoUrl: photoUrl,
           }),
@@ -525,6 +591,7 @@ export default function HomeScreen() {
       );
 
       const result = await response.json();
+      console.log("[home.jsx] sendRequest result", result?.status);
       if (result.status === "success") {
         Alert.alert("Success", "Request sent to " + selectedUser.userName);
         setSelectedUser(null);
@@ -532,11 +599,16 @@ export default function HomeScreen() {
         throw new Error(result.message || "Failed to send request");
       }
     } catch (error) {
+      console.error("[home.jsx] sendRequest error", error);
       Alert.alert("Error", error.message || "Failed to send request.");
     }
   };
 
   const handleCurrentLocation = () => {
+    console.log("[home.jsx] handleCurrentLocation", {
+      hasRef: !!mapRef.current,
+      currentLocation,
+    });
     if (currentLocation) {
       mapRef.current?.animateToRegion(currentLocation, 1000);
     }
@@ -565,6 +637,25 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* DEBUG badge */}
+      {DEBUG && (
+        <View style={styles.debugBadge}>
+          <Text style={styles.debugText}>
+            {`mapReady:${mapReady} | loc:${
+              currentLocation
+                ? `${currentLocation.latitude.toFixed(
+                    4
+                  )},${currentLocation.longitude.toFixed(4)}`
+                : "null"
+            } | markers:${startMarker ? "S" : "-"}${
+              endMarker ? "E" : "-"
+            } | routePts:${routeCoordinates.length} | users:${
+              dummyUsers.length
+            }`}
+          </Text>
+        </View>
+      )}
+
       <Modal transparent animationType="fade" visible={menuVisible}>
         <TouchableOpacity
           style={styles.menuOverlay}
@@ -589,7 +680,12 @@ export default function HomeScreen() {
       </Modal>
 
       {/* Map */}
-      <View style={styles.mapContainer}>
+      <View
+        style={styles.mapContainer}
+        onLayout={(e) =>
+          console.log("[home.jsx] map container layout", e.nativeEvent.layout)
+        }
+      >
         {currentLocation ? (
           <MapView
             ref={mapRef}
@@ -600,19 +696,35 @@ export default function HomeScreen() {
             showsUserLocation
             followsUserLocation
             region={currentLocation}
-            showsCompass={true}
-            showsScale={true}
-            showsTraffic={true}
-            showsBuildings={true}
-            showsIndoors={true}
+            showsCompass
+            showsScale
+            showsTraffic
+            showsBuildings
+            showsIndoors
             showsMyLocationButton={false}
-            showsPointsOfInterest={true}
-            zoomEnabled={true}
-            zoomControlEnabled={true}
-            rotateEnabled={true}
-            scrollEnabled={true}
-            pitchEnabled={true}
-            toolbarEnabled={true}
+            showsPointsOfInterest
+            zoomEnabled
+            zoomControlEnabled
+            rotateEnabled
+            scrollEnabled
+            pitchEnabled
+            toolbarEnabled
+            onMapReady={() => {
+              setMapReady(true);
+              console.log("[home.jsx] Map onMapReady", {
+                hasRef: !!mapRef.current,
+              });
+            }}
+            onMapLoaded={() => console.log("[home.jsx] Map onMapLoaded")}
+            onRegionChangeComplete={(r) =>
+              console.log("[home.jsx] Map regionChangeComplete", r)
+            }
+            onUserLocationChange={(e) =>
+              console.log(
+                "[home.jsx] onUserLocationChange",
+                e.nativeEvent?.coordinate
+              )
+            }
           >
             <Marker coordinate={currentLocation}>
               <Callout>
@@ -678,12 +790,9 @@ export default function HomeScreen() {
               />
             )}
 
-            {/* Dummy Users (Team's generated users) */}
+            {/* Dummy Users */}
             {dummyUsers.map((user) => (
-              <Marker
-                key={user.id}
-                coordinate={user.coordinate}
-              >
+              <Marker key={user.id} coordinate={user.coordinate}>
                 <View style={styles.userMarkerContainer}>
                   <MaterialCommunityIcons
                     name="account"
@@ -693,14 +802,16 @@ export default function HomeScreen() {
                 </View>
                 <Callout>
                   <View style={{ width: 140 }}>
-                    <ThemedText type="defaultSemiBold">User {user.id}</ThemedText>
+                    <ThemedText type="defaultSemiBold">
+                      User {user.id}
+                    </ThemedText>
                     <ThemedText type="caption">Potential companion</ThemedText>
                   </View>
                 </Callout>
               </Marker>
             ))}
 
-            {/* Hardcoded Users (Your existing users) */}
+            {/* Hardcoded Users */}
             {hardcodedUsers.map((user, index) => {
               const distance = calculateDistance(
                 currentLocation.latitude,
@@ -737,7 +848,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Current Location Button (Team's addition) */}
+      {/* Current Location Button */}
       <TouchableOpacity
         style={styles.currentLocationButton}
         onPress={handleCurrentLocation}
@@ -745,7 +856,7 @@ export default function HomeScreen() {
         <Ionicons name="locate" size={24} color={Colors.light.primary} />
       </TouchableOpacity>
 
-      {/* Find Companion Button or Cancel Button (Team's searching UI) */}
+      {/* Find Companion / Cancel */}
       {!isSearching ? (
         <ThemedButton
           title="Find a Companion"
@@ -789,7 +900,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* User Card Modal (Your existing feature) */}
+      {/* User Card Modal */}
       <Modal
         transparent
         animationType="slide"
@@ -874,7 +985,7 @@ export default function HomeScreen() {
         onSubmit={handlePreferencesSubmit}
       />
 
-      {/* Photo Upload Modal (Your existing feature) */}
+      {/* Photo Upload Modal */}
       <PhotoUploadModal
         visible={photoUploadVisible}
         onClose={() => setPhotoUploadVisible(false)}
@@ -899,6 +1010,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.1)",
   },
+  debugBadge: {
+    position: "absolute",
+    top: 56,
+    left: 12,
+    right: 12,
+    zIndex: 100,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  debugText: { color: "#fff", fontSize: 12 },
   mapContainer: {
     flex: 1,
   },

@@ -1,7 +1,6 @@
 # BeSide – IA & User Flows (v1)
 
 ```mermaid
-
 ---
 config:
   theme: dark
@@ -10,8 +9,8 @@ config:
   layout: dagre
   look: handDrawn
 ---
-flowchart LR
-    Launch["App Launch"] -- first run --> ONB["Onboarding"]
+flowchart TD
+    Launch(("App Launch")) -- first run --> ONB["Onboarding"]
     Launch -- not first run --> AUTHQ{"Logged in?"}
     ONB -- Get Started --> AUTHQ
     AUTHQ -- No --> AUTH["Login/Register"]
@@ -34,7 +33,7 @@ flowchart LR
     PREVIEW -- Send Request --> REQ["Request sent : pending"]
     PREVIEW -- View Profile --> OPROFILE["Companion profile"]
     PREVIEW -- Cancel --> HOME
-    REQ -- Accepted --> MATCH["Match created"]
+    REQ -- Accepted --> MATCH(("Match created"))
     REQ -- Declined/Timeout --> RESULTS
     OPROFILE -- Back --> RESULTS
     HOME --> PRO["Your Profile : Edit, Visibility, Delete, Logout"] & SAFETY["Safety sheet"]

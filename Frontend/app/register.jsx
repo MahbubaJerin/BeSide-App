@@ -44,35 +44,45 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (
-      !username || !email || !mobileNo || !password ||
-      !firstName || !lastName || !gender || !country || !countryCode
+      !username ||
+      !email ||
+      !mobileNo ||
+      !password ||
+      !firstName ||
+      !lastName ||
+      !gender ||
+      !country ||
+      !countryCode
     ) {
       alert("Please fill out all required fields");
       return;
     }
 
     try {
-      const registerResponse = await fetch("http://10.0.2.2:5000/api/v1/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userName: username,
-          email,
-          mobileNo,
-          password,
-          firstName,
-          lastName,
-          gender,
-          address: {
-            street,
-            city,
-            state,
-            postalCode,
-            country,
-            countryCode,
-          },
-        }),
-      });
+      const registerResponse = await fetch(
+        "http://10.0.2.2:5000/api/v1/auth/register",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userName: username,
+            email,
+            mobileNo,
+            password,
+            firstName,
+            lastName,
+            gender,
+            address: {
+              street,
+              city,
+              state,
+              postalCode,
+              country,
+              countryCode,
+            },
+          }),
+        }
+      );
 
       const registerData = await registerResponse.json();
 
@@ -81,16 +91,21 @@ export default function RegisterScreen() {
         return;
       }
 
-      const verifyResponse = await fetch("http://10.0.2.2:5000/api/v1/auth/send-verification-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
+      const verifyResponse = await fetch(
+        "http://10.0.2.2:5000/api/v1/auth/send-verification-email",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        }
+      );
 
       const verifyData = await verifyResponse.json();
 
       if (!verifyResponse.ok) {
-        alert(verifyData.message || "User registered but email verification failed");
+        alert(
+          verifyData.message || "User registered but email verification failed"
+        );
         return;
       }
 
@@ -119,15 +134,43 @@ export default function RegisterScreen() {
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView contentContainerStyle={[styles.scrollContainer, { backgroundColor: background }]}>
-        <ThemedText type="title" style={styles.title}>Register</ThemedText>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContainer,
+          { backgroundColor: background },
+        ]}
+      >
+        <ThemedText type="title" style={styles.title}>
+          Register
+        </ThemedText>
 
         {/* Input fields */}
-        <TextInput style={[styles.input, { borderColor: border, color: text }]} placeholder="Username" value={username} onChangeText={setUsername} autoCapitalize="none" placeholderTextColor={border} />
-        <TextInput style={[styles.input, { borderColor: border, color: text }]} placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={border} />
+        <TextInput
+          style={[styles.input, { borderColor: border, color: text }]}
+          placeholder="Username"
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
+          placeholderTextColor={border}
+        />
+        <TextInput
+          style={[styles.input, { borderColor: border, color: text }]}
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          placeholderTextColor={border}
+        />
 
         {/* Country Picker & Mobile Number */}
-        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 20,
+          }}
+        >
           <CountryPicker
             withFlag
             withCallingCode
@@ -147,7 +190,10 @@ export default function RegisterScreen() {
             }}
           />
           <TextInput
-            style={[styles.input, { flex: 1, marginLeft: 10, borderColor: border, color: text }]}
+            style={[
+              styles.input,
+              { flex: 1, marginLeft: 10, borderColor: border, color: text },
+            ]}
             placeholder="Mobile Number"
             value={mobileNo}
             onChangeText={setMobileNo}
@@ -157,13 +203,34 @@ export default function RegisterScreen() {
         </View>
 
         {/* Remaining fields */}
-        <TextInput style={[styles.input, { borderColor: border, color: text }]} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry placeholderTextColor={border} />
-        <TextInput style={[styles.input, { borderColor: border, color: text }]} placeholder="First Name" value={firstName} onChangeText={setFirstName} placeholderTextColor={border} />
-        <TextInput style={[styles.input, { borderColor: border, color: text }]} placeholder="Last Name" value={lastName} onChangeText={setLastName} placeholderTextColor={border} />
+        <TextInput
+          style={[styles.input, { borderColor: border, color: text }]}
+          placeholder="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          placeholderTextColor={border}
+        />
+        <TextInput
+          style={[styles.input, { borderColor: border, color: text }]}
+          placeholder="First Name"
+          value={firstName}
+          onChangeText={setFirstName}
+          placeholderTextColor={border}
+        />
+        <TextInput
+          style={[styles.input, { borderColor: border, color: text }]}
+          placeholder="Last Name"
+          value={lastName}
+          onChangeText={setLastName}
+          placeholderTextColor={border}
+        />
 
         {/* Gender Picker */}
         <View style={{ marginBottom: 20 }}>
-          <ThemedText type="default" style={{ marginBottom: 8, color: text }}>Gender</ThemedText>
+          <ThemedText type="default" style={{ marginBottom: 8, color: text }}>
+            Gender
+          </ThemedText>
           <RNPickerSelect
             onValueChange={setGender}
             value={gender}
@@ -198,69 +265,132 @@ export default function RegisterScreen() {
           />
         </View>
 
-        <TextInput style={[styles.input, { borderColor: border, color: text }]} placeholder="Street Address" value={street} onChangeText={setStreet} placeholderTextColor={border} />
-        <TextInput style={[styles.input, { borderColor: border, color: text }]} placeholder="City" value={city} onChangeText={setCity} placeholderTextColor={border} />
-        <TextInput style={[styles.input, { borderColor: border, color: text }]} placeholder="State" value={state} onChangeText={setState} placeholderTextColor={border} />
-        <TextInput style={[styles.input, { borderColor: border, color: text }]} placeholder="Postal Code" value={postalCode} onChangeText={setPostalCode} keyboardType="numeric" placeholderTextColor={border} />
+        <TextInput
+          style={[styles.input, { borderColor: border, color: text }]}
+          placeholder="Street Address"
+          value={street}
+          onChangeText={setStreet}
+          placeholderTextColor={border}
+        />
+        <TextInput
+          style={[styles.input, { borderColor: border, color: text }]}
+          placeholder="City"
+          value={city}
+          onChangeText={setCity}
+          placeholderTextColor={border}
+        />
+        <TextInput
+          style={[styles.input, { borderColor: border, color: text }]}
+          placeholder="State"
+          value={state}
+          onChangeText={setState}
+          placeholderTextColor={border}
+        />
+        <TextInput
+          style={[styles.input, { borderColor: border, color: text }]}
+          placeholder="Postal Code"
+          value={postalCode}
+          onChangeText={setPostalCode}
+          keyboardType="numeric"
+          placeholderTextColor={border}
+        />
 
         {/* Terms & Conditions checkbox */}
-        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
-          <TouchableOpacity onPress={() => setTermsAccepted(!termsAccepted)} style={{
-            height: 20,
-            width: 20,
-            borderRadius: 4,
-            borderWidth: 1,
-            borderColor: border,
+        <View
+          style={{
+            flexDirection: "row",
             alignItems: "center",
-            justifyContent: "center",
-            marginRight: 10,
-          }}>
+            marginBottom: 16,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => setTermsAccepted(!termsAccepted)}
+            style={{
+              height: 20,
+              width: 20,
+              borderRadius: 4,
+              borderWidth: 1,
+              borderColor: border,
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 10,
+            }}
+          >
             {termsAccepted && (
-              <View style={{
-                height: 10,
-                width: 10,
-                backgroundColor: border,
-              }} />
+              <View
+                style={{
+                  height: 10,
+                  width: 10,
+                  backgroundColor: border,
+                }}
+              />
             )}
           </TouchableOpacity>
           <Text style={{ color: text }}>
-            I agree to the{' '}
-            <Text style={{ color: border, textDecorationLine: 'underline' }} onPress={() => setShowTermsModal(true)}>
+            I agree to the{" "}
+            <Text
+              style={{ color: border, textDecorationLine: "underline" }}
+              onPress={() => setShowTermsModal(true)}
+            >
               Terms & Conditions
             </Text>
           </Text>
         </View>
 
         {/* Register Button (disabled if T&C not accepted) */}
-        <ThemedButton title="Register" onPress={handleRegister} disabled={!termsAccepted} />
+        <ThemedButton
+          title="Register"
+          onPress={handleRegister}
+          disabled={!termsAccepted}
+        />
 
         {/* Navigation to Login */}
         <View style={styles.footerTextContainer}>
           <ThemedText type="default">
             Already have an account?{" "}
-            <ThemedText type="link" onPress={() => router.push("/login")}>Login</ThemedText>
+            <ThemedText type="link" onPress={() => router.push("/login")}>
+              Login
+            </ThemedText>
           </ThemedText>
         </View>
 
         {/* Modal for Terms & Conditions */}
         {showTermsModal && (
-          <View style={{
-            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.6)",
-            justifyContent: "center", alignItems: "center",
-            padding: 20,
-          }}>
-            <View style={{
-              backgroundColor: "#fff", padding: 20,
-              borderRadius: 10, maxHeight: "80%",
-              width: "100%",
-            }}>
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.6)",
+              justifyContent: "center",
+              alignItems: "center",
+              padding: 20,
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: "#fff",
+                padding: 20,
+                borderRadius: 10,
+                maxHeight: "80%",
+                width: "100%",
+              }}
+            >
               <ScrollView>
                 <Text style={{ color: "#000", fontSize: 16 }}>
-                  These are the Terms and Conditions of using the BeSide app. By agreeing, you confirm that you understand the privacy practices and your responsibilities as a user. You must adhere to community guidelines and consent to our use of data per the Privacy Policy.
+                  These are the Terms and Conditions of using the BeSide app. By
+                  agreeing, you confirm that you understand the privacy
+                  practices and your responsibilities as a user. You must adhere
+                  to community guidelines and consent to our use of data per the
+                  Privacy Policy.
                 </Text>
               </ScrollView>
-              <ThemedButton title="Close" onPress={() => setShowTermsModal(false)} />
+              <ThemedButton
+                title="Close"
+                onPress={() => setShowTermsModal(false)}
+              />
             </View>
           </View>
         )}

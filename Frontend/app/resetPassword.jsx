@@ -32,14 +32,17 @@ export default function ResetPasswordScreen() {
         return;
       }
 
-      const response = await fetch("http://10.0.2.2:5000/api/v1/auth/reset-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // ✅ Send token in header
-        },
-        body: JSON.stringify({ email, password, confirmPassword }), // ✅ Include email
-      });
+      const response = await fetch(
+        "http://10.0.2.2:5000/api/v1/auth/reset-password",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`, // ✅ Send token in header
+          },
+          body: JSON.stringify({ email, password, confirmPassword }), // ✅ Include email
+        }
+      );
 
       const data = await response.json();
 

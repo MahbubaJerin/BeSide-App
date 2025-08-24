@@ -18,7 +18,12 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.Frontend"
+      "package": "com.anonymous.Frontend",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBNXoBkWJAzEOHWdQnA3oWK-Rkpt2jcA0A"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -40,6 +45,5 @@
     "experiments": {
       "typedRoutes": true
     }
-    
   }
 }

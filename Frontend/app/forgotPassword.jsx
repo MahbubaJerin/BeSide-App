@@ -22,16 +22,22 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://10.0.2.2:5000/api/v1/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
+      const response = await fetch(
+        "http://10.0.2.2:5000/api/v1/auth/send-otp",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        }
+      );
 
       const data = await response.json();
 
       if (response.ok) {
-        Alert.alert("OTP Sent", "A verification code has been sent to your email.");
+        Alert.alert(
+          "OTP Sent",
+          "A verification code has been sent to your email."
+        );
         router.push({
           pathname: "/verifyOTP",
           params: { email },
