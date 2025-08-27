@@ -27,6 +27,8 @@ import { BASE_URL } from "../config";
 const API_BASE_URL = `${BASE_URL}api/v1/user`; // ✅ correct usage
 const { width, height } = Dimensions.get("window");
 
+
+
 export default function ProfileScreen() {
   const [profile, setProfile] = useState(null);
   const [firstName, setFirstName] = useState("");

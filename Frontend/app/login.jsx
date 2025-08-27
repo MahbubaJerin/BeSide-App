@@ -14,8 +14,7 @@ import { ThemedButton } from "@/components/ThemedButton";
 import { BASE_URL } from "@/config"; // <- uses your config.js
 
 // Adjust if your backend path differs:
-const LOGIN_PATH = "api/v1/auth/login";
-
+const LOGIN_PATH = "/api/v1/auth/login";
 
 export default function LoginScreen() {
   const [username, setUsername] = useState(""); // email or username
