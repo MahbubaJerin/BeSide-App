@@ -83,4 +83,8 @@ const styles = StyleSheet.create({
     marginVertical: 6,
   },
   pressed: { opacity: 0.85 },
+<<<<<<< HEAD
 });
+=======
+});
+>>>>>>> fe1c5a4 (WIP: profile screen updates before switching branch)
