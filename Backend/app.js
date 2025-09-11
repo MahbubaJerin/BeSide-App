@@ -16,6 +16,7 @@ const authRoutes = require("./routes/authRoutes");
 const systemRoutes = require("./routes/systemRoutes");
 const userRoutes = require("./routes/userRoutes");
 const tripRoutes = require("./routes/tripRoutes");
+const sosRoutes = require("./routes/sosRoutes");
 
 const app = express();
 
@@ -64,6 +65,9 @@ app.use(`${baseUrl}/auth`, authRoutes);
 app.use(`${baseUrl}/user`, userRoutes);
 
 app.use(`${baseUrl}/trip`, tripRoutes);
+
+// NEW
+app.use(`${baseUrl}/sos`, sosRoutes);
 
 app.all("*", (req, res, next) => {
   next(new AppError(`Cannot find ${req.originalUrl} on this server!`, 404));

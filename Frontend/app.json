@@ -6,7 +6,9 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
-    "deepLinks": ["myapp://"],
+    "deepLinks": [
+      "myapp://"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -18,7 +20,12 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.Frontend"
+      "package": "com.anonymous.Frontend",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBGfvZy7uxsDpUNoUFE3CpSgAlGhtsZgoA"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -39,7 +46,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "391ab042-cc9f-400f-8f01-69573ddd6648"
+      }
     }
-    
   }
 }

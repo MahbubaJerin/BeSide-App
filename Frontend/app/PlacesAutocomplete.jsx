@@ -1,116 +1,155 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  Text,
-} from "react-native";
+import React, { useEffect, useState } from 'react';
+import { View, TextInput, FlatList, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import Constants from 'expo-constants';
 
-const PlacesAutocomplete = ({
-  placeholder,
-  value,
-  onChangeText,
-  onSelect,
-  style,
-}) => {
-  const [predictions, setPredictions] = useState([]);
-  const [showPredictions, setShowPredictions] = useState(false);
+const GOOGLE_MAPS_API_KEY = Constants.expoConfig.android.config.googleMaps.apiKey;
 
+function useDebounced(value, delay = 250) {
+  const [v, setV] = useState(value);
   useEffect(() => {
-    if (value.length > 2) {
-      fetchPredictions(value);
-    } else {
+    const t = setTimeout(() => setV(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return v;
+}
+
+/**
+ * Props:
+ * - placeholder?: string
+ * - onPlaceSelected: (sel: { name, address, latitude, longitude }) => void
+ * - style?: any
+ * - disabled?: boolean
+ */
+export default function PlacesAutocomplete({
+  placeholder = 'Search...',
+  onPlaceSelected,
+  style,
+  disabled = false,
+}) {
+  const [input, setInput] = useState('');
+  const debounced = useDebounced(input);
+  const [predictions, setPredictions] = useState([]);
+  const [sessionToken, setSessionToken] = useState(() =>
+    Math.random().toString(36).slice(2)
+  );
+
+  // Query autocomplete
+  useEffect(() => {
+    if (disabled) return;
+    if (!debounced || debounced.length < 2) {
       setPredictions([]);
+      return;
     }
-  }, [value]);
+    const url =
+      `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
+      `?input=${encodeURIComponent(debounced)}` +
+      `&key=${GOOGLE_MAPS_API_KEY}` +
+      `&sessiontoken=${sessionToken}`;
 
-  const fetchPredictions = async (text) => {
-    try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${text}&key=AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw`
-      );
-      const data = await response.json();
-      if (data.predictions) {
-        setPredictions(data.predictions);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(url);
+        const json = await res.json();
+        if (!cancelled) setPredictions(json?.predictions || []);
+      } catch {
+        if (!cancelled) setPredictions([]);
       }
-    } catch (error) {
-      console.error("Error fetching predictions:", error);
-    }
-  };
+    })();
 
-  const handleSelect = (place) => {
-    onSelect(place);
-    setShowPredictions(false);
+    return () => {
+      cancelled = true;
+    };
+  }, [debounced, sessionToken, disabled]);
+
+  // When user taps a prediction, fetch Place Details → lat/lng
+  const pickPrediction = async (prediction) => {
+    try {
+      const detailsUrl =
+        `https://maps.googleapis.com/maps/api/place/details/json` +
+        `?place_id=${prediction.place_id}` +
+        `&fields=geometry,name,formatted_address` +
+        `&key=${GOOGLE_MAPS_API_KEY}` +
+        `&sessiontoken=${sessionToken}`;
+      const res = await fetch(detailsUrl);
+      const json = await res.json();
+      const loc = json?.result?.geometry?.location;
+      if (loc && onPlaceSelected) {
+        onPlaceSelected({
+          name: json?.result?.name ?? prediction.description,
+          address: json?.result?.formatted_address ?? prediction.description,
+          latitude: loc.lat,
+          longitude: loc.lng,
+        });
+      }
+      // reset for next flow and reflect selection in the input
+      setSessionToken(Math.random().toString(36).slice(2));
+      setInput(prediction.description);
+      setPredictions([]);
+    } catch {
+      // ignore
+    }
   };
 
   return (
     <View style={[styles.container, style]}>
       <TextInput
-        style={styles.input}
         placeholder={placeholder}
-        value={value}
-        onChangeText={(text) => {
-          onChangeText(text);
-          setShowPredictions(true);
-        }}
-        onFocus={() => setShowPredictions(true)}
+        value={input}
+        onChangeText={setInput}
+        style={styles.input}
+        autoCorrect={false}
+        autoCapitalize="none"
+        returnKeyType="search"
+        editable={!disabled}
       />
-      {showPredictions && predictions.length > 0 && (
-        <FlatList
-          style={styles.predictionsList}
-          data={predictions}
-          keyExtractor={(item) => item.place_id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.predictionItem}
-              onPress={() => handleSelect(item)}
-            >
-              <Text style={styles.predictionText}>{item.description}</Text>
-            </TouchableOpacity>
-          )}
-        />
+      {predictions.length > 0 && !disabled && (
+        <View style={styles.dropdown} pointerEvents="box-none">
+          <FlatList
+            keyboardShouldPersistTaps="handled"
+            data={predictions}
+            keyExtractor={(item) => item.place_id}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.item} onPress={() => pickPrediction(item)}>
+                <Text numberOfLines={2}>{item.description}</Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
       )}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  container: {
-    position: "relative",
-    zIndex: 1,
-  },
+  container: { position: 'relative' },
   input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    borderRadius: 6,
-    backgroundColor: "#fff",
+    backgroundColor: 'white',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-  predictionsList: {
-    position: "absolute",
-    top: "100%",
+  dropdown: {
+    position: 'absolute',
+    top: 48,
     left: 0,
     right: 0,
-    backgroundColor: "#fff",
-    borderRadius: 6,
-    maxHeight: 200,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    zIndex: 2,
+    maxHeight: 260,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    overflow: 'hidden',
+    zIndex: 9999,
+    elevation: 9999,
   },
-  predictionItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  predictionText: {
-    fontSize: 14,
+  item: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#eee',
   },
 });
-
-export default PlacesAutocomplete;

@@ -199,3 +199,70 @@ exports.testCloudinaryConnection = catchAsync(async (req, res, next) => {
 
 // Upload middleware for profile photo (should be declared after all imports)
 exports.uploadProfilePhoto = uploadSingle;
+
+
+// Emergency Contact Management (NEW)
+
+exports.getEmergencyContacts = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select('emergencyContacts');
+  res.status(200).json({ status: 'success', data: user.emergencyContacts });
+});
+
+exports.addEmergencyContact = catchAsync(async (req, res, next) => {
+  const { name, phone, relation, email, isPrimary } = req.body;
+
+  if (!name || !phone) {
+    return next(new AppError("Name and phone are required", 400));
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user) return next(new AppError("User not found", 404));
+
+  if (isPrimary) {
+    user.emergencyContacts.forEach(contact => { contact.isPrimary = false; });
+  }
+
+  user.emergencyContacts.push({ name, phone, relation, email, isPrimary: !!isPrimary });
+  await user.save();
+
+  res.status(201).json({ status: 'success', message: 'Contact added', data: user.emergencyContacts });
+});
+
+exports.updateEmergencyContact = catchAsync(async (req, res, next) => {
+  const { contactId } = req.params;
+  const { name, phone, relation, email, isPrimary } = req.body;
+
+  const user = await User.findById(req.user._id);
+  if (!user) return next(new AppError("User not found", 404));
+
+  const contact = user.emergencyContacts.id(contactId);
+  if (!contact) return next(new AppError("Contact not found", 404));
+
+  if (isPrimary) {
+    user.emergencyContacts.forEach(c => { c.isPrimary = false; });
+    contact.isPrimary = true;
+  }
+  if (name !== undefined) contact.name = name;
+  if (phone !== undefined) contact.phone = phone;
+  if (relation !== undefined) contact.relation = relation;
+  if (email !== undefined) contact.email = email;
+  if (isPrimary === false) contact.isPrimary = false;
+
+  await user.save();
+  res.status(200).json({ status: 'success', message: 'Contact updated', data: user.emergencyContacts });
+});
+
+exports.deleteEmergencyContact = catchAsync(async (req, res, next) => {
+  const { contactId } = req.params;
+
+  const user = await User.findById(req.user._id);
+  if (!user) return next(new AppError("User not found", 404));
+
+  const contact = user.emergencyContacts.id(contactId);
+  if (!contact) return next(new AppError("Contact not found", 404));
+
+  contact.deleteOne();
+  await user.save();
+
+  res.status(204).json({ status: 'success', message: 'Contact deleted' });
+});

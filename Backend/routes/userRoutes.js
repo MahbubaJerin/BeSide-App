@@ -26,4 +26,10 @@ router.post("/consent", userController.updateConsent);
 router.put("/profile-settings", userController.updateProfileSettings);
 router.patch("/availability", userController.updateAvailability);
 
+// Emergency Contact Routes (NEW) 
+router.get("/emergency-contacts", userController.getEmergencyContacts);
+router.post("/emergency-contacts", userController.addEmergencyContact);
+router.put("/emergency-contacts/:contactId", userController.updateEmergencyContact);
+router.delete("/emergency-contacts/:contactId", userController.deleteEmergencyContact);
+
 module.exports = router;
