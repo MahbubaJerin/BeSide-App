@@ -82,25 +82,22 @@ const createSendToken = (user, statusCode, res) => {
 /**
  * Login user and send JWT token
  */
+// authcontroller.js
 exports.login = catchAsync(async (req, res, next) => {
   const { userName, password } = req.body;
 
-  // Check if username and password exist
   if (!userName || !password) {
     return next(new AppError("Please provide username and password", 400));
   }
 
-  // Find user by username
   const user = await User.findOne({ userName }).select("+password");
-
-  // Check if user exists and password is correct
   if (!user || !(await bcrypt.compare(password, user.password))) {
     return next(new AppError("Incorrect username or password", 401));
   }
 
-  // Send token
   createSendToken(user, 200, res);
 });
+
 
 /**
  * Get current user info
@@ -140,7 +137,8 @@ exports.verifyUser = catchAsync(async (req, res, next) => {
     lastName,
     number,
     expiry,
-    dob,
+    dateOfBirth,
+    dob: dobAlias,
   } = req.body;
 
   if (
@@ -161,6 +159,31 @@ exports.verifyUser = catchAsync(async (req, res, next) => {
     dob: dob.trim(),
     [`${verificationIdType}.number`]: number.trim(),
     [`${verificationIdType}.expiryDate`]: expiry.trim()
+  };
+const dob = (dateOfBirth ?? dobAlias ?? "").trim();
+
+   const parseDob = (value) => {
+    if (!value) return null;
+    // accept YYYY-MM-DD or ISO date
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(`${value}T00:00:00.000Z`);
+    }
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const isFuture = (d) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dd = new Date(d);
+    dd.setHours(0, 0, 0, 0);
+    return dd.getTime() > today.getTime();
+  };
+  const calcAge = (d) => {
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+    return age;
   };
 
   const record = await dummyVerification.findOne(query);
@@ -191,6 +214,7 @@ exports.verifyUser = catchAsync(async (req, res, next) => {
  * Register a new user
  * @route POST /api/v1/auth/register
  */
+
 exports.registerUser = catchAsync(async (req, res, next) => {
   const {
     userName,
@@ -201,52 +225,69 @@ exports.registerUser = catchAsync(async (req, res, next) => {
     lastName,
     gender,
     address = {},
+    dateOfBirth,     
+    dob: dobAlias,   
   } = req.body;
 
-  // Check required fields
-  if (
-    !userName ||
-    !email ||
-    !mobileNo ||
-    !password ||
-    !firstName ||
-    !lastName
-  ) {
+  if (!userName || !email || !mobileNo || !password || !firstName || !lastName) {
     return next(new AppError("Please provide all required fields", 400));
   }
-
-  // Check if country and country code are provided
   if (!address.country || !address.countryCode) {
     return next(new AppError("Country and country code are required", 400));
   }
 
-  // Check if user already exists
-  const userExists = await User.findOne({
-    $or: [{ email }, { userName }],
-  });
-
+  const userExists = await User.findOne({ $or: [{ email }, { userName }] });
   if (userExists) {
+    return next(new AppError("User with this email or username already exists", 400));
+  }
+
+
+  const passwordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  if (!passwordRegex.test(password)) {
     return next(
-      new AppError("User with this email or username already exists", 400)
+      new AppError(
+        "Password must be at least 8 characters and include uppercase, lowercase, number, and special character",
+        400
+      )
     );
   }
 
-    // Password validation
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!passwordRegex.test(password)) {
-      return next(
-        new AppError(
-          "Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character",
-          400
-        )
-      );
+  const parseDob = (value) => {
+    if (!value) return null;
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(`${value}T00:00:00.000Z`); 
     }
-  
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const isFuture = (d) => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dd = new Date(d); dd.setHours(0,0,0,0);
+    return dd.getTime() > today.getTime();
+  };
+  const calcAge = (d) => {
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+    return age;
+  };
 
-  // Hash password
+  const dobInput = dateOfBirth ?? dobAlias;
+  const dobDate = parseDob(dobInput);
+  if (!dobDate) {
+    return next(new AppError("Invalid dateOfBirth format. Use YYYY-MM-DD or ISO date.", 400));
+  }
+  if (isFuture(dobDate)) {
+    return next(new AppError("Date of birth cannot be in the future", 400));
+  }
+  if (calcAge(dobDate) < 13) {
+    return next(new AppError("You must be at least 13 years old to register", 400));
+  }
+
   const hashedPassword = await passwordHash(password);
 
-  // Prepare user data including location information
   const userData = {
     userName,
     email,
@@ -255,6 +296,7 @@ exports.registerUser = catchAsync(async (req, res, next) => {
     firstName,
     lastName,
     gender,
+    dateOfBirth: dobDate, // <-- persist DOB here
     address: {
       street: address.street || "",
       city: address.city || "",
@@ -265,13 +307,9 @@ exports.registerUser = catchAsync(async (req, res, next) => {
     },
   };
 
-  // Generate unique user ID
   userData.userId = generateUserId(userData);
 
-  // Create user
   const user = await User.create(userData);
-
-  // Generate and send JWT token
   createSendToken(user, 201, res);
 });
 

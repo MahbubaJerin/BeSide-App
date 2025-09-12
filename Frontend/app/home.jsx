@@ -34,15 +34,17 @@ import CompanionPreferencesModal from "./CompanionPreferencesModal";
 import PhotoUploadModal from "./PhotoUploadModal";
 import { BASE_URL } from "../config";
 import Constants from "expo-constants";
+import { Linking } from "react-native";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
-// Import the placeholder image
+// Placeholder image
 const placeholderImage = require("../assets/images/placeholder2.jpg");
 
-// (Keep your customMapStyle removed/unused for now)
+// Logo assets (replace with your actual paths)
+const logoBlue = require("../assets/images/BeSide.png");
+const logoDark = require("../assets/images/lightlogo.png");
 
-// Hardcoded users for testing (from your code)
 const hardcodedUsers = [
   {
     userName: "AliceSmith",
@@ -77,14 +79,110 @@ const hardcodedUsers = [
 export default function HomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState(null);
-
-  // Menu modal
+  // Menu
   const [menuVisible, setMenuVisible] = useState(false);
-
-  // Availability (now shown and controlled inside the hamburger menu)
   const [availability, setAvailability] = useState(true);
   const [savingAvailability, setSavingAvailability] = useState(false);
+  const [availabilityModalVisible, setAvailabilityModalVisible] = useState(false);
 
+  // Emergency contacts
+  const [contactsVisible, setContactsVisible] = useState(false);
+  const [emergencyContacts, setEmergencyContacts] = useState([]);
+  const loadEmergencyContacts = useCallback(async () => {
+    try {
+      console.log("[Contacts] Loading from AsyncStorage...");
+      const raw = await AsyncStorage.getItem("emergencyContacts");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        console.log("[Contacts] Loaded:", parsed);
+        setEmergencyContacts(Array.isArray(parsed) ? parsed : []);
+      } else {
+        console.log("[Contacts] No saved contacts, seeding example...");
+        const seed = [
+          { name: "Primary Guardian", phone: "+61XXXXXXXXX" },
+          { name: "Trusted Friend", phone: "+61YYYYYYYYY" },
+        ];
+        await AsyncStorage.setItem("emergencyContacts", JSON.stringify(seed));
+        setEmergencyContacts(seed);
+      }
+    } catch (e) {
+      console.log("[Contacts] Error loading contacts:", e);
+      Alert.alert("Could not load emergency contacts.");
+    }
+  }, []);
+
+  const openContacts = async () => {
+    console.log("[UI] Opening Contacts modal");
+    await loadEmergencyContacts();
+    setContactsVisible(true);
+  };
+
+  const handleSOS = async () => {
+    console.log("[SOS] Triggered");
+    Alert.alert(
+      "Confirm SOS",
+      "This will attempt to call emergency services (000) and notify your trusted contacts.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Proceed",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              console.log("[SOS] Calling 000 via Linking");
+              await Linking.openURL("tel:000");
+            } catch (e) {
+              console.log("[SOS] Dial error:", e);
+              Alert.alert("Unable to open dialer.");
+            }
+
+            // 🚨 Broadcast SMS to emergency contacts
+            for (const c of emergencyContacts) {
+              await smsContact(c.phone);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+
+  const smsContact = async (phone) => {
+    try {
+      console.log("[SMS] Preparing SMS to", phone);
+      let locText = "";
+      if (currentLocation) {
+        const { latitude, longitude } = currentLocation;
+        const gmaps = `https://maps.google.com/?q=${latitude},${longitude}`;
+        locText = ` I'm at ${gmaps}`;
+      }
+      const body = encodeURIComponent(
+        `Emergency: I need help. Please call or reach me.${locText}`
+      );
+      const url = Platform.select({
+        ios: `sms:${phone}&body=${body}`,
+        android: `sms:${phone}?body=${body}`,
+        default: `sms:${phone}`,
+      });
+      await Linking.openURL(url);
+      console.log("[SMS] Launched SMS intent:", url);
+    } catch (e) {
+      console.log("[SMS] Error launching SMS:", e);
+      Alert.alert("Unable to open SMS app.");
+    }
+  };
+
+  const callContact = async (phone) => {
+    try {
+      console.log("[Call] Calling", phone);
+      await Linking.openURL(`tel:${phone}`);
+    } catch (e) {
+      console.log("[Call] Error:", e);
+      Alert.alert("Unable to open dialer.");
+    }
+  };
+
+  // Map & matching
   const [modalVisible, setModalVisible] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [photoUploadVisible, setPhotoUploadVisible] = useState(false);
@@ -125,14 +223,9 @@ export default function HomeScreen() {
         }
 
         const { status } = await Location.requestForegroundPermissionsAsync();
+        console.log("[Location] Permission status:", status);
         if (status !== "granted") {
-          console.log(
-            "Location permission denied. Using fallback location."
-          );
-          Alert.alert(
-            "Location Permission Denied",
-            "Please enable location services in your device settings."
-          );
+          console.log("[Location] Using fallback location");
           setCurrentLocation({
             latitude: -33.8688,
             longitude: 151.2093,
@@ -141,15 +234,16 @@ export default function HomeScreen() {
           });
           return;
         }
+        
 
         try {
-          console.log("Attempting to fetch current location...");
+          console.log("[Location] Fetching initial position…");
           const location = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Highest,
             timeout: 10000,
             mayShowUserSettingsDialog: true,
           });
-          console.log("Initial location fetched:", location.coords);
+          console.log("[Location] Initial:", location.coords);
           setCurrentLocation({
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
@@ -164,7 +258,7 @@ export default function HomeScreen() {
               distanceInterval: 10,
             },
             (newLocation) => {
-              console.log("Location updated:", newLocation.coords);
+              console.log("[Location] Update:", newLocation.coords);
               setCurrentLocation({
                 latitude: newLocation.coords.latitude,
                 longitude: newLocation.coords.longitude,
@@ -174,7 +268,7 @@ export default function HomeScreen() {
             }
           );
         } catch (error) {
-          console.error("Error fetching location:", error.message);
+          console.error("[Location] Error:", error?.message);
           Alert.alert("Location Error", "Using fallback location.");
           setCurrentLocation({
             latitude: -33.8688,
@@ -192,6 +286,7 @@ export default function HomeScreen() {
       };
     }, [router])
   );
+  
 
   useEffect(() => {
     if (isSearching) {
@@ -214,12 +309,21 @@ export default function HomeScreen() {
     }
   }, [isSearching, loadingAnimation]);
 
+  // Cleanup searchTimer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimer) clearInterval(searchTimer);
+    };
+  }, [searchTimer]);
+
   const handleLogout = async () => {
+    console.log("[Auth] Logging out");
     await AsyncStorage.removeItem("user");
     router.replace("/login");
   };
 
   const handleFindCompanion = async () => {
+    console.log("[Trip] Create trip request");
     const storedUser = await AsyncStorage.getItem("user");
     const tokenFromStorage = await AsyncStorage.getItem("token");
     if (!storedUser) {
@@ -236,7 +340,7 @@ export default function HomeScreen() {
     }
 
     if (!parsed.isVerified) {
-      setModalVisible(true); // not verified popup
+      setModalVisible(true);
       return;
     }
 
@@ -264,14 +368,15 @@ export default function HomeScreen() {
 
       const result = await response.json();
       if (response.ok && result?.data?.tripRequest?.tripReqId) {
+        console.log("[Trip] Created:", result.data.tripRequest.tripReqId);
         setCurrentTripRequestId(result.data.tripRequest.tripReqId);
         setConsentVisible(true); // proceed to Consent
       } else {
         throw new Error(result?.message || `Trip request failed (${response.status})`);
       }
     } catch (error) {
+      console.log("[Trip] Error:", error?.message);
       Alert.alert("Error", error.message || "Failed to create trip request.");
-      return;
     }
   };
 
@@ -306,7 +411,7 @@ export default function HomeScreen() {
       });
 
       const response = await fetch(
-        `${BASE_URL}api/v1/trip/upload-photo/${currentTripRequestId}`,
+        `${BASE_URL}/api/v1/trip/upload-photo/${currentTripRequestId}`,
         {
           method: "POST",
           body: formData,
@@ -316,6 +421,7 @@ export default function HomeScreen() {
 
       const result = await response.json();
       if (response.ok && result?.status === "success") {
+        console.log("[Photo] Uploaded:", result.data.photoUrl);
         setPhotoUrl(result.data.photoUrl);
         setPhotoUploadVisible(false);
         setPreferencesVisible(true); // next: Preferences
@@ -323,21 +429,53 @@ export default function HomeScreen() {
         throw new Error(result?.message || "Failed to upload photo");
       }
     } catch (error) {
+      console.log("[Photo] Error:", error?.message);
       Alert.alert("Error", error.message || "Failed to upload photo.");
     }
+    if (response.ok && result?.status === "success") {
+      console.log("[Photo] Uploaded:", result.data.photoUrl);
+      setPhotoUrl(result.data.photoUrl);
+      setPhotoUploadVisible(false);
+      setPreferencesVisible(true);
+
+      // Trigger backend verification flag
+      try {
+        const verifyRes = await fetch(`${BASE_URL}/api/v1/user/verify`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ isVerified: true }),
+        });
+        const verifyData = await verifyRes.json();
+        if (verifyRes.ok) {
+          console.log("[Verify] User marked as verified:", verifyData?.data?.user?.userName);
+          // Also sync AsyncStorage so profile & home both see the update
+          await AsyncStorage.setItem("user", JSON.stringify(verifyData.data.user));
+          setUser(verifyData.data.user);
+        } else {
+          console.warn("[Verify] Failed to set verified:", verifyData?.message);
+        }
+      } catch (err) {
+        console.error("[Verify] Error:", err.message);
+      }
+    }
+
   };
 
   const handlePreferencesSubmit = async (preferences) => {
     try {
+      console.log("[Prefs] Start:", preferences.startCoordinates, "Dest:", preferences.destinationCoordinates);
       setStartMarker(preferences.startCoordinates);
       setEndMarker(preferences.destinationCoordinates);
 
-      // Draw 500m radius circle and generate dummy users
+      // radius & dummy users
       setShowRadius(true);
       const users = generateDummyUsers(
         preferences.startCoordinates,
         500,
-        3 + Math.floor(Math.random() * 3) // 3-5 users
+        3 + Math.floor(Math.random() * 3)
       );
       setDummyUsers(users);
       setNearbyUsers(users.length);
@@ -359,6 +497,7 @@ export default function HomeScreen() {
             coord.longitude >= -180 &&
             coord.longitude <= 180
         );
+        console.log("[Directions] Points:", validCoords.length);
         setRouteCoordinates(validCoords);
         if (validCoords.length > 0) {
           mapRef.current?.fitToCoordinates(validCoords, {
@@ -368,18 +507,17 @@ export default function HomeScreen() {
         }
         startSearching();
       } else {
+        console.log("[Directions] No route found. Status:", data?.status);
         Alert.alert("Error", "No route found between the selected locations");
       }
     } catch (error) {
+      console.log("[Directions] Fetch error:", error);
       Alert.alert("Error", "Failed to fetch route information");
     }
   };
 
-  const decodePolyline = (encoded) => {
-    return polyline
-      .decode(encoded)
-      .map(([latitude, longitude]) => ({ latitude, longitude }));
-  };
+  const decodePolyline = (encoded) =>
+    polyline.decode(encoded).map(([latitude, longitude]) => ({ latitude, longitude }));
 
   const generateDummyUsers = (
     centerLocation,
@@ -409,17 +547,21 @@ export default function HomeScreen() {
   };
 
   const startSearching = () => {
+    console.log("[Search] Start polling nearby users…");
     setIsSearching(true);
     const timer = setInterval(() => {
-      const newCount = Math.floor(Math.random() * 3) + 2; // 2-4 users
+      const newCount = Math.floor(Math.random() * 3) + 2; // 2–4 users
       setNearbyUsers(newCount);
       if (startMarker)
         setDummyUsers(generateDummyUsers(startMarker, 500, newCount));
+      if (startMarker) setDummyUsers(generateDummyUsers(startMarker, 500, newCount));
+      console.log("[Search] Nearby users ~", newCount);
     }, 3000);
     setSearchTimer(timer);
   };
 
   const cancelSearch = () => {
+    console.log("[Search] Cancel");
     if (searchTimer) clearInterval(searchTimer);
     setIsSearching(false);
     setNearbyUsers(0);
@@ -436,14 +578,14 @@ export default function HomeScreen() {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
 
-  const handleSendRequest = async (selectedUser) => {
+  const handleSendRequest = async (selUser) => {
     if (!consent.noTouch || !consent.respectful || !consent.safety) {
       Alert.alert("Error", "Please complete the consent form first.");
       setConsentVisible(true);
@@ -471,45 +613,82 @@ export default function HomeScreen() {
         return;
       }
 
-      const response = await fetch(
-        `${BASE_URL}api/v1/trip-request/sendRequest`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            senderId: parsed._id,
-            receiverId: selectedUser.userName,
-            consent: consent,
-            preferences: { gender: parsed.genderPreference || "any" },
-            photoUrl: photoUrl,
-          }),
-        }
-      );
+      const response = await fetch(`${BASE_URL}/api/v1/trip-request/sendRequest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          senderId: parsed._id,
+          receiverId: selUser.userName,
+          consent,
+          preferences: { gender: parsed.genderPreference || "any" },
+          photoUrl,
+        }),
+      });
 
       const result = await response.json();
       if (response.ok && result?.status === "success") {
-        Alert.alert("Success", "Request sent to " + selectedUser.userName);
+        console.log("[Request] Sent to", selUser.userName);
+        Alert.alert("Success", "Request sent to " + selUser.userName);
         setSelectedUser(null);
       } else {
         throw new Error(result?.message || "Failed to send request");
       }
     } catch (error) {
+      console.log("[Request] Error:", error?.message);
       Alert.alert("Error", error.message || "Failed to send request.");
     }
   };
+ 
+  const handleCurrentLocation = async () => {
+    try {
+      console.log("[Map] Fetching current location…");
 
-  const handleCurrentLocation = () => {
-    if (currentLocation) mapRef.current?.animateToRegion(currentLocation, 1000);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        console.log("[Map] Permission denied → fallback");
+        Alert.alert(
+          "Location Permission Denied",
+          "Please enable location services in your device settings."
+        );
+        setCurrentLocation({
+          latitude: -33.8688,
+          longitude: 151.2093,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+        return;
+      }
+
+      // Fetch latest location
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
+        timeout: 10000,
+        mayShowUserSettingsDialog: true,
+      });
+
+      console.log("[Map] Button pressed → GPS:", location.coords);
+
+      const newRegion = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+
+      setCurrentLocation(newRegion);
+      mapRef.current?.animateToRegion(newRegion, 1000);
+
+    } catch (error) {
+      console.error("[Map] Error fetching location:", error?.message);
+      Alert.alert("Location Error", "Could not fetch current GPS position.");
+    }
   };
-
-  // Availability PATCH + cache update (called from switch in menu)
-  const onToggleAvailability = async (value) => {
+  
+  const onToggleAvailability = async (newValue) => {
     const prev = availability;
-    setAvailability(value); // optimistic
+    setAvailability(newValue);
     setSavingAvailability(true);
+
     try {
       const [token, rawUser] = await Promise.all([
         AsyncStorage.getItem("token"),
@@ -519,25 +698,28 @@ export default function HomeScreen() {
       const bearer = token || parsedUser?.token;
       if (!bearer) throw new Error("Not authenticated");
 
-      const res = await fetch(`${BASE_URL}api/v1/user/availability`, {
+      const res = await fetch(`${BASE_URL}/api/v1/user/availability`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${bearer}`,
         },
-        body: JSON.stringify({ availability: value }),
+        body: JSON.stringify({ availability: newValue }),
       });
 
       const data = await res.json();
-      if (!res.ok || data?.status !== "success")
+      if (!res.ok || data?.status !== "success") {
         throw new Error(data?.message || `HTTP ${res.status}`);
+      }
 
       if (data?.data?.user) {
         await AsyncStorage.setItem("user", JSON.stringify(data.data.user));
         setUser(data.data.user);
+        console.log("[Availability] Updated:", newValue);
       }
     } catch (err) {
-      setAvailability(prev); // revert
+      console.log("[Availability] Error:", err?.message);
+      setAvailability(prev); // rollback on failure
       Alert.alert("Couldn’t update status", err?.message ?? "Please try again.");
     } finally {
       setSavingAvailability(false);
@@ -548,53 +730,62 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <ThemedText type="title">BeSide</ThemedText>
+        <View style={styles.logoContainer}>
+          <Image
+            source={Colors === "light" ? logoBlue : logoDark}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+
+        <View style={styles.titleContainer}>
+          <ThemedText type="title" style={styles.titleText}>
+            BeSide
+          </ThemedText>
+        </View>
+
+        {/* Location button */}
         <TouchableOpacity
-          onPress={() => setMenuVisible(true)}
+          style={[styles.topIconButton, { backgroundColor: "#fceaea" }]}
+          onPress={handleCurrentLocation}
           accessibilityRole="button"
-          accessibilityLabel="Open menu"
+          accessibilityLabel="Show Current Location"
         >
-          <ThemedText type="defaultSemiBold">☰</ThemedText>
+          <Ionicons name="location" size={30} color="#e63946" />
+        </TouchableOpacity>
+
+        {/* Availability toggle */}
+        <TouchableOpacity
+          style={[
+            styles.topIconButton,
+            { backgroundColor: availability ? "#e6f8f1" : "#f0f0f0" },
+          ]}
+          onPress={() => setAvailabilityModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Toggle availability"
+        >
+          <Ionicons
+            name={availability ? "toggle" : "toggle-outline"}
+            size={34}
+            color={availability ? "#2ca07b" : "#999"}
+          />
         </TouchableOpacity>
       </View>
 
       {/* Map */}
       <View style={styles.mapContainer}>
-        {/*
-          We render the MapView as soon as the screen loads with a visible initialRegion
-          so tiles draw immediately; your currentLocation continues to drive `region` once ready.
-        */}
-        <MapView
-          ref={mapRef}
-          provider={PROVIDER_GOOGLE}
-          // customMapStyle={customMapStyle}
-          mapType="standard"
-          style={styles.map}
-          showsUserLocation
-          followsUserLocation
-          initialRegion={{
-            latitude: -37.8136,       // Melbourne CBD fallback for instant tiles
-            longitude: 144.9631,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
-          region={currentLocation || undefined}
-          showsCompass={true}
-          showsScale={true}
-          showsTraffic={true}
-          showsBuildings={true}
-          showsIndoors={true}
-          showsMyLocationButton={false}
-          showsPointsOfInterest={true}
-          zoomEnabled={true}
-          zoomControlEnabled={true}
-          rotateEnabled={true}
-          scrollEnabled={true}
-          pitchEnabled={true}
-          toolbarEnabled={true}
-        >
-          {/* Current user marker */}
-          {currentLocation && (
+        {currentLocation ? (
+          <MapView
+            ref={mapRef}
+            provider={PROVIDER_GOOGLE}
+            mapType="standard"
+            style={styles.map}
+            showsUserLocation
+            followsUserLocation
+            region={currentLocation}
+            mapPadding={{ top: 60, right: 20, bottom: 140, left: 0 }}
+          >
+            {/* Current location marker */}
             <Marker coordinate={currentLocation}>
               <Callout>
                 <View style={{ width: 140 }}>
@@ -603,475 +794,372 @@ export default function HomeScreen() {
                 </View>
               </Callout>
             </Marker>
-          )}
 
-          {/* Start Point Marker */}
-          {startMarker && (
-            <Marker coordinate={startMarker}>
-              <View style={styles.markerContainer}>
-                <MaterialCommunityIcons
-                  name="map-marker"
-                  size={30}
-                  color="#4CAF50"
-                />
-              </View>
-              <Callout>
-                <View style={{ width: 140 }}>
-                  <ThemedText type="defaultSemiBold">Start Point</ThemedText>
-                </View>
-              </Callout>
-            </Marker>
-          )}
+            {/* Start / End markers */}
+            {startMarker && (
+              <Marker coordinate={startMarker}>
+                <MaterialCommunityIcons name="map-marker" size={30} color="#4CAF50" />
+              </Marker>
+            )}
+            {endMarker && (
+              <Marker coordinate={endMarker}>
+                <MaterialCommunityIcons name="map-marker" size={30} color="#F44336" />
+              </Marker>
+            )}
 
-          {/* End Point Marker */}
-          {endMarker && (
-            <Marker coordinate={endMarker}>
-              <View style={styles.markerContainer}>
-                <MaterialCommunityIcons
-                  name="map-marker"
-                  size={30}
-                  color="#F44336"
-                />
-              </View>
-              <Callout>
-                <View style={{ width: 140 }}>
-                  <ThemedText type="defaultSemiBold">Destination</ThemedText>
-                </View>
-              </Callout>
-            </Marker>
-          )}
+            {/* Route polyline */}
+            {routeCoordinates.length > 0 && (
+              <Polyline coordinates={routeCoordinates} strokeWidth={4} strokeColor="#2196F3" />
+            )}
 
-          {/* Route Line */}
-          {routeCoordinates.length > 0 && (
-            <Polyline
-              coordinates={routeCoordinates}
-              strokeWidth={4}
-              strokeColor="#2196F3"
-            />
-          )}
+            {/* Radius */}
+            {showRadius && startMarker && (
+              <Circle
+                center={startMarker}
+                radius={500}
+                strokeColor="rgba(158, 158, 255, 0.5)"
+                fillColor="rgba(158, 158, 255, 0.2)"
+              />
+            )}
 
-          {/* 500m Radius Circle */}
-          {showRadius && startMarker && (
-            <Circle
-              center={startMarker}
-              radius={500}
-              strokeColor="rgba(158, 158, 255, 0.5)"
-              fillColor="rgba(158, 158, 255, 0.2)"
-            />
-          )}
+            {/* Dummy users */}
+            {dummyUsers.map((u) => (
+              <Marker key={u.id} coordinate={u.coordinate}>
+                <MaterialCommunityIcons name="account" size={24} color="#FF5722" />
+              </Marker>
+            ))}
 
-          {/* Dummy Users */}
-          {dummyUsers.map((user) => (
-            <Marker key={user.id} coordinate={user.coordinate}>
-              <View style={styles.userMarkerContainer}>
-                <MaterialCommunityIcons
-                  name="account"
-                  size={24}
-                  color="#FF5722"
-                />
-              </View>
-              <Callout>
-                <View style={{ width: 140 }}>
-                  <ThemedText type="defaultSemiBold">User {user.id}</ThemedText>
-                  <ThemedText type="caption">
-                    Potential companion
-                  </ThemedText>
-                </View>
-              </Callout>
-            </Marker>
-          ))}
-
-          {/* Hardcoded Users */}
-          {currentLocation &&
-            hardcodedUsers.map((user, index) => {
+            {/* Hardcoded users */}
+            {hardcodedUsers.map((u, index) => {
               const distance = calculateDistance(
                 currentLocation.latitude,
                 currentLocation.longitude,
-                user.latitude,
-                user.longitude
+                u.latitude,
+                u.longitude
               );
               return (
                 <Marker
                   key={index}
-                  coordinate={{
-                    latitude: user.latitude,
-                    longitude: user.longitude,
-                  }}
-                  title={user.userName}
-                  onPress={() => setSelectedUser({ ...user, distance })}
-                >
-                  <Callout>
-                    <View style={{ width: 140 }}>
-                      <ThemedText type="defaultSemiBold">
-                        {user.userName}
-                      </ThemedText>
-                      <ThemedText type="caption">
-                        Gender: {user.genderPreference}
-                      </ThemedText>
-                    </View>
-                  </Callout>
-                </Marker>
+                  coordinate={{ latitude: u.latitude, longitude: u.longitude }}
+                  title={u.userName}
+                  onPress={() => setSelectedUser({ ...u, distance })}
+                />
               );
             })}
-        </MapView>
+          </MapView>
+        ) : (
+          <ThemedText type="default">Loading map...</ThemedText>
+        )}
       </View>
-
-      {/* Current Location Button */}
-      <TouchableOpacity
-        style={styles.currentLocationButton}
-        onPress={handleCurrentLocation}
-      >
-        <Ionicons name="locate" size={24} color={Colors.light.primary} />
-      </TouchableOpacity>
-
-      {/* Find Companion / Cancel */}
-      {!isSearching ? (
-        <ThemedButton
-          title="Find a Companion"
-          onPress={handleFindCompanion}
-          style={styles.actionButton}
-        />
-      ) : (
+      {/* Searching Overlay */}
+      {isSearching && (
         <View style={styles.searchingContainer}>
-          <View style={styles.loadingBarContainer}>
-            <Animated.View
-              style={[
-                styles.loadingBar,
-                {
-                  transform: [
-                    {
-                      translateX: loadingAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ["-100%", "100%"],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            />
-          </View>
-          <View style={styles.searchingInfo}>
-            <ThemedText type="defaultSemiBold">
-              Searching for companions...
-            </ThemedText>
-            <ThemedText type="caption">
-              {nearbyUsers > 0
-                ? `${nearbyUsers} people found in your area`
-                : "Looking for people nearby..."}
-            </ThemedText>
-          </View>
+          <ActivityIndicator size="large" color={Colors.light.primary} />
+          <ThemedText type="defaultSemiBold" style={{ marginTop: 10 }}>
+            Searching for companions...
+          </ThemedText>
+          <ThemedText type="caption">
+            {nearbyUsers > 0
+              ? `${nearbyUsers} people found nearby`
+              : "Looking for people in your area..."}
+          </ThemedText>
           <ThemedButton
             title="Cancel Search"
             onPress={cancelSearch}
-            style={styles.cancelButton}
+            style={[styles.cardButton, { backgroundColor: Colors.light.danger, marginTop: 10 }]}
           />
         </View>
       )}
 
-      {/* User Card Modal */}
-      <Modal
-        transparent
-        animationType="slide"
-        visible={!!selectedUser}
-        onRequestClose={() => setSelectedUser(null)}
-      >
-        <View style={styles.popupOverlay}>
-          <View style={styles.userCard}>
-            {selectedUser?.userImage && (
-              <Image
-                source={selectedUser.userImage}
-                style={styles.userImage}
-                resizeMode="cover"
-              />
-            )}
-            <ThemedText type="subtitle">{selectedUser?.userName}</ThemedText>
-            <ThemedText type="caption">
-              Distance: {(selectedUser?.distance || 0).toFixed(2)} km
-            </ThemedText>
-            <ThemedText type="caption">
-              Gender Preference: {selectedUser?.genderPreference}
-            </ThemedText>
-            <ThemedButton
-              title="View Profile"
-              onPress={() =>
-                router.push(`/profile?userName=${selectedUser?.userName}`)
-              }
-              style={styles.cardButton}
-            />
-            <ThemedButton
-              title="Send Request"
-              onPress={() => handleSendRequest(selectedUser)}
-              style={styles.cardButton}
-            />
-            <ThemedButton
-              title="Close"
-              onPress={() => setSelectedUser(null)}
-              style={[styles.cardButton, { backgroundColor: Colors.light.danger }]}
-            />
-          </View>
+      {/* Find Companion button */}
+      <View style={styles.findCompanionContainer}>
+
+        <TouchableOpacity
+          style={styles.findButton}
+          onPress={handleFindCompanion}
+          accessibilityLabel="Find a Companion"
+          accessibilityRole="button"
+        >
+          <MaterialCommunityIcons name="account-search-outline" size={32} color="#fff" />
+          <ThemedText style={styles.navLabel}>Find</ThemedText>
+        </TouchableOpacity>
+      </View>
+
+      {/* Bottom Navigation Bar */}
+      <View style={styles.navContainer}>
+        <View style={styles.navBar}>
+          {/* Profile */}
+          <TouchableOpacity style={styles.navButton} onPress={() => router.push("/profile")}>
+            <Ionicons name="person-circle-outline" size={24} color="#fff" />
+            <ThemedText style={styles.navLabel}>Profile</ThemedText>
+          </TouchableOpacity>
+
+          {/* Contacts */}
+          <TouchableOpacity style={styles.navButton} onPress={openContacts}>
+            <Ionicons name="people-outline" size={24} color="#fff" />
+            <ThemedText style={styles.navLabel}>Contacts</ThemedText>
+          </TouchableOpacity>
+
+          {/* SOS */}
+          <TouchableOpacity style={styles.navButton} onPress={handleSOS}>
+            <Ionicons name="alert" size={24} color="#fff" />
+            <ThemedText style={styles.navLabel}>SOS</ThemedText>
+          </TouchableOpacity>
+
+          {/* More */}
+          <TouchableOpacity style={styles.navButton} onPress={() => setMenuVisible(true)}>
+            <Ionicons name="ellipsis-horizontal" size={24} color="#fff" />
+            <ThemedText style={styles.navLabel}>More</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Emergency Contacts Modal */}
+      <Modal transparent animationType="fade" visible={contactsVisible} onRequestClose={() => setContactsVisible(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setContactsVisible(false)} />
+        <View style={styles.contactsBox}>
+          <ThemedText type="defaultSemiBold">Emergency Contacts</ThemedText>
+          {emergencyContacts.length === 0 ? (
+            <ThemedText type="caption">No contacts saved.</ThemedText>
+          ) : (
+            emergencyContacts.map((c, i) => (
+              <View key={i} style={styles.contactRow}>
+                <ThemedText type="defaultSemiBold">{c.name}</ThemedText>
+                <ThemedText type="caption">{c.phone}</ThemedText>
+                <TouchableOpacity onPress={() => callContact(c.phone)}>
+                  <Ionicons name="call" size={18} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => smsContact(c.phone)}>
+                  <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
         </View>
       </Modal>
-
-      {/* Not Verified Popup */}
-      <Modal
-        transparent
-        animationType="slide"
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.popupOverlay}>
-          <View style={styles.popupBox}>
-            <ThemedText type="subtitle">Oops!</ThemedText>
-            <ThemedText type="default">You're not verified yet.</ThemedText>
-            <ThemedButton
-              title="Verify Now"
-              type="primary"
-              onPress={() => {
-                setModalVisible(false);
-                router.push("/verify");
-              }}
-              style={styles.verifyButton}
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* HAMBURGER MENU (with Availability inside) */}
-      <Modal
-        transparent
-        animationType="fade"
-        visible={menuVisible}
-        onRequestClose={() => setMenuVisible(false)}
-      >
-        {/* Backdrop clicks close the menu */}
-        <Pressable
-          style={styles.menuOverlay}
-          onPress={() => setMenuVisible(false)}
-        />
-
-        {/* Menu panel (touches do NOT close automatically) */}
-        <View style={styles.menuBox}>
-          {/* Close button row */}
-          <View style={styles.menuHeader}>
-            <ThemedText type="defaultSemiBold">Menu</ThemedText>
-            <TouchableOpacity
-              onPress={() => setMenuVisible(false)}
-              style={styles.closeBtn}
-            >
-              <ThemedText type="defaultSemiBold">✕</ThemedText>
-            </TouchableOpacity>
-          </View>
-
-          {/* Availability inside menu */}
-          <View style={styles.availabilityRow}>
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">Availability</ThemedText>
+      {/* Selected User Card Modal */}
+      {selectedUser && (
+        <Modal transparent animationType="slide" visible={!!selectedUser} onRequestClose={() => setSelectedUser(null)}>
+          <View style={styles.popupOverlay}>
+            <View style={styles.userCard}>
+              {selectedUser?.userImage && (
+                <Image source={selectedUser.userImage} style={styles.userImage} resizeMode="cover" />
+              )}
+              <ThemedText type="subtitle">{selectedUser?.userName}</ThemedText>
               <ThemedText type="caption">
-                {availability
-                  ? "You’re visible for matching."
-                  : "You’re hidden from matching."}
+                Distance: {(selectedUser?.distance || 0).toFixed(2)} km
               </ThemedText>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Switch
-                value={availability}
-                onValueChange={onToggleAvailability}
-                disabled={savingAvailability}
+              <ThemedText type="caption">
+                Gender Preference: {selectedUser?.genderPreference}
+              </ThemedText>
+              <ThemedButton
+                title="Send Request"
+                onPress={() => handleSendRequest(selectedUser)}
+                style={styles.cardButton}
               />
-              {savingAvailability ? <ActivityIndicator /> : null}
+              <ThemedButton
+                title="Close"
+                onPress={() => setSelectedUser(null)}
+                style={[styles.cardButton, { backgroundColor: Colors.light.danger }]}
+              />
             </View>
           </View>
+        </Modal>
+      )}
 
-          {/* Links */}
-          <TouchableOpacity
-            onPress={() => {
-              setMenuVisible(false);
-              router.push("/profile");
-            }}
-          >
-            <ThemedText type="defaultSemiBold" style={styles.menuItem}>
-              Account
-            </ThemedText>
+      {/* More Menu Modal */}
+      <Modal transparent animationType="fade" visible={menuVisible} onRequestClose={() => setMenuVisible(false)}>
+
+        <Pressable style={styles.menuOverlay} onPress={() => setMenuVisible(false)} />
+        <View style={styles.menuBox}>
+          <TouchableOpacity onPress={() => { setMenuVisible(false); router.push("/settings"); }}>
+            <ThemedText style={styles.menuItem}>⚙️ Settings</ThemedText>
           </TouchableOpacity>
-
-          {/* NEW: Emergency Contacts */}
-          <TouchableOpacity
-            onPress={() => {
-              setMenuVisible(false);
-              router.push("/emergencyContacts");
-            }}
-          >
-            <ThemedText type="defaultSemiBold" style={styles.menuItem}>
-              📇 Emergency Contacts
-            </ThemedText>
+          <TouchableOpacity onPress={() => { setMenuVisible(false); router.push("/help"); }}>
+            <ThemedText style={styles.menuItem}>❓ Help</ThemedText>
           </TouchableOpacity>
-
-          {/* NEW: SOS */}
-          <TouchableOpacity
-            onPress={() => {
-              setMenuVisible(false);
-              router.push("/sos");
-            }}
-          >
-            <ThemedText type="defaultSemiBold" style={styles.menuItem}>
-              🚨 SOS
-            </ThemedText>
+          <TouchableOpacity onPress={() => { setMenuVisible(false); handleLogout(); }}>
+            <ThemedText style={[styles.menuItem, { color: Colors.light.danger }]}>🚪 Logout</ThemedText>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              setMenuVisible(false);
-              router.push("/settings");
-            }}
-          >
-            <ThemedText type="defaultSemiBold" style={styles.menuItem}>
-              Settings
-            </ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              setMenuVisible(false);
-              router.push("/help");
-            }}
-          >
-            <ThemedText type="defaultSemiBold" style={styles.menuItem}>
-              Help
-            </ThemedText>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              setMenuVisible(false);
-              handleLogout();
-            }}
-          >
-            <ThemedText
-              type="defaultSemiBold"
-              style={[styles.menuItem, { color: Colors.light.danger }]}
-            >
-              Logout
-            </ThemedText>
-          </TouchableOpacity>
-
-          {/* Test route button (optional) */}
-          
         </View>
       </Modal>
 
-      {/* Consent / Prefs / Photo */}
+      {/* Consent / Preferences / Photo Upload */}
       <ConsentModal
         visible={consentVisible}
         onClose={() => setConsentVisible(false)}
         consent={consent}
         setConsent={setConsent}
-        onSubmit={() => {
-          setConsentVisible(false);
-          setPhotoUploadVisible(true); // Consent → Selfie
-        }}
+        onSubmit={() => { setConsentVisible(false); setPhotoUploadVisible(true); }}
       />
-
       <CompanionPreferencesModal
         visible={preferencesVisible}
         onClose={() => setPreferencesVisible(false)}
         onSubmit={handlePreferencesSubmit}
       />
-
       <PhotoUploadModal
         visible={photoUploadVisible}
         onClose={() => setPhotoUploadVisible(false)}
-        onSubmit={handlePhotoSubmit} // Selfie → Preferences after upload
+        onSubmit={handlePhotoSubmit}
       />
+
+      {/* Availability Confirmation Modal */}
+      <Modal
+        transparent
+        animationType="fade"
+        visible={availabilityModalVisible}
+        onRequestClose={() => setAvailabilityModalVisible(false)}
+      >
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupBox}>
+            <ThemedText type="subtitle">Availability</ThemedText>
+            <ThemedText type="default" style={{ textAlign: "center", marginVertical: 12 }}>
+              Do you want to {availability ? "become unavailable" : "become available"}?
+            </ThemedText>
+            <ThemedButton
+              title={availability ? "Set Unavailable" : "Set Available"}
+              onPress={() => {
+                setAvailabilityModalVisible(false);
+                onToggleAvailability(!availability);
+              }}
+              style={{ marginTop: 10, width: "80%" }}
+            />
+            <ThemedButton
+              title="Cancel"
+              type="secondary"
+              onPress={() => setAvailabilityModalVisible(false)}
+              style={{ marginTop: 10, width: "80%" }}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
-}
+
+
+};
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.light.background },
+  container: { flex: 1 },
+
+  // --- Top Bar ---
   topBar: {
+    backgroundColor: Colors.light.surface,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: Colors.light.surface,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.1)",
-  },
-  mapContainer: { flex: 1 },
-  // Key change: absolute fill guarantees map visibility
-  map: StyleSheet.absoluteFillObject,
-
-  currentLocationButton: {
-    position: "absolute",
-    bottom: 100,
-    right: 20,
-    backgroundColor: Colors.light.surface,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  actionButton: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
-    right: 20,
-    width: "auto",
-  },
-
-  // --- Menu Modal
-  menuOverlay: {
-    position: "absolute",
-    inset: 0,
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
-  menuBox: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: 240,
-    backgroundColor: Colors.light.surface,
-    padding: 12,
-    borderLeftWidth: 1,
-    borderLeftColor: "rgba(0,0,0,0.1)",
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-  },
-  menuHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-    paddingBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.08)",
+    justifyContent: "space-between",
   },
-  closeBtn: { padding: 6, paddingHorizontal: 10, borderRadius: 8 },
-
-  availabilityRow: {
-    flexDirection: "row",
+  logoContainer: {
+    padding: 4,
+    marginLeft: 5,
+  },
+  logo: {
+    width: 50,
+    height: 70,
+  },
+  titleContainer: {
+    flex: 1,
     alignItems: "center",
-    gap: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-    backgroundColor: "rgba(0,0,0,0.03)",
-    marginBottom: 6,
+  },
+  titleText: {
+    fontSize: 22,
+    fontWeight: "bold",
+  },
+  topIconButton: {
+    padding: 10,
+    borderRadius: 12,
+    marginHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 44,
+    minHeight: 44,
+  },
+  searchingContainer: {
+    position: "absolute",
+    bottom: 180,
+    left: 20,
+    right: 20,
+    backgroundColor: Colors.light.surface,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
   },
 
-  menuItem: { paddingVertical: 10, paddingHorizontal: 6 },
+  // --- Map ---
+  mapContainer: { flex: 1 },
+  map: { width: "100%", height: "100%" },
+  markerContainer: { alignItems: "center", justifyContent: "center" },
+  userMarkerContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 5,
+    borderWidth: 2,
+    borderColor: "#FF5722",
+  },
 
-  // Other modals
+  // --- Find Companion Button ---
+  findCompanionContainer: {
+    position: "absolute",
+    bottom: 90,
+    alignSelf: "center",
+    zIndex: 10,
+  },
+  findButton: {
+    width: 100,
+    height: 60,
+    borderRadius: 90,
+    backgroundColor: "#2ca07b",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 6, // Android shadow
+    shadowColor: "#000", // iOS shadow
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.5,
+    borderWidth: 3,
+    borderColor: "#fff",
+    flexDirection: "row",
+    gap: 6,
+  },
+
+  // --- Bottom Navigation ---
+  navContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+  },
+  navBar: {
+    flexDirection: "row",
+    backgroundColor: Colors.light.primary,
+    width: "100%",
+    height: 70,
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingHorizontal: 0,
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.info,
+  },
+  navButton: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navLabel: {
+    color: "#fff",
+    fontSize: 12,
+    marginTop: 4,
+  },
+
+  // --- Modals & Popups ---
   popupOverlay: {
     flex: 1,
     justifyContent: "center",
@@ -1095,42 +1183,59 @@ const styles = StyleSheet.create({
   },
   cardButton: { marginTop: 10, width: "80%" },
   userImage: { width: 80, height: 80, borderRadius: 40, marginBottom: 10 },
-  markerContainer: { alignItems: "center", justifyContent: "center" },
-  userMarkerContainer: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 5,
-    borderWidth: 2,
-    borderColor: "#FF5722",
+
+  // --- Emergency Contacts ---
+  menuOverlay: {
+    position: "absolute",
+    inset: 0,
+    backgroundColor: "rgba(0,0,0,0.35)",
+  },
+  contactsBox: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 280,
+    backgroundColor: Colors.light.surface,
+    padding: 16,
+    borderLeftWidth: 1,
+    borderLeftColor: "rgba(0,0,0,0.1)",
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+  },
+  contactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.06)",
+  },
+  smallBtn: {
+    backgroundColor: Colors.light.primary,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginLeft: 6,
   },
 
-  searchingContainer: {
+  // --- More Menu ---
+  menuBox: {
     position: "absolute",
-    bottom: 20,
-    left: 20,
+    bottom: 80,
     right: 20,
     backgroundColor: Colors.light.surface,
-    borderRadius: 10,
-    padding: 15,
+    borderRadius: 12,
+    padding: 12,
+    elevation: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
   },
-  loadingBarContainer: {
-    height: 4,
-    backgroundColor: "#E0E0E0",
-    borderRadius: 2,
-    overflow: "hidden",
-    marginBottom: 10,
+  menuItem: {
+    paddingVertical: 10,
+    fontSize: 16,
   },
-  loadingBar: {
-    height: "100%",
-    width: "100%",
-    backgroundColor: "#4CAF50",
-    borderRadius: 2,
-  },
-  searchingInfo: { alignItems: "center", marginBottom: 10 },
-  cancelButton: { backgroundColor: Colors.light.danger },
 });

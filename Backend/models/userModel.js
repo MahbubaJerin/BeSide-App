@@ -55,6 +55,24 @@ const UserSchema = new Schema(
         message: (props) => `${props.value} is not a valid phone number!`,
       },
     },
+dateOfBirth: {
+  type: Date,
+  required: [true, "Date of birth is required"],
+  validate: {
+    validator: function (v) {
+      if (!v) return false;
+      const today = new Date(); today.setHours(0,0,0,0);
+      if (v > today) return false;
+      let age = today.getFullYear() - v.getFullYear();
+      const m = today.getMonth() - v.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < v.getDate())) age--;
+      return age >= 13;
+    },
+    message: "Invalid DOB: must not be in the future and must be at least 13 years old",
+  },
+},
+
+
     // Location information
     address: {
       street: { type: String },

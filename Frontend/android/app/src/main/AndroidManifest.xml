@@ -6,9 +6,12 @@
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
   <uses-permission android:name="android.permission.CAMERA" />
   <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
   <uses-permission android:name="android.permission.VIBRATE" />
+  <!-- Remove WRITE_EXTERNAL_STORAGE unless scoped storage is implemented -->
+  <!-- <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/> -->
 
   <!-- Optional: allow opening https links -->
   <queries>
@@ -28,12 +31,12 @@
       android:theme="@style/AppTheme"
       android:supportsRtl="true">
 
-    <!-- ✅ Google Maps SDK key (must be inside <application>) -->
+    <!-- ✅ Google Maps SDK key (replace YOUR_GOOGLE_MAPS_API_KEY with actual key) -->
     <meta-data
         android:name="com.google.android.geo.API_KEY"
-        android:value="AIzaSyBGfvZy7uxsDpUNoUFE3CpSgAlGhtsZgoA" />
+        android:value="YOUR_GOOGLE_MAPS_API_KEY" />
 
-    <!-- Expo Updates (leave as is if present) -->
+    <!-- Expo Updates -->
     <meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>

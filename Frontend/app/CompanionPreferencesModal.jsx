@@ -85,7 +85,7 @@ export default function CompanionPreferencesModal({
     });
   };
 
-  const valid = (c) =>
+    const valid = (c) =>
     c &&
     typeof c.latitude === "number" &&
     typeof c.longitude === "number" &&

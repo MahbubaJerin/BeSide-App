@@ -5,8 +5,9 @@ const catchAsync = require("../utils/catchAsync");
 const generateUserId = require("../utils/generateUserId");
 
 // Update user profile and generate userId if missing
+// usercontroller.js
 exports.updateUserProfile = catchAsync(async (req, res, next) => {
-  const { userName, email, mobileNo, firstName, lastName, bio, address } = req.body;
+  const { userName, email, mobileNo, firstName, lastName, bio, address, dateOfBirth } = req.body;
 
   const updateData = {};
   if (userName) updateData.userName = userName;
@@ -16,13 +17,37 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
   if (lastName) updateData.lastName = lastName;
   if (bio !== undefined) updateData.bio = bio;
 
+  // --- DOB update (optional)
+  if (dateOfBirth !== undefined) {
+    const parseYmdOrIso = (v) => {
+      if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return new Date(`${v}T00:00:00.000Z`);
+      const d = new Date(v);
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+    const dobParsed = parseYmdOrIso(dateOfBirth);
+    if (!dobParsed) return next(new AppError("Invalid dateOfBirth format", 400));
+
+    const today = new Date(); today.setHours(0,0,0,0);
+    if (dobParsed > today) return next(new AppError("Date of birth cannot be in the future", 400));
+
+    const age = (now, d) => {
+      let a = now.getFullYear() - d.getFullYear();
+      const m = now.getMonth() - d.getMonth();
+      if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
+      return a;
+    };
+    if (age(new Date(), dobParsed) < 13) return next(new AppError("You must be at least 13 years old", 400));
+
+    updateData.dateOfBirth = dobParsed;
+    console.log("[User][updateUserProfile] DOB set:", dobParsed.toISOString());
+  }
+
   const user = await User.findById(req.user._id);
   if (!user) return next(new AppError("User not found", 404));
 
   if (address) {
     updateData.address = { ...user.address, ...address };
     const { countryCode, state, postalCode } = updateData.address;
-
     if (!user.userId && countryCode && state && postalCode) {
       updateData.userId = generateUserId({ address: updateData.address });
       console.log("Generated userId:", updateData.userId);
@@ -31,13 +56,13 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
 
   const updatedUser = await User.findByIdAndUpdate(req.user._id, updateData, {
     new: true,
-    runValidators: true
+    runValidators: true,
   }).select("-password -__v");
 
   res.status(200).json({
     status: "success",
     message: "Profile updated successfully",
-    data: { user: updatedUser }
+    data: { user: updatedUser },
   });
 });
 
@@ -140,6 +165,29 @@ exports.deleteUserProfile = catchAsync(async (req, res, next) => {
   await User.findByIdAndDelete(req.user._id);
   res.status(204).json({ status: "success", message: "User deleted successfully", data: null });
 });
+
+exports.updateVerificationStatus = catchAsync(async (req, res, next) => {
+  const { isVerified } = req.body;
+
+  if (typeof isVerified !== "boolean") {
+    return next(new AppError("isVerified must be true or false", 400));
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { isVerified },
+    { new: true, runValidators: true }
+  ).select("-password -__v");
+
+  if (!user) return next(new AppError("User not found", 404));
+
+  res.status(200).json({
+    status: "success",
+    message: "Verification status updated",
+    data: { user },
+  });
+});
+
 
 // Update user consent
 exports.updateConsent = catchAsync(async (req, res, next) => {

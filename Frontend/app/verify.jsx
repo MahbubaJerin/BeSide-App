@@ -27,7 +27,7 @@ export default function VerifyScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const background = useThemeColor({}, "background");
-  const border = useThemeColor({}, "primary");
+  const border = useThemeColor({}, "surface");
   const text = useThemeColor({}, "text");
 
   useEffect(() => {

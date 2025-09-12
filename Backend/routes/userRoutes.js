@@ -25,6 +25,7 @@ router.post(
 router.post("/consent", userController.updateConsent);
 router.put("/profile-settings", userController.updateProfileSettings);
 router.patch("/availability", userController.updateAvailability);
+router.patch("/verify", userController.updateVerificationStatus);
 
 // Emergency Contact Routes (NEW) 
 router.get("/emergency-contacts", userController.getEmergencyContacts);

@@ -1,32 +1,35 @@
 import React from "react";
 import { StyleSheet, View, Dimensions } from "react-native";
-import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { PROVIDER_GOOGLE, Marker } from "react-native-maps";
 
-const MapComponent = () => {
+const MapComponent = ({ geo, currentLocation, customMapStyle }) => {
   return (
     <View style={styles.container}>
       <MapView
         provider={PROVIDER_GOOGLE}
+        customMapStyle={customMapStyle}
         style={styles.map}
+        showsUserLocation
         initialRegion={{
-          latitude: 37.78825,
-          longitude: -122.4324,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
+          latitude: geo?.lat || currentLocation?.latitude || 37.78825,
+          longitude: geo?.lng || currentLocation?.longitude || -122.4324,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
         }}
-        apiKey="AIzaSyBGfvZy7uxsDpUNoUFE3CpSgAlGhtsZgoA" // Replace with your actual API key
-      />
+      >
+        {geo && (
+          <Marker
+            coordinate={{ latitude: geo.lat, longitude: geo.lng }}
+            title="Selected location"
+          />
+        )}
+      </MapView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  container: { flex: 1, backgroundColor: "#fff" },
   map: {
     width: Dimensions.get("window").width,
     height: Dimensions.get("window").height,

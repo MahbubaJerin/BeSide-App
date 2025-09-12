@@ -40,16 +40,16 @@ export default function PlacesAutocomplete({
       setPredictions([]);
       return;
     }
-    const url =
-      `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
-      `?input=${encodeURIComponent(debounced)}` +
-      `&key=${GOOGLE_MAPS_API_KEY}` +
-      `&sessiontoken=${sessionToken}`;
 
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(url);
+        const res = await fetch(
+          `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
+          `?input=${encodeURIComponent(debounced)}` +
+          `&key=${GOOGLE_MAPS_API_KEY}` +
+          `&sessiontoken=${sessionToken}`
+        );
         const json = await res.json();
         if (!cancelled) setPredictions(json?.predictions || []);
       } catch {
@@ -61,6 +61,7 @@ export default function PlacesAutocomplete({
       cancelled = true;
     };
   }, [debounced, sessionToken, disabled]);
+
 
   // When user taps a prediction, fetch Place Details → lat/lng
   const pickPrediction = async (prediction) => {
