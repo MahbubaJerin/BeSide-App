@@ -11,14 +11,22 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Frontend"
+      "bundleIdentifier": "com.anonymous.Frontend",
+      "config": {
+        "googleMapsApiKey": "AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw"
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.Frontend"
+      "package": "com.anonymous.Frontend",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -34,6 +42,18 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
         }
       ]
     ],

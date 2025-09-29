@@ -14,7 +14,7 @@ const MapComponent = () => {
           latitudeDelta: 0.0922,
           longitudeDelta: 0.0421,
         }}
-        apiKey="AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw" // Replace with your actual API key
+        apiKey="AIzaSyBpelv4QoqO2lHJQVGj46W0xk-sVDv6KQk" // Replace with your actual API key
       />
     </View>
   );

@@ -1,5 +1,6 @@
 const app = require("./app");
 const connectDb = require("./config/db");
+const locationService = require("./services/locationService");
 const dotenv = require("dotenv");
 dotenv.config();
 
@@ -12,7 +13,10 @@ process.on("uncaughtException", (err) => {
 const port = process.env.PORT || 3000;
 
 const server = app.listen(port, async () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`🚀 [SERVER] Server running on port ${port}`);
+  console.log(`📍 [SERVER] Location tracking system initialized`);
+  console.log(`🔍 [SERVER] Companion search APIs ready`);
+  console.log(`🧹 [SERVER] Location cleanup service started`);
 
   await connectDb();
 });

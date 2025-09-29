@@ -29,7 +29,7 @@ const PlacesAutocomplete = ({
   const fetchPredictions = async (text) => {
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${text}&key=AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw`
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${text}&key=AIzaSyBpelv4QoqO2lHJQVGj46W0xk-sVDv6KQk`
       );
       const data = await response.json();
       if (data.predictions) {

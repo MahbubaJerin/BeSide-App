@@ -78,11 +78,12 @@ export default function CompanionPreferencesModal({
 
   const fetchPlaceDetails = async (placeId, isStart) => {
     try {
+      console.log("Fetching details for place ID:", placeId);
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry&key=AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw`
+        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry&key=AIzaSyBpelv4QoqO2lHJQVGj46W0xk-sVDv6KQk`
       );
       const data = await response.json();
-
+      console.log("Place details response:", data);
       if (
         data.result &&
         data.result.geometry &&

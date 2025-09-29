@@ -103,12 +103,10 @@ const UserSchema = new Schema(
       default: false,
     },
 
-
     emailVerified: {
       type: Boolean,
       default: false,
     },
-
 
     consentGiven: {
       type: Boolean,
@@ -145,6 +143,18 @@ const UserSchema = new Schema(
       type: String,
       maxlength: 500,
     },
+
+    // Emergency Contacts (NEW) 
+    emergencyContacts: [
+      {
+        name: { type: String, required: true, trim: true },
+        phone: { type: String, required: true, trim: true },
+        relation: { type: String, trim: true },
+        email: { type: String, trim: true },
+        isPrimary: { type: Boolean, default: false },
+        // keep default _id for subdocs so .id(contactId) works
+      },
+    ],
   },
   {
     timestamps: true,
