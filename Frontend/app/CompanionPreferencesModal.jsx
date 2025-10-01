@@ -1,249 +1,148 @@
-import React, { useState, useEffect } from "react";
-import { Picker } from "@react-native-picker/picker";
-import {
-  View,
-  Text,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Switch,
-  Platform,
-  Alert,
-} from "react-native";
-import { ThemedButton } from "@/components/ThemedButton";
-import PlacesAutocomplete from "@/app/PlacesAutocomplete";
+// Frontend/app/CompanionPreferencesModal.jsx
+import React, { useEffect, useState } from "react";
+import { View, Text, Modal, StyleSheet, Switch, Alert } from "react-native";
 import * as Location from "expo-location";
+import { Picker } from "@react-native-picker/picker";
+import PlacesAutocomplete from "./PlacesAutocomplete";
+import { ThemedButton } from "@/components/ThemedButton";
 
 export default function CompanionPreferencesModal({
   visible,
   onClose,
   onSubmit,
+  prefillStart = null,
+  prefillDestination = null,
 }) {
-  const [chatPreference, setChatPreference] = useState(false);
-  const [startLocation, setStartLocation] = useState("");
-  const [destination, setDestination] = useState("");
-  const [startCoordinates, setStartCoordinates] = useState(null);
+  const [talk, setTalk] = useState(false);
+  const [useCurrent, setUseCurrent] = useState(false);
+
+  const [startText, setStartText] = useState("");
+  const [destText, setDestText] = useState("");
+
+  const [startCoordinates, setStartCoordinates] = useState(null);        // { latitude, longitude }
   const [destinationCoordinates, setDestinationCoordinates] = useState(null);
-  const [transport, setTransport] = useState({ mode: "walking" });
-  const [genderPreference, setGenderPreference] = useState("any");
-  const [isLoading, setIsLoading] = useState(false);
-  const [useCurrentLocation, setUseCurrentLocation] = useState(false);
 
+  const [transport, setTransport] = useState("walk");
+  const [gender, setGender] = useState("any");
+  const [loading, setLoading] = useState(false);
+
+  // Prefills coming from map/home.jsx (optional)
   useEffect(() => {
-    if (useCurrentLocation) {
-      (async () => {
-        setIsLoading(true);
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert("Permission Denied", "Location permission is required.");
-          setIsLoading(false);
-          setUseCurrentLocation(false);
-          return;
-        }
-        const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
-        setStartCoordinates({ latitude: location.coords.latitude, longitude: location.coords.longitude });
-        setStartLocation("Current Location");
-        setIsLoading(false);
-      })();
-    } else {
-      setStartCoordinates(null);
-      setStartLocation("");
+    if (prefillStart) {
+      setUseCurrent(false);
+      setStartCoordinates(prefillStart);
+      setStartText(`Pinned (${prefillStart.latitude.toFixed(5)}, ${prefillStart.longitude.toFixed(5)})`);
     }
-  }, [useCurrentLocation]);
+  }, [prefillStart]);
+  useEffect(() => {
+    if (prefillDestination) {
+      setDestinationCoordinates(prefillDestination);
+      setDestText(`Pinned (${prefillDestination.latitude.toFixed(5)}, ${prefillDestination.longitude.toFixed(5)})`);
+    }
+  }, [prefillDestination]);
 
-  const validateCoordinates = (lat, lng) => {
-    // Ensure coordinates are within valid ranges and have proper precision
-    const validLat = parseFloat(lat.toFixed(6));
-    const validLng = parseFloat(lng.toFixed(6));
+  // Use current location
+  useEffect(() => {
+    if (!useCurrent) return;
+    (async () => {
+      try {
+        setLoading(true);
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") { Alert.alert("Permission required", "Location permission is needed."); setUseCurrent(false); return; }
+        const pos = await Location.getCurrentPositionAsync({});
+        setStartCoordinates({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        setStartText("Current location");
+      } catch (e) {
+        console.log("Use current location error:", e);
+        setUseCurrent(false);
+      } finally { setLoading(false); }
+    })();
+  }, [useCurrent]);
 
-    if (isNaN(validLat) || isNaN(validLng)) return null;
-    if (validLat < -90 || validLat > 90) return null;
-    if (validLng < -180 || validLng > 180) return null;
-
-    return { latitude: validLat, longitude: validLng };
+  // Selection handlers from PlacesAutocomplete
+  const handleStartSelected = (item) => {
+    if (!item) return;
+    setUseCurrent(false);
+    setStartText(item.description);
+    setStartCoordinates({ latitude: item.lat, longitude: item.lng });
+  };
+  const handleDestSelected = (item) => {
+    if (!item) return;
+    setDestText(item.description);
+    setDestinationCoordinates({ latitude: item.lat, longitude: item.lng });
   };
 
-  const handleStartLocationSelect = (place) => {
-    setUseCurrentLocation(false);
-    setStartLocation(place.description);
-    setIsLoading(true);
-    fetchPlaceDetails(place.place_id, true);
-  };
+  const handleConfirm = () => {
+    if (!startCoordinates) return Alert.alert("Missing start", "Please choose a starting point.");
+    if (!destinationCoordinates) return Alert.alert("Missing destination", "Please choose a destination.");
 
-  const handleDestinationSelect = (place) => {
-    setDestination(place.description);
-    setIsLoading(true);
-    fetchPlaceDetails(place.place_id, false);
-  };
-
-  const fetchPlaceDetails = async (placeId, isStart) => {
-    try {
-      console.log("Fetching details for place ID:", placeId);
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry&key=AIzaSyBpelv4QoqO2lHJQVGj46W0xk-sVDv6KQk`
-      );
-      const data = await response.json();
-      console.log("Place details response:", data);
-      if (
-        data.result &&
-        data.result.geometry &&
-        data.result.geometry.location
-      ) {
-        const { lat, lng } = data.result.geometry.location;
-        const validCoords = validateCoordinates(lat, lng);
-
-        if (validCoords) {
-          if (isStart) {
-            setStartCoordinates(validCoords);
-          } else {
-            setDestinationCoordinates(validCoords);
-          }
-        } else {
-          Alert.alert(
-            "Invalid Location",
-            "The selected location coordinates are invalid. Please try selecting a different location."
-          );
-        }
-      } else {
-        Alert.alert(
-          "Error",
-          "Could not get location details. Please try again."
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching place details:", error);
-      Alert.alert(
-        "Error",
-        "Failed to fetch location details. Please check your internet connection and try again."
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSubmit = () => {
-    if (!startCoordinates || !destinationCoordinates) {
-      Alert.alert(
-        "Error",
-        "Please select both start and destination locations"
-      );
-      return;
-    }
-
-    // Additional validation before submission
-    if (
-      !validateCoordinates(
-        startCoordinates.latitude,
-        startCoordinates.longitude
-      ) ||
-      !validateCoordinates(
-        destinationCoordinates.latitude,
-        destinationCoordinates.longitude
-      )
-    ) {
-      Alert.alert(
-        "Error",
-        "Invalid coordinates detected. Please reselect your locations."
-      );
-      return;
-    }
-
-    const preferences = {
-      chat: chatPreference,
-      startLocation,
-      destination,
+    onSubmit({
       startCoordinates,
       destinationCoordinates,
       transport,
-      gender: genderPreference,
-      useCurrentLocation,
-    };
-    onSubmit(preferences);
-    onClose();
+      gender,
+      talk,
+      useCurrentLocation: useCurrent,
+    });
+    onClose?.();
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.overlay}>
-        <View style={styles.box}>
+    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+      <View style={styles.backdrop}>
+        <View style={styles.sheet}>
           <Text style={styles.title}>Companion Preferences</Text>
 
           <View style={styles.row}>
-            <Switch value={chatPreference} onValueChange={setChatPreference} />
-            <Text style={styles.label}>Would you like to talk?</Text>
+            <Text style={styles.rowLabel}>Would you like to talk?</Text>
+            <Switch value={talk} onValueChange={setTalk} />
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-            <Switch value={useCurrentLocation} onValueChange={setUseCurrentLocation} />
-            <Text style={styles.label}>Use Current Location</Text>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Use Current Location</Text>
+            <Switch value={useCurrent} onValueChange={setUseCurrent} />
           </View>
 
-          {!useCurrentLocation && (
-            <PlacesAutocomplete
-              placeholder="Starting point"
-              value={startLocation}
-              onChangeText={setStartLocation}
-              onSelect={handleStartLocationSelect}
-              style={styles.input}
-              disabled={isLoading}
-            />
+          {!useCurrent && (
+            <>
+              <Text style={styles.label}>Starting point</Text>
+              <PlacesAutocomplete
+                placeholder="Starting point"
+                value={startText}
+                onChangeText={setStartText}
+                onSelect={handleStartSelected}
+                country="au"
+              />
+            </>
           )}
 
+          <Text style={[styles.label, { marginTop: 12 }]}>Destination</Text>
           <PlacesAutocomplete
             placeholder="Destination"
-            value={destination}
-            onChangeText={setDestination}
-            onSelect={handleDestinationSelect}
-            style={styles.input}
-            disabled={isLoading}
+            value={destText}
+            onChangeText={setDestText}
+            onSelect={handleDestSelected}
+            country="au"
           />
 
-          <Text style={styles.label}>Choose Transport:</Text>
-          <Picker
-            selectedValue={transport.mode + (transport.transit_mode ? (":" + transport.transit_mode) : "")}
-            style={styles.picker}
-            onValueChange={(itemValue) => {
-              // itemValue is like "walking" or "transit:bus"
-              if (itemValue.startsWith("transit:")) {
-                const submode = itemValue.split(":")[1];
-                setTransport({ mode: "transit", transit_mode: submode });
-              } else {
-                setTransport({ mode: itemValue });
-              }
-            }}
-            enabled={!isLoading}
-          >
-            <Picker.Item label="Walk" value="walking" />
-            <Picker.Item label="Drive" value="driving" />
-            <Picker.Item label="Bicycle" value="bicycling" />
-            <Picker.Item label="Bus" value="transit:bus" />
-            <Picker.Item label="Train" value="transit:train" />
-            <Picker.Item label="Subway" value="transit:subway" />
-            <Picker.Item label="Tram" value="transit:tram" />
+          <Text style={[styles.label, { marginTop: 12 }]}>Choose Transport:</Text>
+          <Picker selectedValue={transport} onValueChange={setTransport} style={styles.picker}>
+            <Picker.Item label="Walk" value="walk" />
+            <Picker.Item label="Bus" value="bus" />
+            <Picker.Item label="Train" value="train" />
+            <Picker.Item label="Car" value="car" />
           </Picker>
 
-          <Text style={styles.label}>Preferred Gender:</Text>
-          <Picker
-            selectedValue={genderPreference}
-            style={styles.picker}
-            onValueChange={(itemValue) => setGenderPreference(itemValue)}
-            enabled={!isLoading}
-          >
+          <Text style={[styles.label, { marginTop: 12 }]}>Preferred Gender:</Text>
+          <Picker selectedValue={gender} onValueChange={setGender} style={styles.picker}>
             <Picker.Item label="Any" value="any" />
-            <Picker.Item label="Male" value="male" />
             <Picker.Item label="Female" value="female" />
-            <Picker.Item label="Non-binary" value="nonbinary" />
+            <Picker.Item label="Male" value="male" />
           </Picker>
 
-          <ThemedButton
-            title={isLoading ? "Loading..." : "Confirm"}
-            onPress={handleSubmit}
-            disabled={isLoading}
-          />
-
-          <Pressable onPress={onClose} style={{ marginTop: 12 }}>
-            <Text style={{ color: "#aaa", textAlign: "center" }}>Cancel</Text>
-          </Pressable>
+          <ThemedButton title={loading ? "Please wait..." : "Confirm"} disabled={loading} onPress={handleConfirm} />
+          <View style={{ height: 8 }} />
+          <ThemedButton variant="secondary" title="Cancel" onPress={onClose} />
         </View>
       </View>
     </Modal>
@@ -251,48 +150,11 @@ export default function CompanionPreferencesModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  box: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 12,
-    width: "90%",
-    maxHeight: "80%",
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  label: {
-    fontSize: 16,
-    marginLeft: 10,
-    marginTop: 10,
-  },
-  input: {
-    marginVertical: 6,
-  },
-  picker: {
-    ...Platform.select({
-      ios: {
-        height: 100,
-      },
-      android: {
-        height: 50,
-      },
-    }),
-    width: "100%",
-    marginBottom: 16,
-  },
+  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center" },
+  sheet: { width: "90%", maxHeight: "88%", backgroundColor: "#fff", borderRadius: 18, padding: 16, elevation: 12 },
+  title: { fontSize: 20, fontWeight: "600", marginBottom: 8, textAlign: "center" },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 },
+  rowLabel: { fontSize: 16 },
+  label: { fontSize: 14, marginBottom: 6 },
+  picker: { borderWidth: 1, borderColor: "#dfe1e5", borderRadius: 10, backgroundColor: "#fff" },
 });

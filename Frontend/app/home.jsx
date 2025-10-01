@@ -394,8 +394,6 @@ export default function HomeScreen() {
     }));
   };
 
-
-
   const cancelSearch = async () => {
     if (searchTimer) {
       clearInterval(searchTimer);
@@ -514,17 +512,45 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Hamburger menu */}
       <Modal transparent animationType="fade" visible={menuVisible}>
         <TouchableOpacity
           style={styles.menuOverlay}
           onPress={() => setMenuVisible(false)}
         >
           <View style={styles.menuBox}>
+            {/* Account */}
             <TouchableOpacity onPress={() => router.push("/profile")}>
               <ThemedText type="defaultSemiBold" style={styles.menuItem}>
                 Account
               </ThemedText>
             </TouchableOpacity>
+
+            {/* Emergency Contacts (added back) */}
+            <TouchableOpacity
+              onPress={() => {
+                setMenuVisible(false);
+                router.push("/emergencyContacts");
+              }}
+            >
+              <ThemedText type="defaultSemiBold" style={styles.menuItem}>
+                Emergency Contacts
+              </ThemedText>
+            </TouchableOpacity>
+
+            {/* SOS (added back) */}
+            <TouchableOpacity
+              onPress={() => {
+                setMenuVisible(false);
+                router.push("/sos");
+              }}
+            >
+              <ThemedText type="defaultSemiBold" style={styles.menuItem}>
+                SOS
+              </ThemedText>
+            </TouchableOpacity>
+
+            {/* Logout */}
             <TouchableOpacity onPress={handleLogout}>
               <ThemedText
                 type="defaultSemiBold"
