@@ -1,37 +1,41 @@
 export const Colors = {
+  // Light mode palette
   light: {
-    text: "#282C3E", // Strong dark for text
-    background: "#FBE6DA", // App background
-    surface: "#EBB7AD", // Card surfaces
+    text: "#272e3a",
+    background: "#0c078c",
+    surface: "#FFFFFF",
 
-    primary: "#282C3E", // Primary actions (CTA, Register)
-    secondary: "#8BE4DB", // Secondary actions (like Submit)
+    primary: "#1c52c8",
+    secondary: "#2ca07b",
+    accent: "#c734ac",
 
-    danger: "#77141F", // Red alert
-    warning: "#EBB7AD", // Soft warning
-    success: "#659B5E", // Success green
-    info: "#8BE4DB", // Info highlight
+    info: "#1F5FEA",
+    success: "#2ca07b",
+    warning: "#fff700",
+    danger: "#e32002",
 
-    outline: "#2DB5A9", // Outline button border
-    muted: "#DDDBe5", // Placeholder, disabled
-    footer: "#38231A", // Footer dark base
+    outline: "#A7C6D9",
+    muted: "#E5E7EB",
+    footer: "#353C46",
   },
 
+  // Dark mode palette
   dark: {
-    text: "#FBE6DA", // Bright on dark
-    background: "#282C3E", // App background
-    surface: "#1E1E1E", // Card surface
+    text: "#F9FAFB",
+    background: "#111827",
+    surface: "#272e3a",
 
-    primary: "#8BE4DB", // CTA for dark mode
-    secondary: "#2DB5A9", // Alt action
+    primary: "#76b6ff",
+    secondary: "#57e77b",
+    accent: "#f58feb",
 
-    danger: "#77141F",
-    warning: "#EBB7AD",
-    success: "#2EC4B6",
-    info: "#8BE4DB",
+    info: "#76b6ff",
+    success: "#57e77b",
+    warning: "#f3d705",
+    danger: "#c40303",
 
-    outline: "#8BE4DB",
-    muted: "#38231A",
-    footer: "#121212",
+    outline: "#76b6ff",
+    muted: "#272e3a",
+    footer: "#111827",
   },
 };
