@@ -13,9 +13,15 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.Frontend",
       "config": {
-        "googleMapsApiKey": "AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw"
+        "googleMapsApiKey": "AIzaSyBGfvZy7uxsDpUNoUFE3CpSgAlGhtsZgoA"
       }
     },
+    "expo": {
+    
+    "extra": {
+      "expoPublicGoogleMapsApiKey": "AIzaSyBGfvZy7uxsDpUNoUFE3CpSgAlGhtsZgoA"
+    }
+  },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
@@ -24,7 +30,7 @@
       "package": "com.anonymous.Frontend",
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw"
+          "apiKey": "AIzaSyBGfvZy7uxsDpUNoUFE3CpSgAlGhtsZgoA"
         }
       }
     },

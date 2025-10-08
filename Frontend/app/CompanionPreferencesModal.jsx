@@ -60,17 +60,18 @@ export default function CompanionPreferencesModal({
   }, [useCurrent]);
 
   // Selection handlers from PlacesAutocomplete
-  const handleStartSelected = (item) => {
-    if (!item) return;
-    setUseCurrent(false);
-    setStartText(item.description);
-    setStartCoordinates({ latitude: item.lat, longitude: item.lng });
-  };
-  const handleDestSelected = (item) => {
-    if (!item) return;
-    setDestText(item.description);
-    setDestinationCoordinates({ latitude: item.lat, longitude: item.lng });
-  };
+const handleStartSelected = (item) => {
+  if (!item?.coordinates) return;
+  setUseCurrent(false);
+  setStartText(item.description);
+  setStartCoordinates(item.coordinates); // Now using the correct structure
+};
+
+const handleDestSelected = (item) => {
+  if (!item?.coordinates) return;
+  setDestText(item.description);
+  setDestinationCoordinates(item.coordinates); // Now using the correct structure
+};
 
   const handleConfirm = () => {
     if (!startCoordinates) return Alert.alert("Missing start", "Please choose a starting point.");

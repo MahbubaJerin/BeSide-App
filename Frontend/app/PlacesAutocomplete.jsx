@@ -1,14 +1,15 @@
-// Frontend/app/PlacesAutocomplete.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { View, TextInput, FlatList, TouchableOpacity, Text, StyleSheet } from "react-native";
+import Constants from 'expo-constants';
 
-const GOOGLE_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+// Using environment variable directly for API key
+const GOOGLE_KEY = Constants.expoConfig?.extra?.expoPublicGoogleMapsApiKey || 'AIzaSyBGfvZy7uxsDpUNoUFE3CpSgAlGhtsZgoA';
 
 /**
  * Lightweight Google Places Autocomplete powered by the Web Service API.
  * Props:
  *  - placeholder, value, onChangeText
- *  - onSelect: ({ description, place_id, lat, lng })
+ *  - onSelect: ({ description, place_id, coordinates: { latitude, longitude } })
  *  - country: e.g. "au" (optional)
  *  - disabled: boolean (optional)
  */
@@ -34,48 +35,93 @@ export default function PlacesAutocomplete({
 
   async function fetchPredictions(input) {
     try {
-      if (!GOOGLE_KEY) { console.warn("Missing EXPO_PUBLIC_GOOGLE_MAPS_API_KEY"); return; }
+      if (!GOOGLE_KEY) { 
+        console.warn("Missing Google Maps API Key"); 
+        return; 
+      }
       const url =
         "https://maps.googleapis.com/maps/api/place/autocomplete/json" +
         `?input=${encodeURIComponent(input)}` +
         `&key=${GOOGLE_KEY}` +
-        `&types=geocode` +
+        `&types=address` +
+        `&location=-37.8136,144.9631` +
+        `&radius=50000` +
         (country ? `&components=country:${country}` : "") +
         `&sessiontoken=${sessionRef.current}`;
+      
       const res = await fetch(url);
       const data = await res.json();
-      if (data?.status === "OK") setPredictions(data.predictions || []);
-      else { setPredictions([]); if (data?.status && data.status !== "ZERO_RESULTS") console.warn("Places:", data.status, data?.error_message); }
+      
+      if (data?.status === "OK") {
+        setPredictions(data.predictions || []);
+      } else { 
+        setPredictions([]); 
+        if (data?.status && data.status !== "ZERO_RESULTS") 
+          console.warn("Places API Error:", data.status, data?.error_message); 
+      }
     } catch (e) {
       console.warn("Places autocomplete error:", e?.message || e);
       setPredictions([]);
     }
   }
 
-  async function fetchDetails(place_id) {
-    try {
-      if (!GOOGLE_KEY) return null;
-      const url =
-        "https://maps.googleapis.com/maps/api/place/details/json" +
-        `?place_id=${encodeURIComponent(place_id)}` +
-        `&fields=geometry` +
-        `&key=${GOOGLE_KEY}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data?.status === "OK") {
-        const g = data.result?.geometry?.location;
-        if (g && typeof g.lat === "number" && typeof g.lng === "number") return { lat: g.lat, lng: g.lng };
-      } else console.warn("Place details:", data?.status, data?.error_message);
-      return null;
-    } catch (e) { console.warn("Place details error:", e?.message || e); return null; }
+  // Update the fetchDetails function to ensure consistent coordinate format
+async function fetchDetails(place_id) {
+  try {
+    if (!GOOGLE_KEY) return null;
+    const url =
+      "https://maps.googleapis.com/maps/api/place/details/json" +
+      `?place_id=${encodeURIComponent(place_id)}` +
+      `&fields=geometry` +
+      `&key=${GOOGLE_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data?.status === "OK") {
+      const g = data.result?.geometry?.location;
+      if (g && typeof g.lat === "number" && typeof g.lng === "number") {
+        // Return coordinates in the exact format expected by MapView
+        return {
+          coordinates: {
+            latitude: parseFloat(g.lat),
+            longitude: parseFloat(g.lng)
+          }
+        };
+      }
+    }
+    return null;
+  } catch (e) { 
+    console.warn("Place details error:", e); 
+    return null; 
   }
-
-  const handlePressPrediction = async (item) => {
-    setOpen(false);
-    const coords = await fetchDetails(item.place_id);
-    if (coords) onSelect({ description: item.description, place_id: item.place_id, lat: coords.lat, lng: coords.lng });
-    else onSelect(null);
-  };
+}
+// Add coordinate validation helper
+function isValidCoordinate(lat, lng) {
+  return (
+    typeof lat === 'number' && 
+    typeof lng === 'number' && 
+    !isNaN(lat) && 
+    !isNaN(lng) && 
+    lat >= -90 && 
+    lat <= 90 && 
+    lng >= -180 && 
+    lng <= 180
+  );
+}
+  // Update handlePressPrediction to ensure coordinates are properly passed
+const handlePressPrediction = async (item) => {
+  const details = await fetchDetails(item.place_id);
+  if (details?.coordinates) {
+    onSelect({
+      description: item.description,
+      place_id: item.place_id,
+      coordinates: details.coordinates
+    });
+    onChangeText(item.description);
+  } else {
+    onSelect(null);
+  }
+  setOpen(false);
+};
 
   return (
     <View style={[styles.container, style]}>
@@ -107,7 +153,10 @@ export default function PlacesAutocomplete({
 }
 
 const styles = StyleSheet.create({
-  container: { position: "relative", zIndex: 1000 },
+  container: { 
+    position: "relative", 
+    zIndex: 1000 
+  },
   input: {
     height: 44,
     borderRadius: 10,
@@ -119,13 +168,26 @@ const styles = StyleSheet.create({
   },
   list: {
     position: "absolute",
-    top: 48, left: 0, right: 0,
+    top: 48,
+    left: 0,
+    right: 0,
     backgroundColor: "#fff",
     borderRadius: 10,
     maxHeight: 240,
     elevation: 8,
-    shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 1 },
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
   },
-  row: { paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#eee" },
-  rowText: { fontSize: 14, color: "#222" },
+  row: { 
+    paddingVertical: 12, 
+    paddingHorizontal: 12, 
+    borderBottomWidth: StyleSheet.hairlineWidth, 
+    borderBottomColor: "#eee" 
+  },
+  rowText: { 
+    fontSize: 14, 
+    color: "#222" 
+  },
 });
