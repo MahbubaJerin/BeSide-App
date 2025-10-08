@@ -1,4 +1,3 @@
-// Frontend/app/verifyOTP.jsx
 import React, { useState } from "react";
 import {
   View,
@@ -17,10 +16,10 @@ import { router, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BASE_URL } from "@/config";
 
-const VERIFY_PATH = "/api/v1/auth/verify-otp";
+const VERIFY_PATH = "api/v1/auth/verify-otp";
 
 export default function VerifyOTPScreen() {
-  const { email } = useLocalSearchParams();
+  const { email, context, next } = useLocalSearchParams();
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [otpErr, setOtpErr] = useState("");
@@ -34,9 +33,7 @@ export default function VerifyOTPScreen() {
   const validate = () => {
     setOtpErr("");
     setApiErr("");
-
     const trimmed = otp.trim();
-    // Accept 4-8 digits (adjust to your backend policy)
     const onlyDigits = /^\d{4,8}$/.test(trimmed);
 
     if (!trimmed) {
@@ -53,17 +50,11 @@ export default function VerifyOTPScreen() {
   const handleVerify = async () => {
     Keyboard.dismiss();
     if (!validate()) return;
-
     const normalizedOtp = otp.trim();
     setLoading(true);
 
     try {
       const url = new URL(VERIFY_PATH, BASE_URL).toString();
-      if (__DEV__) {
-        console.log("[VerifyOTP] POST ->", url);
-        console.log("[VerifyOTP] payload ->", { email, otp: normalizedOtp });
-      }
-
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -74,24 +65,29 @@ export default function VerifyOTPScreen() {
       let data = {};
       try {
         data = raw ? JSON.parse(raw) : {};
-      } catch (e) {
-        if (__DEV__) console.log("[VerifyOTP] non-JSON response:", raw);
-      }
+      } catch {}
 
       if (response.ok) {
         const token =
           data?.token || data?.data?.token || data?.accessToken || null;
 
         if (!token) {
-          const msg = "Verification succeeded but no token returned.";
-          setApiErr(msg);
-          Alert.alert("Error", msg);
+          Alert.alert("Error", "Verification succeeded but no token returned.");
           return;
         }
 
-        await AsyncStorage.setItem("resetToken", String(token));
-        Alert.alert("Success", "OTP verified! Now reset your password.");
-        router.push({ pathname: "/resetPassword", params: { email } });
+        // Redirect based on context (signup / reset / other)
+        if (context === "reset") {
+          await AsyncStorage.setItem("resetToken", String(token));
+          Alert.alert("Success", "OTP verified! Now reset your password.");
+          router.push({ pathname: "/resetPassword", params: { email } });
+        } else if (context === "signup") {
+          Alert.alert("Success", "Email verified successfully!");
+          router.replace(next || "/login");
+        } else {
+          Alert.alert("Success", "OTP verified.");
+          router.replace("/home");
+        }
       } else {
         const msg = data?.message || "Invalid OTP. Please try again.";
         setApiErr(msg);
@@ -99,9 +95,7 @@ export default function VerifyOTPScreen() {
       }
     } catch (error) {
       console.error("[VerifyOTP] error:", error?.message || error);
-      if (!apiErr) {
-        Alert.alert("Error", "An error occurred. Please try again.");
-      }
+      Alert.alert("Error", "An error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -122,7 +116,6 @@ export default function VerifyOTPScreen() {
             Verify OTP
           </ThemedText>
 
-          {/* OTP input */}
           <TextInput
             style={[
               styles.input,
@@ -133,7 +126,6 @@ export default function VerifyOTPScreen() {
             keyboardType="number-pad"
             value={otp}
             onChangeText={(v) => {
-              // Keep only digits to reduce user errors
               const digitsOnly = v.replace(/\D+/g, "");
               setOtp(digitsOnly);
               if (otpErr) setOtpErr("");
@@ -141,8 +133,7 @@ export default function VerifyOTPScreen() {
             }}
             returnKeyType="done"
             onSubmitEditing={handleVerify}
-            accessibilityLabel="One-time password"
-            maxLength={8} // align with validate() rule
+            maxLength={8}
           />
 
           {!!otpErr && (
@@ -157,11 +148,10 @@ export default function VerifyOTPScreen() {
           )}
 
           <ThemedButton
-            title={loading ? "Verifying…" : "Verify OTP"}
+            title={loading ? "Verifying..." : "Verify OTP"}
             onPress={handleVerify}
             disabled={loading}
             style={styles.btn}
-            accessibilityLabel="Verify one-time password"
           />
         </View>
       </ScrollView>

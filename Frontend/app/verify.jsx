@@ -14,7 +14,7 @@ import { router } from "expo-router";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedButton } from "@/components/ThemedButton";
-import { BASE_URL } from "../config"; // <— point to your Frontend/config.js
+import { BASE_URL } from "../config"; 
 
 export default function VerifyScreen() {
   const [userName, setUserName] = useState(null);
@@ -91,7 +91,7 @@ export default function VerifyScreen() {
 
     try {
       setSubmitting(true);
-      const res = await fetch(`${BASE_URL}/api/v1/auth/verify`, {
+      const res = await fetch(`${BASE_URL}api/v1/auth/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
