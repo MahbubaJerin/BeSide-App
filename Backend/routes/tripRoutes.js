@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 
 const tripController = require("../controllers/tripController");
-const { model } = require("mongoose");
 const { uploadSingle } = require("../utils/fileUpload");
 const authController = require("../controllers/authController");
 
@@ -36,5 +35,8 @@ router.put(
   "/:tripReqId",
   tripController.updateTripRequest
 );
+
+// Add route information endpoint
+router.post("/route", tripController.getRoute);
 
 module.exports = router;

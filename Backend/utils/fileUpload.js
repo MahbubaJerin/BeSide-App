@@ -9,11 +9,26 @@ const multerStorage = multer.memoryStorage();
 
 // Filter files to only allow images
 const multerFilter = (req, file, cb) => {
-  if (!file.mimetype.startsWith('image')) {
-    return cb(new AppError('Not an image! Please upload only images.', 400), false);
+  console.log('Validating file:', {
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size
+  });
+
+  // Check if it's an image
+  if (!file.mimetype.startsWith('image/')) {
+    console.log('❌ File rejected: Not an image');
+    return cb(new AppError('Please upload only image files.', 400), false);
+  }
+
+  // Check supported image types
+  const supportedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+  if (!supportedTypes.includes(file.mimetype)) {
+    console.log('❌ File rejected: Unsupported image type');
+    return cb(new AppError('Please upload only JPEG or PNG images.', 400), false);
   }
   
-  // Log successful file validation
+  // Log successful validation
   console.log(`✅ File validated: ${file.originalname} (${file.mimetype}, ${file.size} bytes)`);
   cb(null, true);
 };
@@ -23,7 +38,7 @@ const upload = multer({
   storage: multerStorage,
   fileFilter: multerFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB
+    fileSize: 10 * 1024 * 1024, // 10MB
   },
 });
 

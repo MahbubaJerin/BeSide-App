@@ -61,16 +61,32 @@ export default function CompanionPreferencesModal({
 
   // Selection handlers from PlacesAutocomplete
 const handleStartSelected = (item) => {
-  if (!item?.coordinates) return;
+  console.log('\n=== Start Location Selected ===');
+  console.log('Selected item:', item);
+  
+  if (!item?.coordinates) {
+    console.log('❌ No coordinates in selected item');
+    return;
+  }
+  
   setUseCurrent(false);
   setStartText(item.description);
-  setStartCoordinates(item.coordinates); // Now using the correct structure
+  console.log('Setting start coordinates:', item.coordinates);
+  setStartCoordinates(item.coordinates);
 };
 
 const handleDestSelected = (item) => {
-  if (!item?.coordinates) return;
+  console.log('\n=== Destination Selected ===');
+  console.log('Selected item:', item);
+  
+  if (!item?.coordinates) {
+    console.log('❌ No coordinates in selected item');
+    return;
+  }
+  
   setDestText(item.description);
-  setDestinationCoordinates(item.coordinates); // Now using the correct structure
+  console.log('Setting destination coordinates:', item.coordinates);
+  setDestinationCoordinates(item.coordinates);
 };
 
   const handleConfirm = () => {
@@ -128,10 +144,9 @@ const handleDestSelected = (item) => {
 
           <Text style={[styles.label, { marginTop: 12 }]}>Choose Transport:</Text>
           <Picker selectedValue={transport} onValueChange={setTransport} style={styles.picker}>
-            <Picker.Item label="Walk" value="walk" />
-            <Picker.Item label="Bus" value="bus" />
-            <Picker.Item label="Train" value="train" />
-            <Picker.Item label="Car" value="car" />
+            <Picker.Item label="Walking" value="walking" />
+            <Picker.Item label="Driving" value="driving" />
+            <Picker.Item label="Transit" value="transit" />
           </Picker>
 
           <Text style={[styles.label, { marginTop: 12 }]}>Preferred Gender:</Text>

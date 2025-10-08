@@ -318,11 +318,22 @@ export default function HomeScreen() {
       const user = JSON.parse(storedUser);
       const API_URL = BASE_URL;
       
+      // Create form data with the image
       const formData = new FormData();
+      
+      // Get file extension from uri
+      const fileExtension = url.split('.').pop();
+      const filename = `selfie-${Date.now()}.${fileExtension}`;
+      
       formData.append("photo", {
         uri: url,
-        type: "image/jpeg",
-        name: `selfie-${Date.now()}.jpg`,
+        type: `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`,
+        name: filename,
+      });
+
+      console.log('Uploading photo:', {
+        uri: url,
+        filename: filename
       });
 
       const response = await fetch(
@@ -332,6 +343,7 @@ export default function HomeScreen() {
           body: formData,
           headers: {
             Authorization: `Bearer ${token}`,
+            'Accept': 'application/json',
           },
         }
       );
@@ -351,39 +363,146 @@ export default function HomeScreen() {
 
   const handlePreferencesSubmit = async (preferences) => {
     try {
-      setStartMarker(preferences.startCoordinates);
-      setEndMarker(preferences.destinationCoordinates);
+      // Log received preferences
+      console.log('\n=== Route Planning Start ===');
+      console.log('Received preferences:', {
+        ...preferences,
+        startCoordinates: preferences.startCoordinates 
+          ? `${preferences.startCoordinates.latitude}, ${preferences.startCoordinates.longitude}`
+          : 'missing',
+        destinationCoordinates: preferences.destinationCoordinates
+          ? `${preferences.destinationCoordinates.latitude}, ${preferences.destinationCoordinates.longitude}`
+          : 'missing'
+      });
 
-      // Draw 500m radius circle and generate dummy users
+      // Validate coordinates
+      const { startCoordinates, destinationCoordinates } = preferences;
+      if (!startCoordinates?.latitude || !startCoordinates?.longitude || 
+          !destinationCoordinates?.latitude || !destinationCoordinates?.longitude) {
+        console.log('❌ Invalid coordinates:', { startCoordinates, destinationCoordinates });
+        throw new Error('Invalid coordinates provided');
+      }
+
+      // Validate coordinate ranges
+      if (Math.abs(startCoordinates.latitude) > 90 || Math.abs(startCoordinates.longitude) > 180 ||
+          Math.abs(destinationCoordinates.latitude) > 90 || Math.abs(destinationCoordinates.longitude) > 180) {
+        throw new Error('Coordinates out of valid range');
+      }
+
+      setStartMarker(startCoordinates);
+      setEndMarker(destinationCoordinates);
       setShowRadius(true);
-      const users = generateDummyUsers(preferences.startCoordinates, 500, 3 + Math.floor(Math.random() * 3)); // 3-5 users
-      setDummyUsers(users);
-      setNearbyUsers(users.length);
 
-      // Generate route coordinates using Google Directions API
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${preferences.startCoordinates.latitude},${preferences.startCoordinates.longitude}&destination=${preferences.destinationCoordinates.latitude},${preferences.destinationCoordinates.longitude}&mode=driving&key=AIzaSyBpelv4QoqO2lHJQVGj46W0xk-sVDv6KQk`;
-      const response = await fetch(url);
-      const data = await response.json();
-      if (data.routes && data.routes[0]) {
-        const points = data.routes[0].overview_polyline.points;
-        const coords = decodePolyline(points);
+    try {
+      // Fetch route from backend
+      const token = await AsyncStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+
+      // Debug log the coordinates being sent
+      console.log('Sending route request:', {
+        origin: startCoordinates,
+        destination: destinationCoordinates
+      });
+
+      console.log('Requesting route with:', {
+        startCoordinates,
+        destinationCoordinates,
+        transport: preferences.transport || 'walking'
+      });
+
+      const response = await fetch(`${BASE_URL}api/v1/trip/route`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          origin: startCoordinates,
+          destination: destinationCoordinates,
+          mode: preferences.transport || 'walking' // Use selected transport mode
+        })
+      });        const data = await response.json();
+        
+        if (data.status !== 'success') {
+          throw new Error(data.message || 'Failed to fetch route');
+        }
+
+        if (!data.data?.route?.points) {
+          throw new Error('No route found between the selected locations');
+        }
+
+        // Decode polyline and validate coordinates
+        const coords = decodePolyline(data.data.route.points);
         const validCoords = coords.filter(coord => 
           coord.latitude >= -90 && coord.latitude <= 90 &&
           coord.longitude >= -180 && coord.longitude <= 180
         );
-        setRouteCoordinates(validCoords);
-        if (validCoords.length > 0) {
-          mapRef.current?.fitToCoordinates(validCoords, {
-            edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-            animated: true,
-          });
+
+        if (validCoords.length === 0) {
+          throw new Error('No valid coordinates in route');
         }
-        startSearching();
-      } else {
-        Alert.alert('Error', 'No route found between the selected locations');
+
+        setRouteCoordinates(validCoords);
+        
+        // Animate map to show the entire route
+        mapRef.current?.fitToCoordinates(validCoords, {
+          edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+          animated: true,
+        });
+
+        // Continue with companion search
+        await companionSearch.startSearch(
+          startCoordinates,
+          searchRadius || 500,
+          30000 // Update every 30 seconds
+        );
+
+      } catch (error) {
+        // If backend route fetch fails, try direct Google Maps API as fallback
+        console.warn('Backend route fetch failed, trying direct Google Maps API:', error);
+        
+        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${startCoordinates.latitude},${startCoordinates.longitude}&destination=${destinationCoordinates.latitude},${destinationCoordinates.longitude}&mode=driving&key=${process.env.GOOGLE_MAPS_API_KEY}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error('Google Maps API request failed');
+        }
+
+        const data = await response.json();
+        
+        if (!data.routes?.[0]?.overview_polyline?.points) {
+          throw new Error('No route found between the selected locations');
+        }
+
+        const coords = decodePolyline(data.routes[0].overview_polyline.points);
+        const validCoords = coords.filter(coord => 
+          coord.latitude >= -90 && coord.latitude <= 90 &&
+          coord.longitude >= -180 && coord.longitude <= 180
+        );
+
+        if (validCoords.length === 0) {
+          throw new Error('No valid coordinates in route');
+        }
+
+        setRouteCoordinates(validCoords);
+        mapRef.current?.fitToCoordinates(validCoords, {
+          edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+          animated: true,
+        });
+
+        // Continue with companion search
+        await companionSearch.startSearch(
+          startCoordinates,
+          searchRadius || 500,
+          30000
+        );
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to fetch route information');
+      console.error('Route fetching error:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to fetch route information. Please try again.'
+      );
     }
   };
 

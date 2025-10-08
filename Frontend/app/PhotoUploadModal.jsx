@@ -34,11 +34,15 @@ export default function PhotoUploadModal({ visible, onClose, onSubmit }) {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: false,
-      quality: 0.5,
+      allowsEditing: true,
+      quality: 0.8,
+      aspect: [1, 1],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      base64: false,
     });
 
-    if (!result.canceled && result.assets) {
+    if (!result.canceled && result.assets && result.assets[0]) {
+      console.log('Photo taken:', result.assets[0]);
       setPhoto(result.assets[0].uri);
     }
   };

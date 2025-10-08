@@ -6,6 +6,10 @@ const { uploadToCloudinary, deleteFromCloudinary } = require("../utils/fileUploa
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
 
+// Add Google Maps client initialization
+const { Client } = require("@googlemaps/google-maps-services-js");
+const client = new Client({});
+
   exports.createTripReq = catchAsync(async (req, res, next) => {
     const { user, destination, destinationType, date, time, genderPreference } = req.body;
   
@@ -202,4 +206,91 @@ exports.updateTripRequest = catchAsync(async (req, res, next) => {
       tripRequest
     }
   });
+});
+
+exports.getRoute = catchAsync(async (req, res, next) => {
+  console.log('\n=== Route Request Details ===');
+  console.log('Raw request body:', req.body);
+  
+  const { origin, destination, mode = 'walking' } = req.body;
+
+  // Detailed debug logs
+  console.log('\nParsed request data:');
+  console.log('Origin:', {
+    latitude: origin?.latitude,
+    longitude: origin?.longitude,
+    type: typeof origin,
+    isValid: origin && typeof origin.latitude === 'number' && typeof origin.longitude === 'number'
+  });
+  console.log('Destination:', {
+    latitude: destination?.latitude,
+    longitude: destination?.longitude,
+    type: typeof destination,
+    isValid: destination && typeof destination.latitude === 'number' && typeof destination.longitude === 'number'
+  });
+  console.log('Transport Mode:', mode);
+
+  // Validate mode
+  const validModes = ['walking', 'driving', 'transit'];
+  if (!validModes.includes(mode)) {
+    console.log('❌ Invalid transport mode:', mode);
+    return next(new AppError(`Invalid transport mode. Must be one of: ${validModes.join(', ')}`, 400));
+  }
+
+  // Validate input
+  if (!origin?.latitude || !origin?.longitude || !destination?.latitude || !destination?.longitude) {
+    console.log('Invalid coordinates received');
+    return next(new AppError('Invalid origin or destination coordinates', 400));
+  }
+
+  // Validate coordinate ranges
+  if (Math.abs(origin.latitude) > 90 || Math.abs(origin.longitude) > 180 ||
+      Math.abs(destination.latitude) > 90 || Math.abs(destination.longitude) > 180) {
+    return next(new AppError('Coordinates out of valid range', 400));
+  }
+
+    try {
+      console.log('\n=== Making Google Maps API Request ===');
+      const requestParams = {
+        origin: `${origin.latitude},${origin.longitude}`,
+        destination: `${destination.latitude},${destination.longitude}`,
+        mode: mode,
+        key: process.env.GOOGLE_MAPS_API_KEY
+      };
+      console.log('Request params:', {
+        ...requestParams,
+        key: 'HIDDEN' // Don't log API key
+      });
+
+      // Get route from Google Maps Directions API
+      const response = await client.directions({
+        params: requestParams
+      });
+
+      console.log('\n=== Google Maps API Response ===');
+      console.log('Status:', response.data.status);
+      if (response.data.status !== 'OK') {
+        console.log('Error details:', response.data.error_message || 'No error message provided');
+        return next(new AppError(`Failed to get route: ${response.data.status}${response.data.error_message ? ' - ' + response.data.error_message : ''}`, 400));
+      }    const route = response.data.routes[0];
+    if (!route || !route.overview_polyline || !route.overview_polyline.points) {
+      return next(new AppError('No route found between the given points', 404));
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        route: {
+          points: route.overview_polyline.points,
+          distance: route.legs[0].distance.value, // in meters
+          duration: route.legs[0].duration.value, // in seconds
+          start_address: route.legs[0].start_address,
+          end_address: route.legs[0].end_address
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Google Maps API error:', error);
+    return next(new AppError('Failed to fetch route information', 500));
+  }
 });
