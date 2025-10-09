@@ -1,17 +1,17 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+// Frontend/app/home.jsx
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   View,
   StyleSheet,
   Modal,
   Dimensions,
   TouchableOpacity,
-  Platform,
   Alert,
   Image,
   Animated,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import MapView, {
   Marker,
   Callout,
@@ -19,8 +19,8 @@ import MapView, {
   Circle,
   Polyline,
 } from "react-native-maps";
-import { useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import polyline from "@mapbox/polyline";
 import { Colors } from "@/constants/Colors";
@@ -29,14 +29,187 @@ import { ThemedButton } from "@/components/ThemedButton";
 import ConsentModal from "./ConsentModal";
 import CompanionPreferencesModal from "./CompanionPreferencesModal";
 import PhotoUploadModal from "./PhotoUploadModal";
-import { useLocationTracking } from "@/hooks/useLocationTracking";
-import { useCompanionSearch } from "@/hooks/useCompanionSearch";
 import { BASE_URL } from "../config";
 
-const { width } = Dimensions.get("window");
+// ========= Inline hooks (single-file edition) =========
 
-// Import the placeholder image
+// useLocationTracking: starts/stops foreground location tracking and POSTs to backend
+function useLocationTracking() {
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [watcher, setWatcher] = useState(null);
+  const [isTracking, setIsTracking] = useState(false);
+  const postUpdate = useCallback(async (coords) => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) return;
+      const url = `${BASE_URL.replace(/\/+$/, "")}/api/v1/location/update`;
+      await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy ?? null,
+          speed: coords.speed ?? null,
+          heading: coords.heading ?? null,
+        }),
+      }).catch(() => {});
+    } catch (_) {}
+  }, []);
+
+  const startTracking = useCallback(
+    async (askPermission = true) => {
+      try {
+        if (askPermission) {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== "granted") {
+            Alert.alert(
+              "Permission required",
+              "Please enable location access."
+            );
+            return false;
+          }
+        }
+        const last = await Location.getCurrentPositionAsync({});
+        const coords = {
+          latitude: last.coords.latitude,
+          longitude: last.coords.longitude,
+          accuracy: last.coords.accuracy,
+          speed: last.coords.speed,
+          heading: last.coords.heading,
+        };
+        setCurrentLocation(coords);
+        postUpdate(coords);
+
+        const sub = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            distanceInterval: 15, // meters
+            timeInterval: 10000, // ms
+          },
+          (p) => {
+            const c = {
+              latitude: p.coords.latitude,
+              longitude: p.coords.longitude,
+              accuracy: p.coords.accuracy,
+              speed: p.coords.speed,
+              heading: p.coords.heading,
+            };
+            setCurrentLocation(c);
+            postUpdate(c);
+          }
+        );
+        setWatcher(sub);
+        setIsTracking(true);
+        return true;
+      } catch (e) {
+        console.log("startTracking error:", e?.message || e);
+        return false;
+      }
+    },
+    [postUpdate]
+  );
+
+  const stopTracking = useCallback(() => {
+    try {
+      watcher?.remove();
+    } catch (_) {}
+    setWatcher(null);
+    setIsTracking(false);
+  }, [watcher]);
+
+  return { currentLocation, isTracking, startTracking, stopTracking };
+}
+
+// useCompanionSearch: polls /nearby to find active users around a center
+function useCompanionSearch() {
+  const [companions, setCompanions] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [searchRadius, setSearchRadius] = useState(500);
+  const pollRef = useRef(null);
+  const centerRef = useRef(null);
+
+  const fetchOnce = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token || !centerRef.current) return;
+      setLoading(true);
+      const url = new URL(
+        `${BASE_URL.replace(/\/+$/, "")}/api/v1/location/nearby`
+      );
+      url.searchParams.set("latitude", String(centerRef.current.latitude));
+      url.searchParams.set("longitude", String(centerRef.current.longitude));
+      url.searchParams.set("radius", String(searchRadius));
+      const res = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json?.status === "success") {
+        setCompanions(json.data?.companions || []);
+        if (typeof json.data?.searchRadius === "number") {
+          setSearchRadius(json.data.searchRadius);
+        }
+      }
+    } catch (e) {
+      console.log("companion fetch error:", e?.message || e);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchRadius]);
+
+  const startSearch = useCallback(
+    async (center, radius = 500, intervalMs = 30000) => {
+      centerRef.current = center;
+      setSearchRadius(radius);
+      setIsSearching(true);
+      await fetchOnce();
+      pollRef.current && clearInterval(pollRef.current);
+      pollRef.current = setInterval(fetchOnce, Math.max(8000, intervalMs));
+      return true;
+    },
+    [fetchOnce]
+  );
+
+  const stopSearch = useCallback(async () => {
+    pollRef.current && clearInterval(pollRef.current);
+    pollRef.current = null;
+    setIsSearching(false);
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (token) {
+        await fetch(
+          `${BASE_URL.replace(/\/+$/, "")}/api/v1/location/stop-searching`,
+          { method: "PATCH", headers: { Authorization: `Bearer ${token}` } }
+        );
+      }
+    } catch (_) {}
+  }, []);
+
+  const cleanup = useCallback(() => {
+    pollRef.current && clearInterval(pollRef.current);
+    pollRef.current = null;
+  }, []);
+
+  return {
+    companions,
+    isSearching,
+    loading,
+    searchRadius,
+    startSearch,
+    stopSearch,
+    cleanup,
+  };
+}
+
+// =======================================================
+
+const { width } = Dimensions.get("window");
 const placeholderImage = require("../assets/images/placeholder2.jpg");
+const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 const customMapStyle = [
   {
@@ -44,10 +217,7 @@ const customMapStyle = [
     elementType: "geometry",
     stylers: [{ visibility: "on" }],
   },
-  {
-    featureType: "all",
-    elementType: "labels.text.fill",
-  },
+  { featureType: "all", elementType: "labels.text.fill" },
   {
     featureType: "all",
     elementType: "labels.text.stroke",
@@ -115,7 +285,7 @@ const customMapStyle = [
   },
 ];
 
-// Hardcoded users for testing (from your code)
+// Hardcoded users (demo pins)
 const hardcodedUsers = [
   {
     userName: "AliceSmith",
@@ -150,11 +320,13 @@ const hardcodedUsers = [
 export default function HomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState(null);
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
+  const insets = useSafeAreaInsets();
+  // modal stack
+  const [modalVisible, setModalVisible] = useState(false); // not verified
   const [photoUploadVisible, setPhotoUploadVisible] = useState(false);
   const [consentVisible, setConsentVisible] = useState(false);
   const [preferencesVisible, setPreferencesVisible] = useState(false);
+
   const [consent, setConsent] = useState({
     noTouch: false,
     respectful: false,
@@ -162,20 +334,20 @@ export default function HomeScreen() {
   });
   const [photoUrl, setPhotoUrl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [startMarker, setStartMarker] = useState(null);
   const [endMarker, setEndMarker] = useState(null);
-  const [searchTimer, setSearchTimer] = useState(null);
+
   const loadingAnimation = useRef(new Animated.Value(0)).current;
   const mapRef = useRef(null);
   const [currentTripRequestId, setCurrentTripRequestId] = useState(null);
   const [showRadius, setShowRadius] = useState(false);
 
-  // New location tracking and companion search hooks
+  // hooks
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
-  
-  // Derived state from hooks
+
   const currentLocation = locationTracking.currentLocation;
   const isSearching = companionSearch.isSearching;
   const companions = companionSearch.companions;
@@ -186,18 +358,15 @@ export default function HomeScreen() {
       const load = async () => {
         const stored = await AsyncStorage.getItem("user");
         if (stored) {
-          setUser(JSON.parse(stored));
-          // Start location tracking automatically when user loads
+          const parsed = JSON.parse(stored);
+          setUser(parsed);
           await locationTracking.startTracking(true);
         } else {
           router.replace("/login");
         }
       };
-
       load();
-
       return () => {
-        // Cleanup location tracking when component unmounts
         locationTracking.stopTracking();
         companionSearch.cleanup();
       };
@@ -227,85 +396,85 @@ export default function HomeScreen() {
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem("user");
+    await AsyncStorage.removeItem("token");
     router.replace("/login");
   };
 
   const handleFindCompanion = async () => {
-    const storedUser = await AsyncStorage.getItem("user");
-    const token = await AsyncStorage.getItem("token");
-    if (!storedUser || !token) {
-      router.replace("/login");
-      return;
-    }
-    
-    const parsed = JSON.parse(storedUser);
-    if (parsed.isVerified) {
+    try {
+      const storedUser = await AsyncStorage.getItem("user");
+      const token = await AsyncStorage.getItem("token");
+      if (!storedUser || !token) {
+        router.replace("/login");
+        return;
+      }
+      const parsed = JSON.parse(storedUser);
+
+      if (!parsed.isVerified) {
+        setModalVisible(true);
+        return;
+      }
       if (!currentLocation) {
-        Alert.alert("Location Required", "Please enable location services to find companions.");
+        Alert.alert(
+          "Location Required",
+          "Please enable location services to find companions."
+        );
         return;
       }
 
-      try {
-        // Create trip request first (keeping existing functionality)
-        const API_URL = BASE_URL;
-        const response = await fetch(`${API_URL}api/v1/trip/createTripReq`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+      // 1) create trip request (as you had)
+      const API_URL = BASE_URL.replace(/\/+$/, "");
+      const response = await fetch(`${API_URL}/api/v1/trip/createTripReq`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          user: {
+            userId: parsed._id,
+            userName: parsed.userName,
+            userImage: parsed.userImage || "default.jpg",
           },
-          body: JSON.stringify({
-            user: {
-              userId: parsed._id,
-              userName: parsed.userName,
-              userImage: parsed.userImage || "default.jpg",
-            },
-            destination: "Placeholder",
-            destinationType: "By Walk",
-            date: new Date(),
-            time: "12:00",
-            genderPreference: "any",
-          }),
-        });
+          destination: "Placeholder",
+          destinationType: "By Walk",
+          date: new Date(),
+          time: "12:00",
+          genderPreference: "any",
+        }),
+      });
+      const result = await response.json();
 
-        const result = await response.json();
-        if (result.status === "success") {
-          setCurrentTripRequestId(result.data.tripRequest.tripReqId);
-          
-          // Start companion search
-          const searchStarted = await companionSearch.startSearch(
-            {
-              latitude: currentLocation.latitude,
-              longitude: currentLocation.longitude,
-            },
-            500, // 500m radius
-            30000 // Update every 30 seconds
-          );
-
-          if (searchStarted) {
-            setShowRadius(true);
-            setConsentVisible(true);
-          } else {
-            Alert.alert("Error", "Failed to start companion search.");
-          }
-        } else {
-          throw new Error(result.message || "Failed to create trip request");
-        }
-      } catch (error) {
-        Alert.alert("Error", error.message || "Failed to start companion search.");
-        return;
+      if (result.status !== "success") {
+        throw new Error(result.message || "Failed to create trip request");
       }
-    } else {
-      setModalVisible(true);
+      setCurrentTripRequestId(result.data.tripRequest.tripReqId);
+
+      // 2) prompt consent -> selfie -> preferences
+      setConsentVisible(true);
+
+      // 3) begin searching (centered on currentLocation)
+      const started = await companionSearch.startSearch(
+        {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+        },
+        500,
+        30000
+      );
+      if (!started) throw new Error("Failed to start companion search");
+
+      setShowRadius(true);
+    } catch (e) {
+      Alert.alert("Error", e?.message || "Failed to start companion search.");
     }
   };
 
-  const handlePhotoSubmit = async (url) => {
+  const handlePhotoSubmit = async (uri) => {
     if (!currentTripRequestId) {
       Alert.alert("Error", "No active trip request found.");
       return;
     }
-
     try {
       const storedUser = await AsyncStorage.getItem("user");
       const token = await AsyncStorage.getItem("token");
@@ -314,28 +483,21 @@ export default function HomeScreen() {
         router.replace("/login");
         return;
       }
-
-      const user = JSON.parse(storedUser);
       const API_URL = BASE_URL;
-      
       const formData = new FormData();
       formData.append("photo", {
-        uri: url,
+        uri,
         type: "image/jpeg",
         name: `selfie-${Date.now()}.jpg`,
       });
-
       const response = await fetch(
         `${API_URL}api/v1/trip/upload-photo/${currentTripRequestId}`,
         {
           method: "POST",
           body: formData,
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
-
       const result = await response.json();
       if (result.status === "success") {
         setPhotoUrl(result.data.photoUrl);
@@ -353,23 +515,32 @@ export default function HomeScreen() {
     try {
       setStartMarker(preferences.startCoordinates);
       setEndMarker(preferences.destinationCoordinates);
-
-      // Draw 500m radius circle and generate dummy users
       setShowRadius(true);
-      const users = generateDummyUsers(preferences.startCoordinates, 500, 3 + Math.floor(Math.random() * 3)); // 3-5 users
-      setDummyUsers(users);
-      setNearbyUsers(users.length);
 
-      // Generate route coordinates using Google Directions API
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${preferences.startCoordinates.latitude},${preferences.startCoordinates.longitude}&destination=${preferences.destinationCoordinates.latitude},${preferences.destinationCoordinates.longitude}&mode=driving&key=AIzaSyBpelv4QoqO2lHJQVGj46W0xk-sVDv6KQk`;
+      // Route (Google Directions)
+      const url =
+        "https://maps.googleapis.com/maps/api/directions/json" +
+        `?origin=${preferences.startCoordinates.latitude},${preferences.startCoordinates.longitude}` +
+        `&destination=${preferences.destinationCoordinates.latitude},${preferences.destinationCoordinates.longitude}` +
+        `&mode=${
+          preferences.transport === "car"
+            ? "driving"
+            : preferences.transport === "walk"
+            ? "walking"
+            : "transit"
+        }` +
+        `&key=${GOOGLE_MAPS_KEY}`;
       const response = await fetch(url);
       const data = await response.json();
       if (data.routes && data.routes[0]) {
         const points = data.routes[0].overview_polyline.points;
         const coords = decodePolyline(points);
-        const validCoords = coords.filter(coord => 
-          coord.latitude >= -90 && coord.latitude <= 90 &&
-          coord.longitude >= -180 && coord.longitude <= 180
+        const validCoords = coords.filter(
+          (c) =>
+            c.latitude >= -90 &&
+            c.latitude <= 90 &&
+            c.longitude >= -180 &&
+            c.longitude <= 180
         );
         setRouteCoordinates(validCoords);
         if (validCoords.length > 0) {
@@ -378,48 +549,26 @@ export default function HomeScreen() {
             animated: true,
           });
         }
-        startSearching();
+        // optionally, refine search center to startCoordinates:
+        await companionSearch.startSearch(
+          preferences.startCoordinates,
+          searchRadius,
+          30000
+        );
       } else {
-        Alert.alert('Error', 'No route found between the selected locations');
+        Alert.alert("Error", "No route found between the selected locations");
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to fetch route information');
+      Alert.alert("Error", "Failed to fetch route information");
     }
-  };
-
-  const decodePolyline = (encoded) => {
-    return polyline.decode(encoded).map(([latitude, longitude]) => ({
-      latitude,
-      longitude,
-    }));
   };
 
   const cancelSearch = async () => {
-    if (searchTimer) {
-      clearInterval(searchTimer);
-    }
-    
-    // Stop companion search
     await companionSearch.stopSearch();
-    
     setRouteCoordinates([]);
     setStartMarker(null);
     setEndMarker(null);
     setShowRadius(false);
-  };
-
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
   };
 
   const handleSendRequest = async (selectedUser) => {
@@ -436,38 +585,36 @@ export default function HomeScreen() {
 
     try {
       const storedUser = await AsyncStorage.getItem("user");
-      if (!storedUser) {
+      const token = await AsyncStorage.getItem("token");
+      if (!storedUser || !token) {
         Alert.alert("Error", "User not logged in.");
         router.replace("/login");
         return;
       }
-
-      const user = JSON.parse(storedUser);
+      const me = JSON.parse(storedUser);
       const API_URL = BASE_URL;
 
-      const response = await fetch(
-        `${API_URL}api/v1/trip-request/sendRequest`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${user.token}`,
-          },
-          body: JSON.stringify({
-            senderId: user._id,
-            receiverId: selectedUser.userName,
-            consent: consent,
-            preferences: {
-              gender: user.genderPreference || "any",
-            },
-            photoUrl: photoUrl,
-          }),
-        }
-      );
+      const res = await fetch(`${API_URL}api/v1/trip-request/sendRequest`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          senderId: me._id,
+          receiverId: selectedUser.userId || selectedUser.userName,
+          consent: consent,
+          preferences: { gender: me.genderPreference || "any" },
+          photoUrl: photoUrl,
+        }),
+      });
 
-      const result = await response.json();
+      const result = await res.json();
       if (result.status === "success") {
-        Alert.alert("Success", "Request sent to " + selectedUser.userName);
+        Alert.alert(
+          "Success",
+          "Request sent to " + (selectedUser.userName || "user")
+        );
         setSelectedUser(null);
       } else {
         throw new Error(result.message || "Failed to send request");
@@ -489,80 +636,99 @@ export default function HomeScreen() {
     }
   };
 
-  const mapGenderPreference = (frontendPref) => {
-    switch (frontendPref) {
-      case "male":
-        return "male";
-      case "female":
-        return "female";
-      case "nonbinary":
-        return "nonbinary";
-      case "any":
-      default:
-        return "any";
-    }
-  };
+  const decodePolyline = (encoded) =>
+    polyline
+      .decode(encoded)
+      .map(([latitude, longitude]) => ({ latitude, longitude }));
 
+  // util: distance in km (for hardcoded cards)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+  const [availability, setAvailability] = useState(true);
+  const [availabilityModalVisible, setAvailabilityModalVisible] =
+    useState(false);
+
+  // UI
   return (
     <View style={styles.container}>
+      {/* Top Bar — Logo + Title + Buttons */}
       <View style={styles.topBar}>
-        <ThemedText type="title">BeSide</ThemedText>
-        <TouchableOpacity onPress={() => setMenuVisible(true)}>
-          <ThemedText type="defaultSemiBold">☰</ThemedText>
+        <View style={styles.logoContainer}>...</View>
+
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <ThemedText type="title" style={styles.titleText}>
+            BeSide
+          </ThemedText>
+        </View>
+
+        {/* Current location button */}
+        <TouchableOpacity
+          style={[styles.topIconButton, { backgroundColor: "#fceaea" }]}
+          onPress={handleCurrentLocation}
+        >
+          <Ionicons name="location" size={30} color="#e63946" />
+        </TouchableOpacity>
+
+        {/* Availability toggle */}
+        <TouchableOpacity
+          style={[
+            styles.topIconButton,
+            { backgroundColor: availability ? "#e6f8f1" : "#f0f0f0" },
+          ]}
+          onPress={() => setAvailabilityModalVisible(true)}
+        >
+          <Ionicons
+            name={availability ? "toggle" : "toggle-outline"}
+            size={34}
+            color={availability ? "#2ca07b" : "#999"}
+          />
         </TouchableOpacity>
       </View>
-
-      {/* Hamburger menu */}
-      <Modal transparent animationType="fade" visible={menuVisible}>
-        <TouchableOpacity
-          style={styles.menuOverlay}
-          onPress={() => setMenuVisible(false)}
-        >
-          <View style={styles.menuBox}>
-            {/* Account */}
-            <TouchableOpacity onPress={() => router.push("/profile")}>
-              <ThemedText type="defaultSemiBold" style={styles.menuItem}>
-                Account
-              </ThemedText>
-            </TouchableOpacity>
-
-            {/* Emergency Contacts (added back) */}
-            <TouchableOpacity
-              onPress={() => {
-                setMenuVisible(false);
-                router.push("/emergencyContacts");
-              }}
+      {/* Availability Modal */}
+      <Modal
+        transparent
+        animationType="fade"
+        visible={availabilityModalVisible}
+        onRequestClose={() => setAvailabilityModalVisible(false)}
+      >
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupBox}>
+            <ThemedText type="subtitle">Availability</ThemedText>
+            <ThemedText
+              type="default"
+              style={{ textAlign: "center", marginVertical: 12 }}
             >
-              <ThemedText type="defaultSemiBold" style={styles.menuItem}>
-                Emergency Contacts
-              </ThemedText>
-            </TouchableOpacity>
-
-            {/* SOS (added back) */}
-            <TouchableOpacity
+              Do you want to{" "}
+              {availability ? "become unavailable" : "become available"}?
+            </ThemedText>
+            <ThemedButton
+              title={availability ? "Set Unavailable" : "Set Available"}
               onPress={() => {
-                setMenuVisible(false);
-                router.push("/sos");
+                setAvailabilityModalVisible(false);
+                setAvailability(!availability);
               }}
-            >
-              <ThemedText type="defaultSemiBold" style={styles.menuItem}>
-                SOS
-              </ThemedText>
-            </TouchableOpacity>
-
-            {/* Logout */}
-            <TouchableOpacity onPress={handleLogout}>
-              <ThemedText
-                type="defaultSemiBold"
-                style={[styles.menuItem, { color: Colors.light.danger }]}
-              >
-                Logout
-              </ThemedText>
-            </TouchableOpacity>
+              style={{ marginTop: 10, width: "80%" }}
+            />
+            <ThemedButton
+              title="Cancel"
+              type="secondary"
+              onPress={() => setAvailabilityModalVisible(false)}
+              style={{ marginTop: 10, width: "80%" }}
+            />
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
-
       {/* Map */}
       <View style={styles.mapContainer}>
         {currentLocation ? (
@@ -570,7 +736,6 @@ export default function HomeScreen() {
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
             customMapStyle={customMapStyle}
-            mapType="standard"
             style={styles.map}
             showsUserLocation
             followsUserLocation
@@ -580,19 +745,19 @@ export default function HomeScreen() {
               latitudeDelta: 0.01,
               longitudeDelta: 0.01,
             }}
-            showsCompass={true}
-            showsScale={true}
-            showsTraffic={true}
-            showsBuildings={true}
-            showsIndoors={true}
+            showsCompass
+            showsScale
+            showsTraffic
+            showsBuildings
+            showsIndoors
             showsMyLocationButton={false}
-            showsPointsOfInterest={true}
-            zoomEnabled={true}
-            zoomControlEnabled={true}
-            rotateEnabled={true}
-            scrollEnabled={true}
-            pitchEnabled={true}
-            toolbarEnabled={true}
+            showsPointsOfInterest
+            zoomEnabled
+            zoomControlEnabled
+            rotateEnabled
+            scrollEnabled
+            pitchEnabled
+            toolbarEnabled
           >
             <Marker coordinate={currentLocation}>
               <Callout>
@@ -603,7 +768,7 @@ export default function HomeScreen() {
               </Callout>
             </Marker>
 
-            {/* Start Point Marker */}
+            {/* Start Point */}
             {startMarker && (
               <Marker coordinate={startMarker}>
                 <View style={styles.markerContainer}>
@@ -621,7 +786,7 @@ export default function HomeScreen() {
               </Marker>
             )}
 
-            {/* End Point Marker */}
+            {/* Destination */}
             {endMarker && (
               <Marker coordinate={endMarker}>
                 <View style={styles.markerContainer}>
@@ -639,7 +804,7 @@ export default function HomeScreen() {
               </Marker>
             )}
 
-            {/* Route Line */}
+            {/* Route */}
             {routeCoordinates.length > 0 && (
               <Polyline
                 coordinates={routeCoordinates}
@@ -648,7 +813,7 @@ export default function HomeScreen() {
               />
             )}
 
-            {/* Search Radius Circle */}
+            {/* Radius */}
             {showRadius && currentLocation && (
               <Circle
                 center={currentLocation}
@@ -658,46 +823,50 @@ export default function HomeScreen() {
               />
             )}
 
-            {/* Real Companions from API */}
-            {companions.map((companion) => (
+            {/* Real companions */}
+            {companions.map((c) => (
               <Marker
-                key={companion.userId}
+                key={String(c.userId)}
                 coordinate={{
-                  latitude: companion.location.latitude,
-                  longitude: companion.location.longitude,
+                  latitude: c.location.latitude,
+                  longitude: c.location.longitude,
                 }}
-                onPress={() => setSelectedUser({
-                  userId: companion.userId,
-                  userName: companion.userName,
-                  distance: companion.distance / 1000, // Convert to km
-                  userInfo: companion.userInfo,
-                  lastSeen: companion.lastSeen,
-                  isSearching: companion.isSearching,
-                  userImage: placeholderImage, // Use placeholder for now
-                })}
+                onPress={() =>
+                  setSelectedUser({
+                    userId: c.userId,
+                    userName: c.userName,
+                    distance: (c.distance || 0) / 1000,
+                    userInfo: c.userInfo,
+                    lastSeen: c.lastSeen,
+                    isSearching: c.isSearching,
+                    userImage: placeholderImage,
+                  })
+                }
               >
-                <View style={[
-                  styles.userMarkerContainer,
-                  companion.isSearching && styles.searchingMarker
-                ]}>
+                <View
+                  style={[
+                    styles.userMarkerContainer,
+                    c.isSearching && styles.searchingMarker,
+                  ]}
+                >
                   <MaterialCommunityIcons
-                    name={companion.isSearching ? "account-search" : "account"}
+                    name={c.isSearching ? "account-search" : "account"}
                     size={24}
-                    color={companion.isSearching ? "#4CAF50" : "#FF5722"}
+                    color={c.isSearching ? "#4CAF50" : "#FF5722"}
                   />
                 </View>
                 <Callout>
                   <View style={{ width: 160 }}>
-                    <ThemedText type="defaultSemiBold">{companion.userName}</ThemedText>
+                    <ThemedText type="defaultSemiBold">{c.userName}</ThemedText>
                     <ThemedText type="caption">
-                      {companion.distance}m away
+                      {Math.round(c.distance)}m away
                     </ThemedText>
                     <ThemedText type="caption">
-                      {companion.isSearching ? "🔍 Searching" : "📍 Available"}
+                      {c.isSearching ? "🔍 Searching" : "📍 Available"}
                     </ThemedText>
-                    {companion.userInfo?.gender && (
+                    {c.userInfo?.gender && (
                       <ThemedText type="caption">
-                        Gender: {companion.userInfo.gender}
+                        Gender: {c.userInfo.gender}
                       </ThemedText>
                     )}
                   </View>
@@ -705,31 +874,28 @@ export default function HomeScreen() {
               </Marker>
             ))}
 
-            {/* Hardcoded Users (Your existing users) */}
-            {hardcodedUsers.map((user, index) => {
+            {/* Demo pins */}
+            {hardcodedUsers.map((u, i) => {
               const distance = calculateDistance(
                 currentLocation.latitude,
                 currentLocation.longitude,
-                user.latitude,
-                user.longitude
+                u.latitude,
+                u.longitude
               );
               return (
                 <Marker
-                  key={index}
-                  coordinate={{
-                    latitude: user.latitude,
-                    longitude: user.longitude,
-                  }}
-                  title={user.userName}
-                  onPress={() => setSelectedUser({ ...user, distance })}
+                  key={i}
+                  coordinate={{ latitude: u.latitude, longitude: u.longitude }}
+                  title={u.userName}
+                  onPress={() => setSelectedUser({ ...u, distance })}
                 >
                   <Callout>
                     <View style={{ width: 140 }}>
                       <ThemedText type="defaultSemiBold">
-                        {user.userName}
+                        {u.userName}
                       </ThemedText>
                       <ThemedText type="caption">
-                        Gender: {user.genderPreference}
+                        Gender: {u.genderPreference}
                       </ThemedText>
                     </View>
                   </Callout>
@@ -741,22 +907,20 @@ export default function HomeScreen() {
           <ThemedText type="default">Loading map...</ThemedText>
         )}
       </View>
-
-      {/* Current Location Button (Team's addition) */}
-      <TouchableOpacity
-        style={styles.currentLocationButton}
-        onPress={handleCurrentLocation}
-      >
-        <Ionicons name="locate" size={24} color={Colors.light.primary} />
-      </TouchableOpacity>
-
-      {/* Find Companion Button or Cancel Button (Team's searching UI) */}
+     
+      {/* Find/CANCEL */}
       {!isSearching ? (
-        <ThemedButton
-          title="Find a Companion"
-          onPress={handleFindCompanion}
-          style={styles.actionButton}
-        />
+       <TouchableOpacity
+  style={[styles.actionButton, styles.connectButton]}
+  onPress={handleFindCompanion}
+  activeOpacity={0.8}
+>
+  <Ionicons name="people" size={22} color="#fff" style={{ marginRight: 8 }} />
+  <ThemedText type="buttonText" style={{ color: "#fff", fontSize: 16 }}>
+    Connect
+  </ThemedText>
+</TouchableOpacity>
+
       ) : (
         <View style={styles.searchingContainer}>
           <View style={styles.loadingBarContainer}>
@@ -796,8 +960,42 @@ export default function HomeScreen() {
           />
         </View>
       )}
+      {/* Bottom Navigation Bar (hidden while searching) */}
+      {!isSearching && (
+        <View
+          style={[styles.navContainer, { paddingBottom: insets.bottom || 10 }]}
+        >
+          <View style={styles.navBar}>
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={() => router.push("/profile")}
+            >
+              <Ionicons name="person-circle-outline" size={24} color="#fff" />
+              <ThemedText style={styles.navLabel}>Profile</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={() => router.push("/emergencyContacts")}
+            >
+              <Ionicons name="people-outline" size={24} color="#fff" />
+              <ThemedText style={styles.navLabel}>Contacts</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={() => router.push("/sos")}
+            >
+              <Ionicons name="alert" size={24} color="#fff" />
+              <ThemedText style={styles.navLabel}>SOS</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navButton} onPress={handleLogout}>
+              <Ionicons name="exit-outline" size={24} color="#fff" />
+              <ThemedText style={styles.navLabel}>Logout</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
-      {/* User Card Modal (Your existing feature) */}
+      {/* User Card */}
       <Modal
         transparent
         animationType="slide"
@@ -817,9 +1015,11 @@ export default function HomeScreen() {
             <ThemedText type="caption">
               Distance: {(selectedUser?.distance || 0).toFixed(2)} km
             </ThemedText>
-            <ThemedText type="caption">
-              Gender Preference: {selectedUser?.genderPreference}
-            </ThemedText>
+            {selectedUser?.genderPreference ? (
+              <ThemedText type="caption">
+                Gender Preference: {selectedUser?.genderPreference}
+              </ThemedText>
+            ) : null}
             <ThemedButton
               title="View Profile"
               onPress={() =>
@@ -843,7 +1043,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-
       {/* Not Verified Popup */}
       <Modal transparent animationType="slide" visible={modalVisible}>
         <View style={styles.popupOverlay}>
@@ -862,8 +1061,7 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Consent Form Modal */}
+      {/* Consent → Selfie → Preferences */}
       <ConsentModal
         visible={consentVisible}
         onClose={() => setConsentVisible(false)}
@@ -874,32 +1072,25 @@ export default function HomeScreen() {
           setPhotoUploadVisible(true);
         }}
       />
-
-      {/* Preferences Modal */}
-      <CompanionPreferencesModal
-        visible={preferencesVisible}
-        onClose={() => setPreferencesVisible(false)}
-        onSubmit={handlePreferencesSubmit}
-      />
-
-      {/* Photo Upload Modal (Your existing feature) */}
       <PhotoUploadModal
         visible={photoUploadVisible}
         onClose={() => setPhotoUploadVisible(false)}
         onSubmit={handlePhotoSubmit}
+      />
+      <CompanionPreferencesModal
+        visible={preferencesVisible}
+        onClose={() => setPreferencesVisible(false)}
+        onSubmit={handlePreferencesSubmit}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.light.background,
-  },
+  container: { flex: 1, backgroundColor: Colors.light.background },
   topBar: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     alignItems: "center",
     backgroundColor: Colors.light.surface,
     paddingHorizontal: 20,
@@ -907,13 +1098,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.1)",
   },
-  mapContainer: {
-    flex: 1,
-  },
-  map: {
-    width: "100%",
-    height: "100%",
-  },
+  mapContainer: { flex: 1 },
+  map: { width: "100%", height: "100%" },
   currentLocationButton: {
     position: "absolute",
     bottom: 100,
@@ -932,11 +1118,24 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     position: "absolute",
-    bottom: 20,
-    left: 20,
-    right: 20,
-    width: "auto",
+    bottom: 130,
+    left: 60,
+    right: 60,
+    paddingBottom: 15,
+    paddingTop: 15, 
+    marginBottom: 20,
+    backgroundColor: Colors.light.secondary,
   },
+  connectButton: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+    borderRadius: 50,
+    borderColor: Colors.light.accent,
+    borderWidth: 2,
+},
+
+  // --- Menus & Popups ---
   menuOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -954,10 +1153,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6,
   },
-  menuItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-  },
+  menuItem: { paddingVertical: 10, paddingHorizontal: 10 },
   popupOverlay: {
     flex: 1,
     justifyContent: "center",
@@ -971,10 +1167,7 @@ const styles = StyleSheet.create({
     width: width * 0.8,
     alignItems: "center",
   },
-  verifyButton: {
-    marginTop: 20,
-    width: "80%",
-  },
+  verifyButton: { marginTop: 20, width: "80%" },
   userCard: {
     backgroundColor: Colors.light.surface,
     padding: 20,
@@ -982,20 +1175,9 @@ const styles = StyleSheet.create({
     width: width * 0.8,
     alignItems: "center",
   },
-  cardButton: {
-    marginTop: 10,
-    width: "80%",
-  },
-  userImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
-  },
-  markerContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  cardButton: { marginTop: 10, width: "80%" },
+  userImage: { width: 80, height: 80, borderRadius: 40, marginBottom: 10 },
+  markerContainer: { alignItems: "center", justifyContent: "center" },
   userMarkerContainer: {
     backgroundColor: "white",
     borderRadius: 20,
@@ -1003,10 +1185,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FF5722",
   },
-  searchingMarker: {
-    borderColor: "#4CAF50",
-    backgroundColor: "#E8F5E8",
-  },
+  searchingMarker: { borderColor: "#4CAF50", backgroundColor: "#E8F5E8" },
   searchingContainer: {
     position: "absolute",
     bottom: 20,
@@ -1034,11 +1213,42 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
     borderRadius: 2,
   },
-  searchingInfo: {
+  searchingInfo: { alignItems: "center", marginBottom: 10 },
+  cancelButton: { backgroundColor: Colors.light.danger },
+  // --- Top bar ---
+  logoContainer: { padding: 4, marginLeft: 5 },
+  logo: { width: 50, height: 70 },
+  titleText: { fontSize: 22, fontWeight: "bold" },
+  topIconButton: {
+    padding: 10,
+    borderRadius: 12,
+    marginHorizontal: 4,
     alignItems: "center",
-    marginBottom: 10,
+    justifyContent: "center",
+    minWidth: 44,
+    minHeight: 44,
   },
-  cancelButton: {
-    backgroundColor: Colors.light.danger,
+  navContainer: {
+    position: "absolute",
+    left: 15,
+    right: 15,
+    bottom: 10,
+    height: 80,
+    marginBottom: 40,
+    alignItems: "center",
+    borderRadius: 16,
+            backgroundColor: Colors.light.background,
+
   },
+  navBar: {
+    flexDirection: "row",
+    width: "100%",
+    height: 70,
+    alignItems: "center",
+    justifyContent: "space-around",
+
+  },
+
+  navButton: { alignItems: "center", justifyContent: "center" },
+  navLabel: { color: "#fff", fontSize: 12, marginTop: 4 },
 });

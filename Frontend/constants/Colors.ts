@@ -7,7 +7,7 @@ export const Colors = {
 
     primary: "#1c52c8",
     secondary: "#2ca07b",
-    accent: "#c734ac",
+    accent: "#214E34",
 
     info: "#1F5FEA",
     success: "#2ca07b",
@@ -26,11 +26,11 @@ export const Colors = {
     surface: "#272e3a",
 
     primary: "#76b6ff",
-    secondary: "#57e77b",
+    secondary: "#7ADFBB",
     accent: "#f58feb",
 
     info: "#76b6ff",
-    success: "#57e77b",
+    success: "#7ADFBB",
     warning: "#f3d705",
     danger: "#c40303",
 
