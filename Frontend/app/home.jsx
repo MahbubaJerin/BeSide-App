@@ -25,10 +25,12 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import polyline from "@mapbox/polyline";
 import { Colors } from "@/constants/Colors";
 import { ThemedText } from "@/components/ThemedText";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedButton } from "@/components/ThemedButton";
 import ConsentModal from "./ConsentModal";
 import CompanionPreferencesModal from "./CompanionPreferencesModal";
 import PhotoUploadModal from "./PhotoUploadModal";
+import BeSideLogo from "../assets/images/BeSide.png"; 
 import { BASE_URL } from "../config";
 
 // ========= Inline hooks (single-file edition) =========
@@ -663,72 +665,54 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       {/* Top Bar — Logo + Title + Buttons */}
-      <View style={styles.topBar}>
-        <View style={styles.logoContainer}>...</View>
+<View style={styles.topBar}>
+  {/* Left Corner Logo */}
+  <View style={styles.logoContainer}>
+    <Image
+      source={BeSideLogo}
+      style={styles.logo}
+      resizeMode="contain"
+      accessibilityLabel="BeSide app logo"
+    />
+  </View>
+  
 
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <ThemedText type="title" style={styles.titleText}>
-            BeSide
-          </ThemedText>
-        </View>
+  {/* Centered App Title */}
+  <View style={{ flex: 1, alignItems: "center" }}>
+    <ThemedText type="title" style={styles.titleText}>
+      BeSide
+    </ThemedText>
+  </View>
 
-        {/* Current location button */}
-        <TouchableOpacity
-          style={[styles.topIconButton, { backgroundColor: "#fceaea" }]}
-          onPress={handleCurrentLocation}
-        >
-          <Ionicons name="location" size={30} color="#e63946" />
+  {/* Right Buttons */}
+  < View style={{ flexDirection: "row", alignItems: "center" }}>
+    {/* Current location button */}
+    <TouchableOpacity
+      style={[styles.topIconButton, { backgroundColor: "#fceaea" }]}
+      onPress={handleCurrentLocation}
+      accessibilityLabel="Center map on current location"
+    >
+      <Ionicons name="location" size={28} color="#e63946" />
+    </TouchableOpacity>
+
+    {/* Availability toggle */}
+    <TouchableOpacity
+      style={[
+        styles.topIconButton,
+        { backgroundColor: availability ? "#e6f8f1" : "#f0f0f0" },
+      ]}
+      onPress={() => setAvailabilityModalVisible(true)}
+      accessibilityLabel="Change availability status"
+    >
+      <Ionicons
+        name={availability ? "toggle" : "toggle-outline"}
+        size={28}
+        color={availability ? "#2ca07b" : "#999"}
+      />
         </TouchableOpacity>
-
-        {/* Availability toggle */}
-        <TouchableOpacity
-          style={[
-            styles.topIconButton,
-            { backgroundColor: availability ? "#e6f8f1" : "#f0f0f0" },
-          ]}
-          onPress={() => setAvailabilityModalVisible(true)}
-        >
-          <Ionicons
-            name={availability ? "toggle" : "toggle-outline"}
-            size={34}
-            color={availability ? "#2ca07b" : "#999"}
-          />
-        </TouchableOpacity>
-      </View>
-      {/* Availability Modal */}
-      <Modal
-        transparent
-        animationType="fade"
-        visible={availabilityModalVisible}
-        onRequestClose={() => setAvailabilityModalVisible(false)}
-      >
-        <View style={styles.popupOverlay}>
-          <View style={styles.popupBox}>
-            <ThemedText type="subtitle">Availability</ThemedText>
-            <ThemedText
-              type="default"
-              style={{ textAlign: "center", marginVertical: 12 }}
-            >
-              Do you want to{" "}
-              {availability ? "become unavailable" : "become available"}?
-            </ThemedText>
-            <ThemedButton
-              title={availability ? "Set Unavailable" : "Set Available"}
-              onPress={() => {
-                setAvailabilityModalVisible(false);
-                setAvailability(!availability);
-              }}
-              style={{ marginTop: 10, width: "80%" }}
-            />
-            <ThemedButton
-              title="Cancel"
-              type="secondary"
-              onPress={() => setAvailabilityModalVisible(false)}
-              style={{ marginTop: 10, width: "80%" }}
-            />
           </View>
-        </View>
-      </Modal>
+</View>
+      
       {/* Map */}
       <View style={styles.mapContainer}>
         {currentLocation ? (
@@ -917,7 +901,7 @@ export default function HomeScreen() {
 >
   <Ionicons name="people" size={22} color="#fff" style={{ marginRight: 8 }} />
   <ThemedText type="buttonText" style={{ color: "#fff", fontSize: 16 }}>
-    Connect
+    Find Companion
   </ThemedText>
 </TouchableOpacity>
 
@@ -1087,33 +1071,25 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.light.background },
+  container: { flex: 1, backgroundColor: Colors.light.surface },
   topBar: {
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    alignItems: "center",
-    backgroundColor: Colors.light.surface,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(0,0,0,0.1)",
-  },
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  backgroundColor: Colors.light.surface,
+  paddingHorizontal: 16,
+  paddingVertical: 8,
+  marginTop: 40, // adjust based on safe area if needed
+  borderBottomWidth: 1,
+  borderColor: "#e0e0e0",
+},
   mapContainer: { flex: 1 },
   map: { width: "100%", height: "100%" },
   currentLocationButton: {
     position: "absolute",
-    bottom: 100,
-    right: 20,
     backgroundColor: Colors.light.surface,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
     elevation: 5,
   },
   actionButton: {
@@ -1210,15 +1186,33 @@ const styles = StyleSheet.create({
   loadingBar: {
     height: "100%",
     width: "100%",
-    backgroundColor: "#4CAF50",
+    backgroundColor: Colors.light.secondary,
     borderRadius: 2,
   },
   searchingInfo: { alignItems: "center", marginBottom: 10 },
-  cancelButton: { backgroundColor: Colors.light.danger },
+  cancelButton: { backgroundColor: Colors.light.danger, borderColor: Colors.light.danger , marginBottom: 25},
   // --- Top bar ---
-  logoContainer: { padding: 4, marginLeft: 5 },
-  logo: { width: 50, height: 70 },
-  titleText: { fontSize: 22, fontWeight: "bold" },
+  
+logoContainer: {
+  width: 60,
+  height: 60,
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+logo: {
+  width: 45,
+  height: 45,
+  borderRadius: 10,
+},
+
+titleText: {
+  fontSize: 22,
+  fontWeight: "bold",
+  color: Colors.light.text,
+  letterSpacing: 0.5,
+  },
+
   topIconButton: {
     padding: 10,
     borderRadius: 12,
@@ -1236,14 +1230,14 @@ const styles = StyleSheet.create({
     height: 80,
     marginBottom: 40,
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: 36,
             backgroundColor: Colors.light.background,
 
   },
   navBar: {
     flexDirection: "row",
     width: "100%",
-    height: 70,
+    height: 80,
     alignItems: "center",
     justifyContent: "space-around",
 

@@ -193,6 +193,7 @@ export default function VerifyScreen() {
           onPress={submitting ? undefined : handleVerify}
           disabled={submitting}
           testID="verify-button"
+          style={{ backgroundColor: Colors.light.accent, borderColor: Colors.light.accent}}
         />
       </ScrollView>
     </KeyboardAvoidingView>
