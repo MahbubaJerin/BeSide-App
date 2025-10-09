@@ -78,15 +78,25 @@ export default function VerifyOTPScreen() {
 
         // Redirect based on context (signup / reset / other)
         if (context === "reset") {
+          // OTP verified for password reset
           await AsyncStorage.setItem("resetToken", String(token));
-          Alert.alert("Success", "OTP verified! Now reset your password.");
-          router.push({ pathname: "/resetPassword", params: { email } });
+          Alert.alert("Success", "OTP verified! Please reset your password.", [
+            {
+              text: "OK",
+              onPress: () =>
+                router.push({ pathname: "/resetPassword", params: { email } }),
+            },
+          ]);
         } else if (context === "signup") {
-          Alert.alert("Success", "Email verified successfully!");
-          router.replace(next || "/login");
+          // OTP verified after registration
+          Alert.alert("Success", "Email verified successfully!", [
+            { text: "OK", onPress: () => router.replace(next || "/login") },
+          ]);
         } else {
-          Alert.alert("Success", "OTP verified.");
-          router.replace("/home");
+          // Fallback
+          Alert.alert("Success", "OTP verified successfully!", [
+            { text: "OK", onPress: () => router.replace("/home") },
+          ]);
         }
       } else {
         const msg = data?.message || "Invalid OTP. Please try again.";

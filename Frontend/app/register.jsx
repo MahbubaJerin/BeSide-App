@@ -1,33 +1,87 @@
-import React, { useState } from "react";
+// app/register.jsx
+import React, { useEffect, useState } from "react";
 import {
   View,
   TextInput,
   StyleSheet,
-  ScrollView,
   Platform,
   KeyboardAvoidingView,
   Alert,
   TouchableOpacity,
+  Keyboard,
+  TouchableWithoutFeedback,
+  ScrollView,
   Text,
+  StatusBar,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import CountryPicker from "react-native-country-picker-modal";
 import RNPickerSelect from "react-native-picker-select";
-
+import DateTimePicker from "@react-native-community/datetimepicker";
+import PlacesAutocomplete from "./PlacesAutocomplete";
 import { useThemeColor } from "@/hooks/useThemeColor";
-import { BASE_URL } from "@/config";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedButton } from "@/components/ThemedButton";
+import { BASE_URL } from "@/config";
 
+/* ---------------- Utility helpers ---------------- */
+function formatDateYMD(d) {
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function formatDatePretty(d) {
+  return d
+    ? d.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : "Select your date of birth";
+}
+function calcAge(d) {
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+  return age;
+}
+function getStrengthColor(label) {
+  return label === "Strong"
+    ? "#22c55e"
+    : label === "Fair"
+    ? "#f59e0b"
+    : label === "Weak"
+    ? "#ef4444"
+    : "#d1d5db";
+}
+function getPasswordChecks(pw) {
+  return [
+    { label: "At least 8 characters", ok: pw.length >= 8 },
+    { label: "Contains number", ok: /\d/.test(pw) },
+    { label: "Contains uppercase", ok: /[A-Z]/.test(pw) },
+    { label: "Contains lowercase", ok: /[a-z]/.test(pw) },
+    { label: "Contains symbol", ok: /[^A-Za-z0-9]/.test(pw) },
+  ];
+}
+
+/* ---------------- Main Screen ---------------- */
 export default function RegisterScreen() {
-  // Form states
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [mobileNo, setMobileNo] = useState("");
-  const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [mobileNo, setMobileNo] = useState("");
+  const [password, setPassword] = useState("");
   const [gender, setGender] = useState(null);
+  const [dob, setDob] = useState(null);
+  const [showDobPicker, setShowDobPicker] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [step, setStep] = useState(0);
+  const [geo, setGeo] = useState(null);
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -35,59 +89,75 @@ export default function RegisterScreen() {
   const [countryCode, setCountryCode] = useState("AU");
   const [country, setCountry] = useState("Australia");
 
-  // Terms agreement states
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [showTermsModal, setShowTermsModal] = useState(false);
+  const emailValid = email.includes("@") && email.endsWith(".com");
 
-  const background = useThemeColor({}, "background");
+  const background = useThemeColor({}, "surface");
   const text = useThemeColor({}, "text");
   const border = useThemeColor({}, "primary");
+  const surface = useThemeColor({}, "surface");
+
+  const passwordStrength =
+    password.length >= 10
+      ? "Strong"
+      : password.length >= 6
+      ? "Fair"
+      : password.length > 0
+      ? "Weak"
+      : "";
+
+  const passwordChecks = getPasswordChecks(password);
+
+  const validateStep = () => {
+    if (step === 0)
+      return firstName && lastName && emailValid && dob && calcAge(dob) >= 13;
+    if (step === 1) return mobileNo;
+    if (step === 2) return password.length >= 8;
+    if (step === 3) return termsAccepted;
+    return true;
+  };
 
   const handleRegister = async () => {
-    console.log("Register button pressed");
-    if (
-      !username ||
-      !email ||
-      !mobileNo ||
-      !password ||
-      !firstName ||
-      !lastName ||
-      !gender ||
-      !country ||
-      !countryCode
-    ) {
-      alert("Please fill out all required fields");
+    if (!validateStep()) {
+      Alert.alert(
+        "Missing Info",
+        "Please complete all required fields before continuing."
+      );
       return;
     }
 
     try {
-      // 1️⃣ Register the user
+      const payload = {
+        userName: username || email,
+        email: email.trim().toLowerCase(),
+        mobileNo: mobileNo.trim(),
+        password,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        gender,
+        dateOfBirth: dob ? formatDateYMD(dob) : undefined,
+        address: {
+          street: street.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          postalCode: postalCode.trim(),
+          country,
+          countryCode,
+        },
+        geo,
+      };
+
       const registerResponse = await fetch(`${BASE_URL}api/v1/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userName: username.trim(),
-          email: email.trim().toLowerCase(),
-          mobileNo: mobileNo.trim(),
-          password,
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          gender,
-          address: {
-            street: street.trim(),
-            city: city.trim(),
-            state: state.trim(),
-            postalCode: postalCode.trim(),
-            country,
-            countryCode,
-          },
-        }),
+        body: JSON.stringify(payload),
       });
 
       const registerData = await registerResponse.json();
-
       if (!registerResponse.ok) {
-        alert(registerData.message || "Registration failed");
+        Alert.alert(
+          "Registration Failed",
+          registerData.message || "Try again."
+        );
         return;
       }
 
@@ -98,15 +168,16 @@ export default function RegisterScreen() {
       });
 
       const otpData = await otpResponse.json();
-
       if (!otpResponse.ok) {
-        alert(otpData.message || "User registered but sending OTP failed");
+        Alert.alert(
+          "Email Error",
+          otpData.message || "User registered but OTP not sent."
+        );
         return;
       }
 
-      // 3️⃣ Navigate to Verify OTP screen
       Alert.alert(
-        "Registration Successful",
+        "Success",
         "We’ve sent a 6-digit OTP to your email. Please verify to continue.",
         [
           {
@@ -120,297 +191,471 @@ export default function RegisterScreen() {
         ]
       );
     } catch (err) {
-      console.error(err);
+      console.error("[Register Error]", err);
       Alert.alert("Error", "Something went wrong during registration.");
     }
   };
 
+  /* ---------------- UI Layout ---------------- */
+  const stepsTotal = 4;
+
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContainer,
-          { backgroundColor: background },
-        ]}
-      >
+  style={{ flex: 1, backgroundColor: background }}
+  behavior={Platform.OS === "ios" ? "padding" : "height"}
+  keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+>
+
+      <StatusBar
+        barStyle={Platform.OS === "ios" ? "light-content" : "default"}
+      />
+
+      {/* Header */}
+      <View style={styles.headerTop}>
         <ThemedText type="title" style={styles.title}>
           Register
         </ThemedText>
-
-        {/* Input fields */}
-        <TextInput
-          style={[styles.input, { borderColor: border, color: text }]}
-          placeholder="Username"
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          placeholderTextColor={border}
-        />
-        <TextInput
-          style={[styles.input, { borderColor: border, color: text }]}
-          placeholder="Email"
-          value={email}
-          onChangeText={(val) => setEmail(val.trim())}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          placeholderTextColor={border}
-        />
-
-        {/* Country Picker & Mobile Number */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 20,
-          }}
-        >
-          <CountryPicker
-            withFlag
-            withCallingCode
-            withFilter
-            withCountryNameButton
-            countryCode={countryCode}
-            onSelect={(country) => {
-              setCountryCode(country.cca2);
-              setCountry(country.name?.common || country.name);
-            }}
-            containerButtonStyle={{
-              borderWidth: 1,
-              borderColor: border,
-              borderRadius: 8,
-              padding: 12,
-              backgroundColor: "transparent",
-            }}
-          />
-          <TextInput
+        <ThemedText type="subtitle" style={styles.stepSubtitle}>
+          Step {String(step + 1).padStart(2, "0")}/
+          {String(stepsTotal).padStart(2, "0")}
+        </ThemedText>
+        <View style={[styles.progressTrack, { backgroundColor: surface }]}>
+          <View
             style={[
-              styles.input,
-              { flex: 1, marginLeft: 10, borderColor: border, color: text },
+              styles.progressFill,
+              {
+                backgroundColor: border,
+                width: `${((step + 1) / stepsTotal) * 100}%`,
+              },
             ]}
-            placeholder="Mobile Number"
-            value={mobileNo}
-            onChangeText={setMobileNo}
-            keyboardType="phone-pad"
-            placeholderTextColor={border}
           />
         </View>
+      </View>
 
-        {/* Remaining fields */}
-        <TextInput
-          style={[styles.input, { borderColor: border, color: text }]}
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholderTextColor={border}
-        />
-        <TextInput
-          style={[styles.input, { borderColor: border, color: text }]}
-          placeholder="First Name"
-          value={firstName}
-          onChangeText={setFirstName}
-          placeholderTextColor={border}
-        />
-        <TextInput
-          style={[styles.input, { borderColor: border, color: text }]}
-          placeholder="Last Name"
-          value={lastName}
-          onChangeText={setLastName}
-          placeholderTextColor={border}
-        />
-
-        {/* Gender Picker */}
-        <View style={{ marginBottom: 20 }}>
-          <ThemedText type="default" style={{ marginBottom: 8, color: text }}>
-            Gender
-          </ThemedText>
-          <RNPickerSelect
-            onValueChange={setGender}
-            value={gender}
-            placeholder={{ label: "Select Gender", value: null }}
-            items={[
-              { label: "Male", value: "male" },
-              { label: "Female", value: "female" },
-              { label: "Non-binary", value: "non-binary" },
-              { label: "Prefer not to say", value: "prefer-not-to-say" },
-              { label: "Other", value: "other" },
-            ]}
-            style={{
-              inputIOS: {
-                height: 50,
-                paddingHorizontal: 16,
-                borderWidth: 1,
-                borderColor: border,
-                borderRadius: 8,
-                color: text,
-                fontSize: 16,
-              },
-              inputAndroid: {
-                height: 50,
-                paddingHorizontal: 16,
-                borderWidth: 1,
-                borderColor: border,
-                borderRadius: 8,
-                color: text,
-                fontSize: 16,
-              },
-            }}
-          />
-        </View>
-
-        <TextInput
-          style={[styles.input, { borderColor: border, color: text }]}
-          placeholder="Street Address"
-          value={street}
-          onChangeText={setStreet}
-          placeholderTextColor={border}
-        />
-        <TextInput
-          style={[styles.input, { borderColor: border, color: text }]}
-          placeholder="City"
-          value={city}
-          onChangeText={setCity}
-          placeholderTextColor={border}
-        />
-        <TextInput
-          style={[styles.input, { borderColor: border, color: text }]}
-          placeholder="State"
-          value={state}
-          onChangeText={setState}
-          placeholderTextColor={border}
-        />
-        <TextInput
-          style={[styles.input, { borderColor: border, color: text }]}
-          placeholder="Postal Code"
-          value={postalCode}
-          onChangeText={setPostalCode}
-          keyboardType="numeric"
-          placeholderTextColor={border}
-        />
-
-        {/* Terms & Conditions checkbox */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 16,
-          }}
-        >
-          <TouchableOpacity
-            onPress={() => setTermsAccepted(!termsAccepted)}
-            style={{
-              height: 20,
-              width: 20,
-              borderRadius: 4,
-              borderWidth: 1,
-              borderColor: border,
-              alignItems: "center",
-              justifyContent: "center",
-              marginRight: 10,
-            }}
+      {/* Login link */}
+      <View style={styles.footerNote}>
+        <ThemedText style={styles.loginHint}>
+          Already have an account?{" "}
+          <ThemedText
+            style={styles.loginLink}
+            onPress={() => router.push("/login")}
           >
-            {termsAccepted && (
-              <View
-                style={{
-                  height: 10,
-                  width: 10,
-                  backgroundColor: border,
+            Login
+          </ThemedText>
+        </ThemedText>
+      </View>
+
+{/* Steps */}
+<TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+  <ScrollView
+    contentContainerStyle={styles.scrollContainer}
+    keyboardShouldPersistTaps="handled"
+    showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.stepWrap}>
+        {/* STEP 0 */}
+        {step === 0 && (
+          <View style={styles.stepInner}>
+            <ThemedText style={styles.sectionLead}>Personal Details</ThemedText>
+
+            <ThemedText style={styles.label}>First Name*</ThemedText>
+            <TextInput
+              style={[
+                styles.input,
+                { borderColor: border, color: text, backgroundColor: surface },
+              ]}
+              value={firstName}
+              onChangeText={setFirstName}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+
+            <ThemedText style={styles.label}>Last Name*</ThemedText>
+            <TextInput
+              style={[
+                styles.input,
+                { borderColor: border, color: text, backgroundColor: surface },
+              ]}
+              value={lastName}
+              onChangeText={setLastName}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+
+            <ThemedText style={styles.label}>Email*</ThemedText>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  borderColor: !email || emailValid ? border : "#B00020",
+                  color: text,
+                  backgroundColor: surface,
+                },
+              ]}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {!!email && !emailValid && (
+              <ThemedText style={{ fontSize: 12, color: "#B00020" }}>
+                Please enter a valid email (must include @ and end with .com)
+              </ThemedText>
+            )}
+
+            <ThemedText style={styles.label}>Date of Birth*</ThemedText>
+            <TouchableOpacity
+              style={[
+                styles.input,
+                {
+                  justifyContent: "center",
+                  borderColor: dob ? border : "#ccc",
+                  backgroundColor: surface,
+                },
+              ]}
+              onPress={() => setShowDobPicker(true)}
+            >
+              <Text style={{ color: dob ? text : "#777" }}>
+                {dob ? formatDatePretty(dob) : "Select your date of birth"}
+              </Text>
+            </TouchableOpacity>
+
+            {showDobPicker && (
+              <DateTimePicker
+                value={dob ?? new Date(2000, 0, 1)}
+                mode="date"
+                display={Platform.OS === "ios" ? "inline" : "calendar"}
+                maximumDate={new Date()}
+                onChange={(e, selected) => {
+                  if (selected) setDob(selected);
+                  setShowDobPicker(false);
                 }}
               />
             )}
-          </TouchableOpacity>
-          <Text style={{ color: text }}>
-            I agree to the{" "}
-            <Text
-              style={{ color: border, textDecorationLine: "underline" }}
-              onPress={() => setShowTermsModal(true)}
-            >
-              Terms & Conditions
-            </Text>
-          </Text>
-        </View>
+          </View>
+        )}
 
-        {/* Register Button (disabled if T&C not accepted) */}
-        <ThemedButton
-          title="Register"
-          onPress={handleRegister}
-          disabled={!termsAccepted}
-        />
+        {/* STEP 1 */}
+        {step === 1 && (
+          <View style={styles.stepInner}>
+            <ThemedText style={styles.sectionLead}>Contact Details</ThemedText>
 
-        {/* Navigation to Login */}
-        <View style={styles.footerTextContainer}>
-          <ThemedText type="default">
-            Already have an account?{" "}
-            <ThemedText type="link" onPress={() => router.push("/login")}>
-              Login
-            </ThemedText>
-          </ThemedText>
-        </View>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <CountryPicker
+                withFlag
+                withCallingCode
+                withFilter
+                countryCode={countryCode}
+                onSelect={(c) => {
+                  setCountryCode(c.cca2);
+                  setCountry(c.name?.common || c.name);
+                }}
+                containerButtonStyle={styles.ccBtn}
+              />
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <ThemedText style={styles.label}>Mobile Number*</ThemedText>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      borderColor: border,
+                      color: text,
+                      backgroundColor: surface,
+                    },
+                  ]}
+                  value={mobileNo}
+                  onChangeText={setMobileNo}
+                  keyboardType="phone-pad"
+                />
+              </View>
+            </View>
 
-        {/* Modal for Terms & Conditions */}
-        {showTermsModal && (
-          <View
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "rgba(0,0,0,0.6)",
-              justifyContent: "center",
-              alignItems: "center",
-              padding: 20,
-            }}
-          >
-            <View
-              style={{
-                backgroundColor: "#fff",
-                padding: 20,
-                borderRadius: 10,
-                maxHeight: "80%",
-                width: "100%",
-              }}
-            >
-              <ScrollView>
-                <Text style={{ color: "#000", fontSize: 16 }}>
-                  These are the Terms and Conditions of using the BeSide app. By
-                  agreeing, you confirm that you understand the privacy
-                  practices and your responsibilities as a user. You must adhere
-                  to community guidelines and consent to our use of data per the
-                  Privacy Policy.
-                </Text>
-              </ScrollView>
-              <ThemedButton
-                title="Close"
-                onPress={() => setShowTermsModal(false)}
+            <ThemedText style={styles.label}>Username (optional)</ThemedText>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  borderColor: border,
+                  color: text,
+                  backgroundColor: surface,
+                },
+              ]}
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+            />
+
+            <ThemedText style={styles.label}>Gender</ThemedText>
+            <View style={styles.pickerWrap}>
+              <RNPickerSelect
+                onValueChange={setGender}
+                value={gender}
+                placeholder={{ label: "Select Gender", value: null }}
+                items={[
+                  { label: "Male", value: "male" },
+                  { label: "Female", value: "female" },
+                  { label: "Non-binary", value: "non-binary" },
+                  { label: "Other", value: "other" },
+                ]}
               />
             </View>
           </View>
         )}
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
+
+        {/* STEP 2 */}
+        {step === 2 && (
+          <View style={styles.stepInner}>
+            <ThemedText style={styles.sectionLead}>Create Password</ThemedText>
+            <ThemedText style={styles.label}>Password*</ThemedText>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  borderColor: border,
+                  color: text,
+                  backgroundColor: surface,
+                },
+              ]}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+            {password.length > 0 && (
+              <>
+                <View style={styles.strengthBarWrap}>
+                  <View
+                    style={[
+                      styles.strengthBar,
+                      {
+                        backgroundColor: getStrengthColor(passwordStrength),
+                      },
+                    ]}
+                  />
+                  <ThemedText style={{ marginLeft: 8 }}>
+                    {passwordStrength}
+                  </ThemedText>
+                </View>
+                <View style={styles.checkList}>
+                  {passwordChecks.map((c, i) => (
+                    <Text
+                      key={i}
+                      style={{
+                        color: c.ok ? "#22c55e" : "#ef4444",
+                        fontSize: 14,
+                        marginVertical: 2,
+                      }}
+                    >
+                      {c.ok ? "✓" : "✗"} {c.label}
+                    </Text>
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
+        )}
+
+        {/* STEP 3 */}
+        {step === 3 && (
+          <View style={styles.stepInner}>
+            <ThemedText style={styles.sectionLead}>Location & Terms</ThemedText>
+            <PlacesAutocomplete
+              placeholder="Type your address"
+              value={street}
+              onChangeText={setStreet}
+              onSelect={(place) => {
+                if (place) {
+                  setStreet(place.description);
+                  setGeo({ lat: place.lat, lng: place.lng });
+                }
+              }}
+              style={{ marginTop: 8 }}
+            />
+
+            <View style={{ flexDirection: "row", marginTop: 20 }}>
+              <TouchableOpacity
+                onPress={() => setTermsAccepted(!termsAccepted)}
+                style={styles.checkbox}
+              >
+                {termsAccepted && (
+                  <View
+                    style={[styles.checkboxInner, { backgroundColor: border }]}
+                  />
+                )}
+              </TouchableOpacity>
+              <Text style={{ color: text }}>
+                I agree to the{" "}
+                <Text
+                  style={{ color: border, textDecorationLine: "underline" }}
+                  onPress={() =>
+                    Alert.alert(
+                      "Terms & Conditions",
+                      "Link to Terms & Privacy here."
+                    )
+                  }
+                >
+                  Terms & Conditions
+                </Text>
+              </Text>
+            </View>
+          </View>
+        )}
+
+        <View style={styles.footerBar}>
+          {step > 0 && (
+            <ThemedButton
+              title="Back"
+              onPress={() => setStep(step - 1)}
+              style={styles.btnHalf}
+              textStyle={styles.btnText}
+            />
+          )}
+          <ThemedButton
+            title={step < 3 ? "Next" : "Register"}
+            onPress={() => {
+              if (!validateStep()) {
+                Alert.alert(
+                  "Missing Info",
+                  "Please complete all * fields correctly before proceeding."
+                );
+                return;
+              }
+              if (step < 3) setStep(step + 1);
+              else handleRegister();
+            }}
+            disabled={step === 3 && !termsAccepted}
+            style={step === 0 ? styles.btnSingleCenter : styles.btnHalf}
+            textStyle={styles.btnText}
+          />
+        </View>
+      </View>
+  </ScrollView>
+  </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>);
 }
 
-// Styles
+/* ---------------- Styles ---------------- */
 const styles = StyleSheet.create({
-  scrollContainer: {
-    paddingBottom: 30,
+  headerTop: {
+    paddingTop: Platform.OS === "android" ? 30 : 40,
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === "android" ? 60 : 80,
-    flexGrow: 1,
+    paddingBottom: 8,
+    alignItems: "center",
   },
-  title: { textAlign: "center", marginBottom: 30 },
-  input: {
-    height: 50,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    fontSize: 16,
+  title: { marginTop: 6, textAlign: "center", paddingTop: 6 },
+  stepSubtitle: { marginTop: 6, textAlign: "center" },
+  progressTrack: {
+    height: 6,
+    marginTop: 20,
+    borderRadius: 100,
+    overflow: "hidden",
+    width: "100%",
+    maxWidth: 640,
+  },
+  progressFill: { height: "100%", borderRadius: 100 },
+  stepWrap: {
+    flex: 1,
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
+  },
+  stepInner: {
+    alignItems: "stretch",
+    alignSelf: "center",
+    width: "90%",
+    maxWidth: 400,
+  },
+  footerBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
     marginBottom: 20,
   },
-  footerTextContainer: { marginTop: 24, alignItems: "center" },
+
+  sectionLead: {
+    textAlign: "left",
+    alignSelf: "center",
+    opacity: 0.9,
+    fontWeight: "bold",
+    fontSize: 20,
+  },
+
+  label: {
+    fontSize: 14,
+    opacity: 0.9,
+    marginBottom: 6,
+    marginTop: 10,
+    textAlign: "left",
+  },
+  input: {
+    height: 46,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    marginBottom: 12,
+    alignSelf: "stretch",
+  },
+
+  pickerWrap: {
+    borderWidth: 1,
+    borderRadius: 10,
+    borderColor: "#ccc",
+    paddingHorizontal: 12,
+    height: 50,
+    justifyContent: "center",
+  },
+  ccBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: "#fff",
+  },
+  strengthBarWrap: { flexDirection: "row", alignItems: "center", marginTop: 6 },
+  strengthBar: { height: 8, borderRadius: 100, width: 120 },
+  checkList: { marginTop: 8, gap: 4 },
+  checkbox: {
+    height: 20,
+    width: 20,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: "#888",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  checkboxInner: { height: 10, width: 10 },
+  btnCenter: { minHeight: 48, minWidth: 200, alignSelf: "center" },
+  btnHalf: {
+    height: 50,
+    minWidth: 140,
+    marginHorizontal: 5,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  btnText: {
+    fontSize: 16,
+    textAlign: "center",
+    textAlignVertical: "center",
+  },
+  btnSingleCenter: {
+    height: 50,
+    width: "80%",
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
+    borderRadius: 33,
+  },
+ 
+
+  footerNote: {
+    marginTop: 20,
+    marginBottom: 15,
+    paddingHorizontal: 20,
+    alignItems: "flex-end",
+  },
+  loginHint: { fontSize: 15, opacity: 0.8 },
+  loginLink: { textDecorationLine: "underline", fontWeight: "bold" },
 });

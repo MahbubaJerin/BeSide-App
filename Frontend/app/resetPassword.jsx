@@ -88,8 +88,9 @@ export default function ResetPasswordScreen() {
       }
 
       await AsyncStorage.removeItem("resetToken");
-      Alert.alert("Success", "Password has been reset. Please log in.");
-      router.replace("/login");
+      Alert.alert("Success", "Password has been reset successfully!", [
+        { text: "OK", onPress: () => router.replace("/home") },
+      ]);
     } catch (error) {
       console.error("[ResetPassword] error:", error?.message || error);
       Alert.alert("Error", "Something went wrong. Please try again.");

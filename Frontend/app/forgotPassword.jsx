@@ -75,7 +75,10 @@ export default function ForgotPasswordScreen() {
 
       if (response.ok) {
         Alert.alert("OTP Sent", "A verification code has been sent to your email.");
-        router.push({ pathname: "/verifyOTP", params: { email: normalizedEmail } });
+        router.push({
+  pathname: "/verifyOTP",
+  params: { email: normalizedEmail, context: "reset" },
+});
       } else {
         const msg = data?.message || "Unable to send OTP. Please try again.";
         setApiErr(msg);
