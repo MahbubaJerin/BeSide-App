@@ -83,24 +83,23 @@ const createSendToken = (user, statusCode, res) => {
  * Login user and send JWT token
  */
 exports.login = catchAsync(async (req, res, next) => {
-  const { userName, password } = req.body;
+  const { userName, email, password } = req.body;
 
-  // Check if username and password exist
-  if (!userName || !password) {
-    return next(new AppError("Please provide username and password", 400));
+  // Allow login via either username or email
+  if ((!userName && !email) || !password) {
+    return next(new AppError("Please provide username/email and password", 400));
   }
 
-  // Find user by username
-  const user = await User.findOne({ userName }).select("+password");
+  const query = userName ? { userName } : { email };
+  const user = await User.findOne(query).select("+password");
 
-  // Check if user exists and password is correct
   if (!user || !(await bcrypt.compare(password, user.password))) {
-    return next(new AppError("Incorrect username or password", 401));
+    return next(new AppError("Incorrect username/email or password", 401));
   }
 
-  // Send token
   createSendToken(user, 200, res);
 });
+
 
 /**
  * Get current user info
@@ -454,10 +453,11 @@ exports.resetPassword = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Password is required" });
   }
 
-  user.password = password; // should be hashed in pre-save
-  user.canResetPassword = false;
+ const hashed = await bcrypt.hash(password, 12);
+user.password = hashed;
+user.canResetPassword = false;
+await user.save({ validateBeforeSave: false });
 
-  await user.save();
 
   res.status(200).json({ message: "Password reset successfully" });
 });

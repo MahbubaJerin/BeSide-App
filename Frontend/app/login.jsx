@@ -1,4 +1,3 @@
-// login.jsx
 import React, { useRef, useState } from "react";
 import {
   View,
@@ -39,17 +38,20 @@ export default function LoginScreen() {
   const passwordRef = useRef(null);
 
   const saveAuth = async (payload) => {
-    const token =
-      payload?.token ||
-      payload?.accessToken ||
-      payload?.data?.token ||
-      payload?.data?.accessToken ||
-      null;
+    await AsyncStorage.multiRemove(["user", "token"]); // clear any stale data
 
-    const user = payload?.user || payload?.data?.user || null;
+const user =
+  payload?.data?.user || payload?.user || payload?.data?.data?.user || null;
+const token =
+  payload?.token ||
+  payload?.accessToken ||
+  payload?.data?.token ||
+  payload?.data?.accessToken ||
+  null;
 
-    if (user) await AsyncStorage.setItem("user", JSON.stringify(user));
-    if (token) await AsyncStorage.setItem("token", String(token));
+if (user) await AsyncStorage.setItem("user", JSON.stringify(user));
+if (token) await AsyncStorage.setItem("token", String(token));
+
   };
 
   const validate = () => {
@@ -81,51 +83,68 @@ export default function LoginScreen() {
     return serverMsg || "Something went wrong. Please try again.";
   };
 
-  const handleLogin = async () => {
-    Keyboard.dismiss();
-    if (!validate()) return;
+ const handleLogin = async () => {
+  Keyboard.dismiss();
+  if (!validate()) return;
 
+  try {
+    setLoading(true);
+
+    // ✅ Determine input type (email or username)
+    const isEmail = username.includes("@");
+    const loginBody = isEmail
+      ? { email: username.trim().toLowerCase(), password }
+      : { userName: username.trim(), password };
+
+    // ✅ Clear old data before login (avoid wrong profile mix-up)
+    await AsyncStorage.multiRemove(["user", "token", "resetToken"]);
+
+    // ✅ Send clean login request
+    const res = await fetch(`${BASE_URL}${LOGIN_PATH}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(loginBody),
+    });
+
+    const raw = await res.text();
+    let data = {};
     try {
-      setLoading(true);
-
-      const res = await fetch(`${BASE_URL}${LOGIN_PATH}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: username.trim(),
-          userName: username.trim(),
-          password,
-        }),
-      });
-
-      const raw = await res.text();
-      let data = {};
-      try {
-        data = raw ? JSON.parse(raw) : {};
-      } catch {
-        // non-JSON error page
-      }
-
-      if (!res.ok) {
-        const msg = friendlyMessageForStatus(
-          res.status,
-          data?.message || data?.error
-        );
-        setApiErr(msg);
-        throw new Error(msg);
-      }
-
-      await saveAuth(data);
-      router.replace("/home");
-    } catch (err) {
-      console.error("Login error:", err?.message || err);
-      if (!apiErr) {
-        Alert.alert("Login error", String(err?.message || "Something went wrong"));
-      }
-    } finally {
-      setLoading(false);
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      console.warn("Non-JSON response:", raw);
     }
-  };
+
+    if (!res.ok) {
+      const msg = friendlyMessageForStatus(
+        res.status,
+        data?.message || data?.error
+      );
+      setApiErr(msg);
+      throw new Error(msg);
+    }
+
+    // ✅ Save new user/token cleanly
+    const token =
+      data?.token ||
+      data?.accessToken ||
+      data?.data?.token ||
+      data?.data?.accessToken ||
+      null;
+
+    const user =
+      data?.user || data?.data?.user || data?.data?.data?.user || null;
+
+    if (user) await AsyncStorage.setItem("user", JSON.stringify(user));
+    if (token) await AsyncStorage.setItem("token", String(token));
+
+    router.replace("/home");
+  } catch (err) {
+    console.error("Login error:", err?.message || err);
+    Alert.alert("Login error", err?.message || "Something went wrong");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <KeyboardAvoidingView

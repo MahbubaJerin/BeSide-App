@@ -87,7 +87,7 @@ export default function ResetPasswordScreen() {
         return;
       }
 
-      await AsyncStorage.removeItem("resetToken");
+      await AsyncStorage.multiRemove(["resetToken", "token", "user"]);
       Alert.alert("Success", "Password has been reset successfully!", [
         { text: "OK", onPress: () => router.replace("/home") },
       ]);
