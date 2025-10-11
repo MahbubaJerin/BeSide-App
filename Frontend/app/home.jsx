@@ -1223,14 +1223,7 @@ titleText: {
     minHeight: 44,
   },
   navContainer: {
-    position: "absolute",
-    left: 15,
-    right: 15,
-    bottom: 10,
-    height: 80,
-    marginBottom: 40,
-    alignItems: "center",
-    borderRadius: 36,
+    bottom: 0,
             backgroundColor: Colors.light.background,
 
   },
