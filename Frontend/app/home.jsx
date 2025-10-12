@@ -9,6 +9,8 @@ import {
   Alert,
   Image,
   Animated,
+  Platform,
+  Linking,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useFocusEffect } from "expo-router";
@@ -637,6 +639,20 @@ export default function HomeScreen() {
       mapRef.current?.animateToRegion(region, 1000);
     }
   };
+const handleSOS = async (num = "000") => {
+  const url = Platform.OS === "ios" ? `telprompt:${num}` : `tel:${num}`;
+  try {
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert("Cannot open dialer", `Please call ${num} manually.`);
+    }
+  } catch (error) {
+    Alert.alert("Error", "Something went wrong while opening the dialer.");
+    console.error("Dial error:", error);
+  }
+};
 
   const decodePolyline = (encoded) =>
     polyline
@@ -966,7 +982,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navButton}
-              onPress={() => router.push("/sos")}
+              onPress={() => handleSOS("000")} 
             >
               <Ionicons name="alert" size={24} color="#fff" />
               <ThemedText style={styles.navLabel}>SOS</ThemedText>

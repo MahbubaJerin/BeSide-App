@@ -29,6 +29,8 @@ export default function VerifyScreen() {
   const background = useThemeColor({}, "surface");
   const border = useThemeColor({}, "primary");
   const text = useThemeColor({}, "text");
+  const accent = useThemeColor({}, "accent");
+
 
   useEffect(() => {
     const loadUser = async () => {
@@ -193,7 +195,7 @@ export default function VerifyScreen() {
           onPress={submitting ? undefined : handleVerify}
           disabled={submitting}
           testID="verify-button"
-          style={{ backgroundColor: Colors.light.accent, borderColor: Colors.light.accent}}
+          style={{ backgroundColor: accent, borderColor: accent }}
         />
       </ScrollView>
     </KeyboardAvoidingView>
