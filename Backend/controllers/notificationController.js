@@ -9,47 +9,81 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
     const { tripReqId, startCoordinates, searchRadius = 500 } = req.body;
     const senderId = req.user._id;
 
+    console.log("🔍 [BACKEND] Send to nearby users request:");
+    console.log("- Sender ID:", senderId);
+    console.log("- Trip Request ID:", tripReqId);
+    console.log("- Start Coordinates:", startCoordinates);
+    console.log("- Search Radius:", searchRadius);
+
     // Validate required fields
     if (!tripReqId || !startCoordinates) {
+        console.log("❌ [BACKEND] Missing required fields");
         return next(new AppError("Trip request ID and start coordinates are required", 400));
     }
 
     if (!startCoordinates.longitude || !startCoordinates.latitude) {
+        console.log("❌ [BACKEND] Invalid coordinates");
         return next(new AppError("Valid coordinates (longitude, latitude) are required", 400));
     }
 
     // Find the trip request
     const tripRequest = await TripRequest.findOne({ tripReqId });
+    console.log("📋 [BACKEND] Trip request found:", !!tripRequest);
     if (!tripRequest) {
+        console.log("❌ [BACKEND] Trip request not found in database");
         return next(new AppError("Trip request not found", 404));
     }
 
     // Check if the trip request belongs to the current user
+    console.log("👤 [BACKEND] Trip request owner:", tripRequest.user.userId, "vs sender:", senderId.toString());
     if (tripRequest.user.userId !== senderId.toString()) {
+        console.log("❌ [BACKEND] User not authorized for this trip request");
         return next(new AppError("You can only send your own trip requests", 403));
     }
 
     // Find nearby active users
+    console.log("🔍 [BACKEND] Searching for nearby users...");
     const nearbyUsers = await UserLocation.findNearbyUsers(
         startCoordinates.longitude,
         startCoordinates.latitude,
         searchRadius,
         senderId
     );
+    console.log("📍 [BACKEND] Found nearby users:", nearbyUsers.length);
+    console.log("📍 [BACKEND] Nearby users:", nearbyUsers.map(u => ({ userId: u.userId, userName: u.userName })));
 
-    // Filter out the sender and users who already received this request
-    const eligibleUsers = nearbyUsers.filter(user => 
-        user.userId.toString() !== senderId.toString() &&
-        !tripRequest.recipients.some(recipient => recipient.userId === user.userId.toString())
-    );
+    // Filter out the sender, users who already received this request, and verify they exist in Users collection
+    const eligibleUsers = [];
+    for (const user of nearbyUsers) {
+        const isNotSender = user.userId.toString() !== senderId.toString();
+        const notAlreadyRecipient = !tripRequest.recipients.some(recipient => recipient.userId === user.userId.toString());
+        
+        // Check if user actually exists in Users collection
+        const userExists = await User.findById(user.userId);
+        
+        console.log(`- User ${user.userName}: isNotSender=${isNotSender}, notAlreadyRecipient=${notAlreadyRecipient}, userExists=${!!userExists}`);
+        
+        if (isNotSender && notAlreadyRecipient && userExists) {
+            eligibleUsers.push(user);
+        } else if (!userExists) {
+            console.log(`⚠️ [BACKEND] User ${user.userName} (${user.userId}) exists in UserLocation but not in Users collection - skipping`);
+        }
+    }
+
+    console.log("✅ [BACKEND] Eligible users:", eligibleUsers.length);
 
     if (eligibleUsers.length === 0) {
+        console.log("⚠️ [BACKEND] No eligible users found");
         return res.status(200).json({
             status: "success",
             message: "No new nearby users found",
             data: {
                 tripRequest,
-                recipientCount: 0
+                recipientCount: 0,
+                debug: {
+                    totalNearbyUsers: nearbyUsers.length,
+                    alreadySent: tripRequest.recipients.length
+                }
             }
         });
     }
@@ -61,9 +95,13 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
         responseStatus: "notified"
     }));
 
+    console.log("📤 [BACKEND] Adding recipients:", newRecipients);
+
     // Add new recipients to existing ones
     tripRequest.recipients.push(...newRecipients);
     await tripRequest.save();
+
+    console.log("✅ [BACKEND] Trip request updated successfully");
 
     res.status(200).json({
         status: "success",
@@ -80,6 +118,8 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
 exports.getPendingRequests = catchAsync(async (req, res, next) => {
     const userId = req.user._id.toString();
 
+    console.log("🔍 [BACKEND] Getting pending requests for user:", userId);
+
     const requests = await TripRequest.find({
         "recipients.userId": userId,
         "recipients.responseStatus": { $in: ["notified", "viewed"] },
@@ -87,11 +127,17 @@ exports.getPendingRequests = catchAsync(async (req, res, next) => {
         expiresAt: { $gt: new Date() }
     }).populate('user.userId', 'firstName lastName profilePhoto');
 
+    console.log("📋 [BACKEND] Raw requests found:", requests.length);
+
     // Filter requests where the current user hasn't responded
     const pendingRequests = requests.filter(request => {
         const userRecipient = request.recipients.find(r => r.userId === userId);
-        return userRecipient && ["notified", "viewed"].includes(userRecipient.responseStatus);
+        const isEligible = userRecipient && ["notified", "viewed"].includes(userRecipient.responseStatus);
+        console.log(`- Request ${request.tripReqId}: userRecipient=${!!userRecipient}, isEligible=${isEligible}`);
+        return isEligible;
     });
+
+    console.log("✅ [BACKEND] Filtered pending requests:", pendingRequests.length);
 
     res.status(200).json({
         status: "success",

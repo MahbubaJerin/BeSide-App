@@ -525,43 +525,65 @@ export default function HomeScreen() {
   const sendTripRequestToNearby = async (startCoordinates) => {
     try {
       const token = await AsyncStorage.getItem("token");
+      const user = await AsyncStorage.getItem("user");
+      
+      console.log("🔍 DEBUG - Sending request to nearby users:");
+      console.log("Token exists:", !!token);
+      console.log("User exists:", !!user);
+      console.log("Current trip request ID:", currentTripRequestId);
+      console.log("Start coordinates:", startCoordinates);
+      
       if (!token || !currentTripRequestId) {
-        console.log("Missing token or trip request ID");
+        console.log("❌ Missing token or trip request ID");
+        Alert.alert("Debug Error", `Missing: ${!token ? 'Token' : ''} ${!currentTripRequestId ? 'Trip Request ID' : ''}`);
         return;
       }
 
       const API_URL = BASE_URL.replace(/\/+$/, "");
+      const requestBody = {
+        tripReqId: currentTripRequestId,
+        startCoordinates: {
+          longitude: startCoordinates.longitude,
+          latitude: startCoordinates.latitude,
+        },
+        searchRadius: 500,
+      };
+      
+      console.log("🌐 API URL:", `${API_URL}/api/v1/trip/send-to-nearby`);
+      console.log("📤 Request body:", JSON.stringify(requestBody, null, 2));
+      
       const response = await fetch(`${API_URL}/api/v1/trip/send-to-nearby`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          tripReqId: currentTripRequestId,
-          startCoordinates: {
-            longitude: startCoordinates.longitude,
-            latitude: startCoordinates.latitude,
-          },
-          searchRadius: 500, // 500 meters
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log("📥 Response status:", response.status);
+      console.log("📥 Response ok:", response.ok);
+      
       const result = await response.json();
+      console.log("📥 Response body:", JSON.stringify(result, null, 2));
+      
       if (result.status === "success") {
+        console.log("✅ Success - Recipients:", result.data.recipientCount);
         Alert.alert(
           "Request Sent! 🚀",
-          `Your companion request has been sent to ${result.data.recipientCount} nearby users`,
+          `Your companion request has been sent to ${result.data.recipientCount} nearby users\n\nDEBUG INFO:\n- Trip ID: ${currentTripRequestId}\n- Coordinates: ${startCoordinates.latitude}, ${startCoordinates.longitude}\n- Recipients: ${result.data.recipientCount}`,
           [{ text: "OK" }]
         );
       } else {
+        console.log("❌ API Error:", result.message);
+        Alert.alert("API Error", result.message || "Failed to send request");
         throw new Error(result.message || "Failed to send request to nearby users");
       }
     } catch (error) {
-      console.error("Error sending to nearby users:", error);
+      console.error("🚨 Error sending to nearby users:", error);
       Alert.alert(
-        "Info",
-        "Request sent to companion search, but couldn't notify nearby users at this time."
+        "Debug Error",
+        `Network/Parse Error: ${error.message}\n\nCheck console for details`
       );
     }
   };
