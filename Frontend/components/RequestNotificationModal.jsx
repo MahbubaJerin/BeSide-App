@@ -16,6 +16,84 @@ import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { BASE_URL } from "../config";
 
+// Separate component for each request card to properly handle hooks
+function RequestCard({ request, onMarkViewed, onResponse, respondingTo, formatDate, formatTimeRemaining }) {
+  // Mark as viewed when component mounts
+  useEffect(() => {
+    onMarkViewed(request.tripReqId);
+  }, [request.tripReqId, onMarkViewed]);
+
+  return (
+    <View style={styles.requestCard}>
+      <View style={styles.cardHeader}>
+        <View style={styles.userInfo}>
+          <View style={styles.avatar}>
+            <ThemedText style={styles.avatarText}>
+              {request.user.userName.charAt(0).toUpperCase()}
+            </ThemedText>
+          </View>
+          <View>
+            <ThemedText style={styles.userName}>
+              {request.user.userName}
+            </ThemedText>
+            <ThemedText style={styles.timeAgo}>
+              {formatTimeRemaining(request.expiresAt)}
+            </ThemedText>
+          </View>
+        </View>
+        <View style={styles.urgencyBadge}>
+          <ThemedText style={styles.urgencyText}>NEW</ThemedText>
+        </View>
+      </View>
+
+      <View style={styles.requestDetails}>
+        <View style={styles.detailRow}>
+          <ThemedText style={styles.detailIcon}>📍</ThemedText>
+          <ThemedText style={styles.detailText}>
+            Going to: {request.destination}
+          </ThemedText>
+        </View>
+        
+        <View style={styles.detailRow}>
+          <ThemedText style={styles.detailIcon}>🚶</ThemedText>
+          <ThemedText style={styles.detailText}>
+            Transport: {request.destinationType}
+          </ThemedText>
+        </View>
+
+        <View style={styles.detailRow}>
+          <ThemedText style={styles.detailIcon}>⏰</ThemedText>
+          <ThemedText style={styles.detailText}>
+            {formatDate(request.date)} 
+          </ThemedText>
+        </View>
+
+        <View style={styles.detailRow}>
+          <ThemedText style={styles.detailIcon}>👥</ThemedText>
+          <ThemedText style={styles.detailText}>
+            Prefers: {request.genderPreference === "any" ? "Anyone" : request.genderPreference}
+          </ThemedText>
+        </View>
+      </View>
+
+      <View style={styles.actionButtons}>
+        <ThemedButton
+          title={respondingTo === request.tripReqId ? "..." : "✅ Accept"}
+          onPress={() => onResponse(request.tripReqId, "accepted")}
+          style={[styles.button, styles.acceptButton]}
+          disabled={respondingTo === request.tripReqId}
+        />
+        <ThemedButton
+          title={respondingTo === request.tripReqId ? "..." : "❌ Decline"}
+          onPress={() => onResponse(request.tripReqId, "declined")}
+          style={[styles.button, styles.declineButton]}
+          disabled={respondingTo === request.tripReqId}
+        />
+      </View>
+    </View>
+  );
+}
+
 export default function RequestNotificationModal({ visible, onClose, onRequestAccepted }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -180,82 +258,17 @@ export default function RequestNotificationModal({ visible, onClose, onRequestAc
                 </ThemedText>
               </View>
             ) : (
-              requests.map((request) => {
-                // Mark as viewed when displayed
-                useEffect(() => {
-                  markAsViewed(request.tripReqId);
-                }, [request.tripReqId]);
-
-                return (
-                  <View key={request.tripReqId} style={styles.requestCard}>
-                    <View style={styles.cardHeader}>
-                      <View style={styles.userInfo}>
-                        <View style={styles.avatar}>
-                          <ThemedText style={styles.avatarText}>
-                            {request.user.userName.charAt(0).toUpperCase()}
-                          </ThemedText>
-                        </View>
-                        <View>
-                          <ThemedText style={styles.userName}>
-                            {request.user.userName}
-                          </ThemedText>
-                          <ThemedText style={styles.timeAgo}>
-                            {formatTimeRemaining(request.expiresAt)}
-                          </ThemedText>
-                        </View>
-                      </View>
-                      <View style={styles.urgencyBadge}>
-                        <ThemedText style={styles.urgencyText}>NEW</ThemedText>
-                      </View>
-                    </View>
-
-                    <View style={styles.requestDetails}>
-                      <View style={styles.detailRow}>
-                        <ThemedText style={styles.detailIcon}>📍</ThemedText>
-                        <ThemedText style={styles.detailText}>
-                          Going to: {request.destination}
-                        </ThemedText>
-                      </View>
-                      
-                      <View style={styles.detailRow}>
-                        <ThemedText style={styles.detailIcon}>🚶</ThemedText>
-                        <ThemedText style={styles.detailText}>
-                          Transport: {request.destinationType}
-                        </ThemedText>
-                      </View>
-
-                      <View style={styles.detailRow}>
-                        <ThemedText style={styles.detailIcon}>⏰</ThemedText>
-                        <ThemedText style={styles.detailText}>
-                          {formatDate(request.date)} 
-                        </ThemedText>
-                      </View>
-
-                      <View style={styles.detailRow}>
-                        <ThemedText style={styles.detailIcon}>👥</ThemedText>
-                        <ThemedText style={styles.detailText}>
-                          Prefers: {request.genderPreference === "any" ? "Anyone" : request.genderPreference}
-                        </ThemedText>
-                      </View>
-                    </View>
-
-                    <View style={styles.actionButtons}>
-                      <ThemedButton
-                        title={respondingTo === request.tripReqId ? "..." : "✅ Accept"}
-                        onPress={() => handleResponse(request.tripReqId, "accepted")}
-                        style={[styles.button, styles.acceptButton]}
-                        disabled={respondingTo === request.tripReqId}
-                      />
-                      <ThemedButton
-                        title={respondingTo === request.tripReqId ? "..." : "❌ Decline"}
-                        onPress={() => handleResponse(request.tripReqId, "declined")}
-                        style={[styles.button, styles.declineButton]}
-                        disabled={respondingTo === request.tripReqId}
-                      />
-                    </View>
-                  </View>
-                );
-              })
+              requests.map((request) => (
+                <RequestCard 
+                  key={request.tripReqId}
+                  request={request}
+                  onMarkViewed={markAsViewed}
+                  onResponse={handleResponse}
+                  respondingTo={respondingTo}
+                  formatDate={formatDate}
+                  formatTimeRemaining={formatTimeRemaining}
+                />
+              ))
             )}
           </ScrollView>
 
