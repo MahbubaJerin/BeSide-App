@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const tripController = require("../controllers/tripController");
+const notificationController = require("../controllers/notificationController");
 const { model } = require("mongoose");
 const { uploadSingle } = require("../utils/fileUpload");
 const authController = require("../controllers/authController");
@@ -35,6 +36,37 @@ router.post(
 router.put(
   "/:tripReqId",
   tripController.updateTripRequest
+);
+
+// Notification routes for companion matching
+router.post(
+  "/send-to-nearby",
+  notificationController.sendTripRequestToNearby
+);
+
+router.get(
+  "/pending-requests",
+  notificationController.getPendingRequests
+);
+
+router.post(
+  "/mark-viewed",
+  notificationController.markRequestAsViewed
+);
+
+router.post(
+  "/respond-request",
+  notificationController.respondToTripRequest
+);
+
+router.get(
+  "/sent-requests-status",
+  notificationController.getSentRequestsStatus
+);
+
+router.post(
+  "/cancel-request",
+  notificationController.cancelTripRequest
 );
 
 module.exports = router;

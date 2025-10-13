@@ -32,8 +32,11 @@ import { ThemedButton } from "@/components/ThemedButton";
 import ConsentModal from "./ConsentModal";
 import CompanionPreferencesModal from "./CompanionPreferencesModal";
 import PhotoUploadModal from "./PhotoUploadModal";
+import SentRequestStatusModal from "@/components/SentRequestStatusModal";
+import RequestNotificationModal from "@/components/RequestNotificationModal";
 import BeSideLogo from "../assets/images/BeSide.png"; 
 import { BASE_URL } from "../config";
+import { useRequestPolling } from "../hooks/useRequestPolling";
 
 // ========= Inline hooks (single-file edition) =========
 
@@ -330,6 +333,8 @@ export default function HomeScreen() {
   const [photoUploadVisible, setPhotoUploadVisible] = useState(false);
   const [consentVisible, setConsentVisible] = useState(false);
   const [preferencesVisible, setPreferencesVisible] = useState(false);
+  const [sentRequestStatusVisible, setSentRequestStatusVisible] = useState(false);
+  const [requestNotificationVisible, setRequestNotificationVisible] = useState(false);
 
   const [consent, setConsent] = useState({
     noTouch: false,
@@ -351,6 +356,7 @@ export default function HomeScreen() {
   // hooks
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
+  const requestPolling = useRequestPolling(10000, true); // Poll every 10 seconds
 
   const currentLocation = locationTracking.currentLocation;
   const isSearching = companionSearch.isSearching;
@@ -515,6 +521,51 @@ export default function HomeScreen() {
     }
   };
 
+  // NEW: Send trip request to nearby users
+  const sendTripRequestToNearby = async (startCoordinates) => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token || !currentTripRequestId) {
+        console.log("Missing token or trip request ID");
+        return;
+      }
+
+      const API_URL = BASE_URL.replace(/\/+$/, "");
+      const response = await fetch(`${API_URL}/api/v1/trip/send-to-nearby`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          tripReqId: currentTripRequestId,
+          startCoordinates: {
+            longitude: startCoordinates.longitude,
+            latitude: startCoordinates.latitude,
+          },
+          searchRadius: 500, // 500 meters
+        }),
+      });
+
+      const result = await response.json();
+      if (result.status === "success") {
+        Alert.alert(
+          "Request Sent! 🚀",
+          `Your companion request has been sent to ${result.data.recipientCount} nearby users`,
+          [{ text: "OK" }]
+        );
+      } else {
+        throw new Error(result.message || "Failed to send request to nearby users");
+      }
+    } catch (error) {
+      console.error("Error sending to nearby users:", error);
+      Alert.alert(
+        "Info",
+        "Request sent to companion search, but couldn't notify nearby users at this time."
+      );
+    }
+  };
+
   const handlePreferencesSubmit = async (preferences) => {
     try {
       setStartMarker(preferences.startCoordinates);
@@ -553,12 +604,18 @@ export default function HomeScreen() {
             animated: true,
           });
         }
-        // optionally, refine search center to startCoordinates:
+        
+        // Start companion search as before
         await companionSearch.startSearch(
           preferences.startCoordinates,
           searchRadius,
           30000
         );
+
+        // NEW: Send trip request to nearby users
+        if (currentTripRequestId) {
+          await sendTripRequestToNearby(preferences.startCoordinates);
+        }
       } else {
         Alert.alert("Error", "No route found between the selected locations");
       }
@@ -982,6 +1039,32 @@ const handleSOS = async (num = "000") => {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navButton}
+              onPress={() => setSentRequestStatusVisible(true)}
+            >
+              <Ionicons name="paper-plane-outline" size={24} color="#fff" />
+              <ThemedText style={styles.navLabel}>My Requests</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={() => {
+                setRequestNotificationVisible(true);
+                requestPolling.markAsViewed(); // Clear the badge when opened
+              }}
+            >
+              <View style={styles.notificationIconContainer}>
+                <Ionicons name="notifications-outline" size={24} color="#fff" />
+                {requestPolling.hasNewRequests && (
+                  <View style={styles.notificationBadge}>
+                    <ThemedText style={styles.badgeText}>
+                      {requestPolling.requestCount}
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+              <ThemedText style={styles.navLabel}>Notifications</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navButton}
               onPress={() => handleSOS("000")} 
             >
               <Ionicons name="alert" size={24} color="#fff" />
@@ -1081,6 +1164,18 @@ const handleSOS = async (num = "000") => {
         visible={preferencesVisible}
         onClose={() => setPreferencesVisible(false)}
         onSubmit={handlePreferencesSubmit}
+      />
+      <SentRequestStatusModal
+        visible={sentRequestStatusVisible}
+        onClose={() => setSentRequestStatusVisible(false)}
+      />
+      <RequestNotificationModal
+        visible={requestNotificationVisible}
+        onClose={() => setRequestNotificationVisible(false)}
+        onRequestAccepted={(tripRequest) => {
+          // Handle when a request is accepted
+          console.log("Request accepted:", tripRequest);
+        }}
       />
     </View>
   );
@@ -1261,4 +1356,27 @@ titleText: {
 
   navButton: { alignItems: "center", justifyContent: "center" },
   navLabel: { color: "#fff", fontSize: 12, marginTop: 4 },
+  notificationIconContainer: { 
+    position: "relative", 
+    alignItems: "center", 
+    justifyContent: "center" 
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    backgroundColor: "#FF4444",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
 });

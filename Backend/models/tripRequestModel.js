@@ -64,6 +64,59 @@ const TripReqSchema = new Schema(
             default: "",
         },
     },
-}
-);
+
+    // New fields for notification system
+    status: {
+        type: String,
+        enum: ["pending", "accepted", "declined", "expired", "completed"],
+        default: "pending"
+    },
+
+    recipients: [{
+        userId: {
+            type: String,
+            required: true
+        },
+        userName: {
+            type: String,
+            required: true
+        },
+        notifiedAt: {
+            type: Date,
+            default: Date.now
+        },
+        responseStatus: {
+            type: String,
+            enum: ["notified", "viewed", "accepted", "declined"],
+            default: "notified"
+        }
+    }],
+
+    acceptedBy: {
+        userId: {
+            type: String,
+            default: ""
+        },
+        userName: {
+            type: String,
+            default: ""
+        },
+        acceptedAt: {
+            type: Date,
+            default: null
+        }
+    },
+
+    expiresAt: {
+        type: Date,
+        default: () => new Date(Date.now() + 10 * 60 * 1000) // 10 minutes from creation
+    },
+
+    matchedTripId: {
+        type: String,
+        default: ""
+    },
+}, {
+    timestamps: true // This adds createdAt and updatedAt automatically
+});
 module.exports = mongoose.model("TripRequest", TripReqSchema);
