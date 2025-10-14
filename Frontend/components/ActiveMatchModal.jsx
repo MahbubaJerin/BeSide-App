@@ -15,6 +15,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/Colors";
 import MeetingPointModal from "./MeetingPointModal";
+import LiveTripModal from "./LiveTripModal";
 
 export default function ActiveMatchModal({
   visible,
@@ -29,6 +30,7 @@ export default function ActiveMatchModal({
   currentUserId,
 }) {
   const [meetingPointModalVisible, setMeetingPointModalVisible] = useState(false);
+  const [liveTripModalVisible, setLiveTripModalVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -247,11 +249,21 @@ export default function ActiveMatchModal({
                       )}
                       
                       {match.status === 'in-progress' && (
-                        <ThemedButton
-                          title="✅ Complete"
-                          onPress={() => handleStatusUpdate(match, 'completed')}
-                          style={[styles.actionButton, styles.completeButton]}
-                        />
+                        <>
+                          <ThemedButton
+                            title="🗺️ Live Tracking"
+                            onPress={() => {
+                              setSelectedMatch(match);
+                              setLiveTripModalVisible(true);
+                            }}
+                            style={[styles.actionButton, styles.liveTrackingButton]}
+                          />
+                          <ThemedButton
+                            title="✅ Complete"
+                            onPress={() => handleStatusUpdate(match, 'completed')}
+                            style={[styles.actionButton, styles.completeButton]}
+                          />
+                        </>
                       )}
                       
                       {['active', 'in-progress'].includes(match.status) && (
@@ -291,6 +303,18 @@ export default function ActiveMatchModal({
         match={selectedMatch}
         onSetMeetingPoint={onSetMeetingPoint}
         currentLocation={currentLocation}
+      />
+
+      {/* Live Trip Modal */}
+      <LiveTripModal
+        visible={liveTripModalVisible}
+        onClose={() => {
+          setLiveTripModalVisible(false);
+          setSelectedMatch(null);
+        }}
+        match={selectedMatch}
+        currentUserId={currentUserId}
+        onUpdateTripStatus={onUpdateStatus}
       />
     </Modal>
   );
@@ -470,6 +494,9 @@ const styles = StyleSheet.create({
   },
   meetingButton: {
     backgroundColor: "#FF9800",
+  },
+  liveTrackingButton: {
+    backgroundColor: "#9C27B0",
   },
   completeButton: {
     backgroundColor: "#2196F3",

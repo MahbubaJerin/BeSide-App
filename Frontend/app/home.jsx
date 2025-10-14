@@ -38,6 +38,7 @@ import BeSideLogo from "../assets/images/BeSide.png";
 import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";
 import { useActiveMatches } from "../hooks/useActiveMatches";
+import { useTripNotifications } from "../hooks/useTripNotifications";
 
 // ========= Inline hooks (single-file edition) =========
 
@@ -274,6 +275,7 @@ export default function HomeScreen() {
   const companionSearch = useCompanionSearch();
   const requestPolling = useRequestPolling(10000, true); // Poll every 10 seconds
   const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds
+  const tripNotifications = useTripNotifications();
 
   const currentLocation = locationTracking.currentLocation;
   const isSearching = companionSearch.isSearching;
@@ -586,6 +588,23 @@ export default function HomeScreen() {
   const handleUpdateMatchStatus = async (matchId, newStatus) => {
     try {
       await activeMatches.updateMatchStatus(matchId, newStatus);
+      
+      // Send notification to other user
+      const statusMessages = {
+        'in-progress': 'Trip has been started!',
+        'completed': 'Trip has been completed!',
+        'cancelled': 'Trip has been cancelled.'
+      };
+      
+      if (statusMessages[newStatus]) {
+        await tripNotifications.sendTripNotification(
+          matchId, 
+          'status_change', 
+          statusMessages[newStatus],
+          { newStatus }
+        );
+      }
+      
       console.log(`✅ Trip ${matchId} status updated to ${newStatus}`);
     } catch (error) {
       console.error("Error updating match status:", error);

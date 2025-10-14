@@ -95,4 +95,19 @@ router.post(
   notificationController.setMeetingPoint
 );
 
+router.post(
+  "/match/:matchId/location",
+  notificationController.updateLiveLocation
+);
+
+router.get(
+  "/match/:matchId/locations",
+  notificationController.getLiveLocations
+);
+
+router.post(
+  "/match/:matchId/notify",
+  notificationController.sendTripNotification
+);
+
 module.exports = router;

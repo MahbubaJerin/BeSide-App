@@ -223,6 +223,75 @@ export function useActiveMatches(pollingInterval = 30000) {
     }
   }, [fetchActiveMatches]);
 
+  // Update live location for a match
+  const updateLiveLocation = useCallback(async (matchId, latitude, longitude) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const API_URL = BASE_URL.replace(/\/+$/, '');
+      const response = await fetch(`${API_URL}/api/v1/trip/match/${matchId}/location`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ latitude, longitude })
+      });
+
+      if (response.status === 429) {
+        throw new Error('Too many requests. Please try again later.');
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to update location');
+      }
+
+      console.log('📍 [LOCATION UPDATE] Location updated successfully');
+      return result.data;
+    } catch (err) {
+      console.error('❌ [LOCATION UPDATE] Error:', err.message);
+      throw err;
+    }
+  }, []);
+
+  // Get live locations for a match
+  const getLiveLocations = useCallback(async (matchId) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const API_URL = BASE_URL.replace(/\/+$/, '');
+      const response = await fetch(`${API_URL}/api/v1/trip/match/${matchId}/locations`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.status === 429) {
+        throw new Error('Too many requests. Please try again later.');
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to get locations');
+      }
+
+      return result.data;
+    } catch (err) {
+      console.error('❌ [GET LOCATIONS] Error:', err.message);
+      throw err;
+    }
+  }, []);
+
   // Setup and cleanup effects
   useEffect(() => {
     isActiveRef.current = true;
@@ -248,6 +317,8 @@ export function useActiveMatches(pollingInterval = 30000) {
     updateMatchStatus,
     getMatchDetails,
     setMeetingPoint,
+    updateLiveLocation,
+    getLiveLocations,
     startPolling,
     stopPolling
   };

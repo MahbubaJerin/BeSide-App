@@ -527,3 +527,134 @@ exports.setMeetingPoint = catchAsync(async (req, res, next) => {
         }
     });
 });
+
+// Update live location during trip
+exports.updateLiveLocation = catchAsync(async (req, res, next) => {
+    const { matchId } = req.params;
+    const { latitude, longitude } = req.body;
+    const userId = req.user._id.toString();
+
+    console.log("📍 [BACKEND] Updating live location for match:", matchId);
+
+    // Validate coordinates
+    if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude)) {
+        return next(new AppError("Valid latitude and longitude are required", 400));
+    }
+
+    const match = await TripMatch.findOne({ matchId });
+
+    if (!match) {
+        return next(new AppError("Match not found", 404));
+    }
+
+    // Check if user is part of this match
+    if (!match.includesUser(userId)) {
+        return next(new AppError("You are not authorized to update location for this match", 403));
+    }
+
+    // Update location based on user role
+    const isOrganizer = match.organizer.userId.toString() === userId;
+    const locationUpdate = {
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        lastUpdated: new Date()
+    };
+
+    if (isOrganizer) {
+        match.liveLocationSharing.organizerLocation = locationUpdate;
+    } else {
+        match.liveLocationSharing.companionLocation = locationUpdate;
+    }
+
+    // Enable location sharing if not already enabled
+    match.liveLocationSharing.enabled = true;
+
+    await match.save();
+
+    console.log(`✅ [BACKEND] Location updated for ${isOrganizer ? 'organizer' : 'companion'}`);
+
+    res.status(200).json({
+        status: "success",
+        message: "Location updated successfully",
+        data: { 
+            match,
+            userRole: isOrganizer ? 'organizer' : 'companion',
+            location: locationUpdate
+        }
+    });
+});
+
+// Get live locations of both users in a match
+exports.getLiveLocations = catchAsync(async (req, res, next) => {
+    const { matchId } = req.params;
+    const userId = req.user._id.toString();
+
+    const match = await TripMatch.findOne({ matchId });
+
+    if (!match) {
+        return next(new AppError("Match not found", 404));
+    }
+
+    // Check if user is part of this match
+    if (!match.includesUser(userId)) {
+        return next(new AppError("You are not authorized to view locations for this match", 403));
+    }
+
+    console.log("📍 [BACKEND] Getting live locations for match:", matchId);
+
+    res.status(200).json({
+        status: "success",
+        data: {
+            matchId,
+            locationSharing: match.liveLocationSharing,
+            meetingPoint: match.meetingPoint,
+            tripStatus: match.status
+        }
+    });
+});
+
+// Send notification to other user in match
+exports.sendTripNotification = catchAsync(async (req, res, next) => {
+    const { matchId } = req.params;
+    const { type, message, data } = req.body;
+    const userId = req.user._id.toString();
+
+    console.log("📱 [BACKEND] Sending trip notification:", type, message);
+
+    const match = await TripMatch.findOne({ matchId });
+
+    if (!match) {
+        return next(new AppError("Match not found", 404));
+    }
+
+    // Check if user is part of this match
+    if (!match.includesUser(userId)) {
+        return next(new AppError("You are not authorized to send notifications for this match", 403));
+    }
+
+    // Get the other user
+    const otherUser = match.getOtherUser(userId);
+    if (!otherUser) {
+        return next(new AppError("Other user not found in match", 404));
+    }
+
+    // In a real app, you would send push notifications here
+    // For now, we'll just log the notification
+    console.log(`📱 [BACKEND] Notification sent to ${otherUser.userName}:`, {
+        type,
+        message,
+        data,
+        from: req.user.userName,
+        matchId
+    });
+
+    res.status(200).json({
+        status: "success",
+        message: "Notification sent successfully",
+        data: {
+            recipient: otherUser.userName,
+            type,
+            message
+        }
+    });
+});
