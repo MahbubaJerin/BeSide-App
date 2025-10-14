@@ -184,7 +184,7 @@ export default function EnhancedConsentModal({
             <Pressable onPress={onClose} style={styles.cancelButton}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </Pressable>
-          </div>
+          </View>
         </View>
       </View>
     </Modal>
