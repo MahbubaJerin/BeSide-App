@@ -284,104 +284,13 @@ export function useRouteCalculation() {
     };
   }, []);
 
-  // Enhanced function to calculate receiver route with multiple fallback options
-  const calculateReceiverRouteEnhanced = useCallback(async (routeData, receiverLocation, senderCurrentLocation) => {
-    setCalculating(true);
-    setError(null);
-
-    try {
-      console.log('🚀 [ENHANCED ROUTE] Starting enhanced route calculation...');
-      console.log('📍 [ENHANCED ROUTE] Receiver location:', receiverLocation);
-      console.log('📍 [ENHANCED ROUTE] Sender current location:', senderCurrentLocation);
-      console.log('📊 [ENHANCED ROUTE] Route data:', routeData);
-
-      let destinationCoords = null;
-
-      // Option 1: Use stored destination coordinates if available
-      if (routeData.destinationLocation && routeData.destinationLocation.latitude && routeData.destinationLocation.longitude) {
-        console.log('✅ [ENHANCED ROUTE] Using stored destination coordinates');
-        destinationCoords = routeData.destinationLocation;
-      }
-      // Option 2: Geocode destination text
-      else if (routeData.destinationText && 
-               routeData.destinationText !== 'Placeholder' && 
-               routeData.destinationText !== 'Find Companion' &&
-               routeData.destinationText !== 'Destination') {
-        console.log('🌍 [ENHANCED ROUTE] Geocoding destination text:', routeData.destinationText);
-        
-        // Test API key first if this is the first geocoding attempt
-        const isApiValid = await testApiKey();
-        if (!isApiValid) {
-          console.warn('⚠️ [ENHANCED ROUTE] API key test failed, skipping geocoding');
-        } else {
-          try {
-            destinationCoords = await geocodeAddress(routeData.destinationText);
-          } catch (geocodeError) {
-            console.warn('⚠️ [ENHANCED ROUTE] Geocoding failed:', geocodeError);
-          }
-        }
-      } else {
-        console.log('⚠️ [ENHANCED ROUTE] Skipping geocoding for placeholder destination:', routeData.destinationText);
-      }
-
-      // Option 3: Fallback to sender's current location as destination
-      if (!destinationCoords && senderCurrentLocation && senderCurrentLocation.latitude && senderCurrentLocation.longitude) {
-        console.log('🔄 [ENHANCED ROUTE] Using sender current location as fallback destination');
-        destinationCoords = {
-          latitude: senderCurrentLocation.latitude,
-          longitude: senderCurrentLocation.longitude,
-          address: `${routeData.senderName || 'Sender'}'s location`
-        };
-      }
-
-      // Option 4: Use a default location as last resort (Melbourne CBD as example)
-      if (!destinationCoords) {
-        console.log('🏙️ [ENHANCED ROUTE] Using default location as last resort');
-        destinationCoords = {
-          latitude: -37.8136,
-          longitude: 144.9631,
-          address: 'Melbourne CBD (Default destination)'
-        };
-      }
-
-      console.log('✅ [ENHANCED ROUTE] Final destination determined:', destinationCoords);
-
-      console.log('🎯 [ENHANCED ROUTE] Final destination coordinates:', destinationCoords);
-
-      // Calculate the route
-      const route = await calculateReceiverRoute(receiverLocation, destinationCoords, routeData.transportMode || 'walking');
-
-      // Enhanced route data
-      const enhancedRoute = {
-        ...route,
-        routeType: 'receiver-to-destination',
-        destinationInfo: {
-          coordinates: destinationCoords,
-          address: destinationCoords.address || routeData.destinationText || 'Destination',
-          senderName: routeData.senderName,
-          receiverName: routeData.receiverName
-        },
-        transportMode: routeData.transportMode || 'walking'
-      };
-
-      console.log('✅ [ENHANCED ROUTE] Enhanced route calculated successfully');
-      return enhancedRoute;
-
-    } catch (error) {
-      console.error('💥 [ENHANCED ROUTE] Enhanced route calculation failed:', error);
-      setError(error.message);
-      throw error;
-    } finally {
-      setCalculating(false);
-    }
-  }, [calculateReceiverRoute]);
+  // Removed enhanced route calculation - using simple direct routing instead
 
   return {
     calculating,
     error,
     calculateReceiverRoute,
     calculateTwoStepRoute,
-    calculateReceiverRouteEnhanced,
     geocodeAddress,
     getMapRegion,
     testApiKey,

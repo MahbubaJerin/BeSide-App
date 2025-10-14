@@ -108,7 +108,11 @@ function RequestCard({ request, onMarkViewed, onResponse, respondingTo, formatDa
       <View style={styles.actionButtons}>
         <ThemedButton
           title={respondingTo === request.tripReqId ? "..." : "✅ Accept"}
-          onPress={() => onResponse(request.tripReqId, "accepted")}
+          onPress={() => {
+            console.log('🚨 [DEBUG] Accept button pressed for request:', request.tripReqId);
+            console.log('🚨 [DEBUG] Button is disabled?', respondingTo === request.tripReqId);
+            onResponse(request.tripReqId, "accepted");
+          }}
           style={[styles.button, styles.acceptButton]}
           disabled={respondingTo === request.tripReqId}
         />
@@ -175,14 +179,34 @@ export default function RequestNotificationModal({
   };
 
   const handleResponse = async (tripReqId, response) => {
-    if (respondingTo === tripReqId) return; // Prevent double-tap
+    console.log('🔥 [DEBUG] === ACCEPT BUTTON CLICKED ===');
+    console.log('🔥 [DEBUG] Trip Request ID:', tripReqId);
+    console.log('🔥 [DEBUG] Response Type:', response);
+    console.log('🔥 [DEBUG] Current respondingTo:', respondingTo);
+    console.log('🔥 [DEBUG] Current Location:', currentLocation);
+    
+    if (respondingTo === tripReqId) {
+      console.log('🚫 [DEBUG] Already responding to this request, preventing double-tap');
+      return; // Prevent double-tap
+    }
     
     try {
+      console.log('🔥 [DEBUG] Setting respondingTo state...');
       setRespondingTo(tripReqId);
+      
+      console.log('🔥 [DEBUG] Getting token from AsyncStorage...');
       const token = await AsyncStorage.getItem("token");
-      if (!token) return;
+      if (!token) {
+        console.log('❌ [DEBUG] No token found in AsyncStorage!');
+        return;
+      }
+      console.log('✅ [DEBUG] Token retrieved successfully');
 
+      console.log('🔥 [DEBUG] Preparing API request...');
       const API_URL = BASE_URL.replace(/\/+$/, "");
+      console.log('🔥 [DEBUG] API URL:', `${API_URL}/api/v1/trip/respond-request`);
+      console.log('🔥 [DEBUG] Request body:', { tripReqId, response });
+      
       const apiResponse = await fetch(`${API_URL}/api/v1/trip/respond-request`, {
         method: "POST",
         headers: {
@@ -192,7 +216,11 @@ export default function RequestNotificationModal({
         body: JSON.stringify({ tripReqId, response }),
       });
 
+      console.log('🔥 [DEBUG] API Response Status:', apiResponse.status);
+      console.log('🔥 [DEBUG] API Response OK:', apiResponse.ok);
+      
       const result = await apiResponse.json();
+      console.log('🔥 [DEBUG] API Result:', JSON.stringify(result, null, 2));
       
       if (!apiResponse.ok) {
         // Handle specific error cases
@@ -216,49 +244,75 @@ export default function RequestNotificationModal({
       }
 
       if (result.status === "success") {
+        console.log('✅ [DEBUG] API Response successful!');
+        console.log('🔥 [DEBUG] Result data:', JSON.stringify(result.data, null, 2));
+        
         if (response === "accepted") {
-          // Simple, direct route calculation to sender's current location
-          if (currentLocation && result.data.senderCurrentLocation && onRouteUpdate) {
+          console.log('🔥 [DEBUG] Processing ACCEPTED response...');
+          console.log('🔥 [DEBUG] Has currentLocation:', !!currentLocation);
+          console.log('🔥 [DEBUG] Has senderCurrentLocation:', !!result.data.senderCurrentLocation);
+          console.log('🔥 [DEBUG] Has onRouteUpdate callback:', !!onRouteUpdate);
+          
+          // CORRECTED FLOW: Route to meeting point (sender's start location)
+          if (currentLocation && result.data.routeData && onRouteUpdate) {
             try {
-              console.log('🚀 [SIMPLE ROUTE] Starting simple route calculation...');
-              console.log('📍 [SIMPLE ROUTE] Receiver location:', currentLocation);
-              console.log('📍 [SIMPLE ROUTE] Sender location:', result.data.senderCurrentLocation);
+              console.log('🚀 [MEETING POINT ROUTE] Starting meeting point route calculation...');
+              console.log('📍 [MEETING POINT ROUTE] Receiver location:', currentLocation);
+              console.log('📍 [MEETING POINT ROUTE] Route data:', result.data.routeData);
               
-              // Calculate direct route from receiver to sender's current location
-              const simpleRoute = await calculateReceiverRoute(
+              // Meeting point is the sender's starting location
+              const meetingPoint = result.data.routeData.startLocation;
+              const finalDestination = result.data.routeData.destinationLocation;
+              
+              if (!meetingPoint || !meetingPoint.latitude || !meetingPoint.longitude) {
+                throw new Error('Meeting point (sender start location) not available');
+              }
+              
+              console.log('🎯 [MEETING POINT ROUTE] Meeting point:', meetingPoint);
+              console.log('🏁 [MEETING POINT ROUTE] Final destination:', finalDestination);
+              
+              // Calculate route from receiver to meeting point
+              const routeToMeetingPoint = await calculateReceiverRoute(
                 currentLocation,
-                result.data.senderCurrentLocation,
+                meetingPoint,
                 'walking'
               );
               
-              console.log('✅ [SIMPLE ROUTE] Route calculated successfully');
+              console.log('✅ [MEETING POINT ROUTE] Route to meeting point calculated successfully');
               
-              // Update parent map with receiver's route to sender
+              // Update parent map with receiver's route to meeting point
               onRouteUpdate({
-                receiverRoute: simpleRoute,
-                routeType: 'direct',
-                destination: {
-                  coordinates: result.data.senderCurrentLocation,
-                  address: `${result.data.routeData?.senderName || 'Companion'}'s location`,
-                  senderName: result.data.routeData?.senderName || 'Companion'
+                receiverRoute: routeToMeetingPoint,
+                routeType: 'to-meeting-point',
+                meetingPoint: {
+                  coordinates: meetingPoint,
+                  address: meetingPoint.address || 'Meeting Point',
                 },
+                finalDestination: {
+                  coordinates: finalDestination,
+                  address: finalDestination?.address || 'Final Destination',
+                },
+                companion: result.data.routeData?.senderName || 'Companion',
                 mapRegion: getMapRegion([
                   currentLocation,
-                  result.data.senderCurrentLocation
+                  meetingPoint
                 ])
               });
               
-              // Show success message
+              // Show success message with meeting point info
               const companionName = result.data.routeData?.senderName || 'your companion';
+              const meetingAddress = meetingPoint.address || 'the meeting point';
               
               Alert.alert(
                 "🎉 Match Found!", 
-                `Route calculated! Navigate to ${companionName}'s current location to meet up.`,
+                `Route calculated! Navigate to ${meetingAddress} to meet ${companionName}, then travel together to your destination.`,
                 [{ text: "Let's go!" }]
               );
               
             } catch (routeError) {
-              console.warn('⚠️ [SIMPLE ROUTE] Route calculation failed:', routeError);
+              console.error('❌ [DEBUG] Route calculation failed with error:', routeError);
+              console.error('❌ [DEBUG] Route error message:', routeError.message);
+              console.error('❌ [DEBUG] Route error stack:', routeError.stack);
               
               Alert.alert(
                 "✅ Match Successful!", 
@@ -298,15 +352,25 @@ export default function RequestNotificationModal({
           Alert.alert("Request Declined", "You've declined this trip request.");
         }
         
+        console.log('🔥 [DEBUG] Refreshing requests list...');
         // Refresh the list to remove the responded request
         await fetchPendingRequests();
+        console.log('✅ [DEBUG] Requests refreshed successfully');
       } else {
+        console.error('❌ [DEBUG] API returned error status:', result.status);
+        console.error('❌ [DEBUG] Error message:', result.message);
         throw new Error(result.message || "Failed to respond to request");
       }
     } catch (error) {
-      console.error("Error responding to request:", error);
+      console.error('💥 [DEBUG] === CRITICAL ERROR IN HANDLE RESPONSE ===');
+      console.error('💥 [DEBUG] Error type:', error.constructor.name);
+      console.error('💥 [DEBUG] Error message:', error.message);
+      console.error('💥 [DEBUG] Error stack:', error.stack);
+      console.error('💥 [DEBUG] Full error object:', error);
+      
       Alert.alert("Error", error.message || "Failed to respond to request");
     } finally {
+      console.log('🔥 [DEBUG] Cleaning up - setting respondingTo to null');
       setRespondingTo(null);
     }
   };

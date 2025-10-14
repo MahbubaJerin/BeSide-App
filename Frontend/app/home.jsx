@@ -1131,8 +1131,21 @@ export default function HomeScreen() {
         onRouteUpdate={(routeData) => {
           console.log("🗺️ [HOME] Updating map with receiver route:", routeData);
           
-          // Update map markers and route
-          if (routeData.routeType === 'two-step') {
+          // Update map markers and route based on route type
+          if (routeData.routeType === 'to-meeting-point') {
+            // CORRECTED: Display route from receiver to meeting point (sender's start)
+            console.log('🎯 [HOME] Displaying route to meeting point');
+            setRouteCoordinates(routeData.receiverRoute.coordinates);
+            
+            // Show meeting point marker (where receiver needs to go)
+            if (routeData.meetingPoint && routeData.meetingPoint.coordinates) {
+              setEndMarker(routeData.meetingPoint.coordinates);
+            }
+            
+            // Show receiver's current location as start
+            setStartMarker(currentLocation);
+            
+          } else if (routeData.routeType === 'two-step') {
             // Display two-step route: receiver → meeting point → destination
             const allCoords = [
               ...routeData.receiverRoute.step1.coordinates,
