@@ -275,6 +275,13 @@ export default function HomeScreen() {
   const [startMarker, setStartMarker] = useState(null);
   const [endMarker, setEndMarker] = useState(null);
   const [currentNavigationRoute, setCurrentNavigationRoute] = useState(null);
+  const [arrivalStatus, setArrivalStatus] = useState({
+    isNearMeetingPoint: false,
+    hasArrivedAtMeetingPoint: false,
+    distanceToMeetingPoint: null,
+    canStartFinalJourney: false,
+    bothUsersArrived: false
+  });
 
   const loadingAnimation = useRef(new Animated.Value(0)).current;
   const mapRef = useRef(null);
@@ -287,7 +294,12 @@ export default function HomeScreen() {
   const requestPolling = useRequestPolling(30000, true); // Poll every 30 seconds (reduced from 10s)
   const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds
   const tripNotifications = useTripNotifications();
-  const { openGoogleMapsNavigation, getNavigationInstructions } = useRouteCalculation();
+  const { 
+    openGoogleMapsNavigation, 
+    getNavigationInstructions,
+    calculateDistance,
+    checkArrivalAtMeetingPoint 
+  } = useRouteCalculation();
 
   const currentLocation = locationTracking.currentLocation;
   const isSearching = companionSearch.isSearching;
@@ -327,10 +339,93 @@ export default function HomeScreen() {
     }
   }, [isSearching]);
 
+  // Monitor distance to meeting point
+  useEffect(() => {
+    if (location && activeRequest?.meetingPointCoordinates) {
+      const distance = calculateDistance(
+        location.latitude,
+        location.longitude,
+        activeRequest.meetingPointCoordinates.lat,
+        activeRequest.meetingPointCoordinates.lng
+      );
+
+      const isNear = distance <= 50; // 50 meters threshold
+
+      setArrivalStatus(prev => ({
+        ...prev,
+        isNearMeetingPoint: isNear,
+        distanceToMeetingPoint: Math.round(distance),
+      }));
+    }
+  }, [location, activeRequest?.meetingPointCoordinates]);
+
   const handleLogout = async () => {
     await AsyncStorage.removeItem("user");
     await AsyncStorage.removeItem("token");
     router.replace("/login");
+  };
+
+  const handleMarkArrived = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token || !activeRequest) return;
+
+      // Mark this user as arrived at meeting point
+      const response = await fetch(`${BASE_URL}/api/v1/trip/markArrived`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          requestId: activeRequest._id,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        setArrivalStatus(prev => ({
+          ...prev,
+          hasArrivedAtMeetingPoint: true,
+          bothUsersArrived: result.data.canStartFinalJourney || false
+        }));
+        
+        Alert.alert(
+          "Arrival Confirmed",
+          result.data.canStartFinalJourney 
+            ? "Both companions have arrived! You can now navigate to your final destination."
+            : "You've marked yourself as arrived at the meeting point. Waiting for your companion to arrive.",
+          [{ text: "OK" }]
+        );
+      }
+    } catch (error) {
+      console.error("Error marking arrival:", error);
+      Alert.alert("Error", "Failed to mark arrival. Please try again.");
+    }
+  };
+
+  const handleStartFinalJourney = () => {
+    if (activeRequest?.destinationLocation) {
+      // Set up navigation to final destination
+      setCurrentNavigationRoute({
+        destination: {
+          latitude: activeRequest.destinationLocation.latitude,
+          longitude: activeRequest.destinationLocation.longitude
+        },
+        origin: location,
+        destinationAddress: activeRequest.destinationLocation.address || activeRequest.destination,
+        routeInfo: null,
+        companion: null // No longer meeting, now traveling together
+      });
+
+      // Start route calculation to final destination
+      calculateRoute(
+        location,
+        activeRequest.destinationLocation,
+        activeRequest.transportMode || 'walking'
+      );
+    }
   };
 
   // ⬇️ CHANGED: no search starts here; only createTripReq + open modal
@@ -733,20 +828,6 @@ export default function HomeScreen() {
   const decodePolyline = (encoded) =>
     polyline.decode(encoded).map(([latitude, longitude]) => ({ latitude, longitude }));
 
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
   const [availability, setAvailability] = useState(true);
   const [availabilityModalVisible, setAvailabilityModalVisible] = useState(false);
 
@@ -990,7 +1071,9 @@ export default function HomeScreen() {
         <View style={styles.navigationContainer}>
           <View style={styles.navigationInfo}>
             <ThemedText type="defaultSemiBold" style={styles.navigationTitle}>
-              🗺️ Navigation to {currentNavigationRoute.destinationAddress}
+              {arrivalStatus.bothUsersArrived 
+                ? `🎯 Final Destination: ${currentNavigationRoute.destinationAddress}`
+                : `🗺️ Navigation to ${currentNavigationRoute.destinationAddress}`}
             </ThemedText>
             {currentNavigationRoute.routeInfo && (
               <ThemedText type="caption" style={styles.navigationDetails}>
@@ -1003,8 +1086,38 @@ export default function HomeScreen() {
                 Meeting {currentNavigationRoute.companion}
               </ThemedText>
             )}
+            {arrivalStatus.isNearMeetingPoint && !arrivalStatus.hasArrivedAtMeetingPoint && (
+              <ThemedText type="caption" style={[styles.navigationDetails, { color: Colors.light.tint }]}>
+                📍 Near meeting point ({arrivalStatus.distanceToMeetingPoint}m away)
+              </ThemedText>
+            )}
+            {arrivalStatus.hasArrivedAtMeetingPoint && !arrivalStatus.bothUsersArrived && (
+              <ThemedText type="caption" style={[styles.navigationDetails, { color: '#4CAF50' }]}>
+                ✅ Arrived - Waiting for companion
+              </ThemedText>
+            )}
+            {arrivalStatus.bothUsersArrived && (
+              <ThemedText type="caption" style={[styles.navigationDetails, { color: '#FF6B35' }]}>
+                🎉 Both companions ready! Ready to start final journey
+              </ThemedText>
+            )}
           </View>
           <View style={styles.navigationButtons}>
+            {/* Show different buttons based on arrival status */}
+            {arrivalStatus.bothUsersArrived && (
+              <ThemedButton 
+                title="🚀 Start Final Journey" 
+                onPress={handleStartFinalJourney}
+                style={[styles.navigationButton, { backgroundColor: '#FF6B35' }]} 
+              />
+            )}
+            {arrivalStatus.isNearMeetingPoint && !arrivalStatus.hasArrivedAtMeetingPoint && (
+              <ThemedButton 
+                title="✅ Arrived" 
+                onPress={handleMarkArrived}
+                style={[styles.navigationButton, { backgroundColor: '#4CAF50' }]} 
+              />
+            )}
             <ThemedButton 
               title="📱 Open Maps" 
               onPress={() => {

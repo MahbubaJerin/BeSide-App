@@ -1,5 +1,6 @@
 // Frontend/hooks/useRouteCalculation.js
 import { useState, useCallback } from 'react';
+import * as Linking from 'expo-linking';
 
 const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -370,18 +371,34 @@ export function useRouteCalculation() {
       
       console.log('🔗 [NAVIGATION] Google Maps URL:', navigationUrl);
       
-      // Open Google Maps navigation
-      import('expo-linking').then(({ default: Linking }) => {
-        Linking.openURL(navigationUrl).catch(err => {
-          console.error('❌ [NAVIGATION] Failed to open Google Maps:', err);
+      console.log('🔗 [NAVIGATION] Attempting to open URL:', navigationUrl);
+      
+      // Try opening Google Maps
+      Linking.canOpenURL(navigationUrl).then(supported => {
+        if (supported) {
+          console.log('✅ [NAVIGATION] URL is supported, opening...');
+          return Linking.openURL(navigationUrl);
+        } else {
+          console.warn('⚠️ [NAVIGATION] Google Maps web URL not supported, trying app scheme...');
           
-          // Fallback: Try opening with different URL scheme
-          const fallbackUrl = `google.navigation:q=${destination.latitude},${destination.longitude}&mode=${transportMode}`;
-          Linking.openURL(fallbackUrl).catch(fallbackErr => {
-            console.error('❌ [NAVIGATION] Fallback also failed:', fallbackErr);
-            throw new Error('Unable to open navigation app. Please check if Google Maps is installed.');
+          // Fallback: Try Google Maps app scheme
+          const appUrl = `comgooglemaps://?daddr=${destination.latitude},${destination.longitude}&directionsmode=${transportMode}`;
+          console.log('🔗 [NAVIGATION] Trying app URL:', appUrl);
+          
+          return Linking.canOpenURL(appUrl).then(appSupported => {
+            if (appSupported) {
+              return Linking.openURL(appUrl);
+            } else {
+              // Final fallback: Generic geo URL
+              const geoUrl = `geo:${destination.latitude},${destination.longitude}`;
+              console.log('🔗 [NAVIGATION] Trying geo URL:', geoUrl);
+              return Linking.openURL(geoUrl);
+            }
           });
-        });
+        }
+      }).catch(err => {
+        console.error('❌ [NAVIGATION] All navigation attempts failed:', err);
+        throw new Error('Unable to open navigation app. Please ensure Google Maps is installed or try manually navigating.');
       });
       
     } catch (error) {
@@ -430,6 +447,37 @@ export function useRouteCalculation() {
     return iconMap[maneuver] || '↑';
   };
 
+  // Function to calculate distance between two coordinates (in meters)
+  const calculateDistance = useCallback((coord1, coord2) => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = coord1.latitude * Math.PI/180;
+    const φ2 = coord2.latitude * Math.PI/180;
+    const Δφ = (coord2.latitude-coord1.latitude) * Math.PI/180;
+    const Δλ = (coord2.longitude-coord1.longitude) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c; // Distance in meters
+  }, []);
+
+  // Function to check if user has arrived at meeting point (within 50 meters)
+  const checkArrivalAtMeetingPoint = useCallback((currentLocation, meetingPoint, threshold = 50) => {
+    if (!currentLocation || !meetingPoint) {
+      return { hasArrived: false, distance: null };
+    }
+    
+    const distance = calculateDistance(currentLocation, meetingPoint);
+    const hasArrived = distance <= threshold;
+    
+    console.log(`📍 [ARRIVAL CHECK] Distance to meeting point: ${distance.toFixed(1)}m (threshold: ${threshold}m)`);
+    console.log(`🎯 [ARRIVAL CHECK] Has arrived: ${hasArrived}`);
+    
+    return { hasArrived, distance: Math.round(distance) };
+  }, [calculateDistance]);
+
   return {
     calculating,
     error,
@@ -440,6 +488,8 @@ export function useRouteCalculation() {
     testApiKey,
     openGoogleMapsNavigation,
     getNavigationInstructions,
+    calculateDistance,
+    checkArrivalAtMeetingPoint,
     clearError: () => setError(null)
   };
 }

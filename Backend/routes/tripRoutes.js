@@ -49,6 +49,11 @@ router.put(
   tripController.completeReceiverConsent
 );
 
+router.post(
+  "/markArrived",
+  tripController.markArrived
+);
+
 router.get(
   "/active-request",
   tripController.getActiveRequest

@@ -158,6 +158,16 @@ const TripReqSchema = new Schema(
         type: String,
         default: ""
     },
+
+    // Arrival tracking for meeting point
+    arrivedUsers: [{
+        type: String, // User IDs of users who have arrived
+    }],
+
+    canStartFinalJourney: {
+        type: Boolean,
+        default: false
+    },
 }, {
     timestamps: true // This adds createdAt and updatedAt automatically
 });

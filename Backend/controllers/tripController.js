@@ -337,3 +337,53 @@ exports.updateTripRequestBasic = catchAsync(async (req, res, next) => {
     }
   });
 });
+
+exports.markArrived = catchAsync(async (req, res, next) => {
+  const { requestId } = req.body;
+  const userId = req.user._id.toString();
+
+  if (!requestId) {
+    return next(new AppError("Request ID is required", 400));
+  }
+
+  const tripRequest = await TripRequest.findById(requestId);
+  if (!tripRequest) {
+    return next(new AppError("Trip request not found", 404));
+  }
+
+  // Initialize arrivedUsers array if it doesn't exist
+  if (!tripRequest.arrivedUsers) {
+    tripRequest.arrivedUsers = [];
+  }
+
+  // Check if user already marked as arrived
+  if (tripRequest.arrivedUsers.includes(userId)) {
+    return res.status(200).json({
+      status: "success",
+      message: "Already marked as arrived"
+    });
+  }
+
+  // Add user to arrived list
+  tripRequest.arrivedUsers.push(userId);
+
+  // Check if both users have arrived (sender and receiver)
+  const allUsersArrived = tripRequest.arrivedUsers.includes(tripRequest.user.userId) && 
+                          tripRequest.receiverConsent && 
+                          tripRequest.arrivedUsers.includes(tripRequest.receiverConsent.receiverId);
+
+  if (allUsersArrived) {
+    tripRequest.canStartFinalJourney = true;
+  }
+
+  await tripRequest.save();
+
+  res.status(200).json({
+    status: "success",
+    message: allUsersArrived ? "Both users arrived! Ready to start final journey." : "Arrival marked successfully",
+    data: {
+      arrivedUsers: tripRequest.arrivedUsers,
+      canStartFinalJourney: tripRequest.canStartFinalJourney
+    }
+  });
+});
