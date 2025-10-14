@@ -519,6 +519,9 @@ export default function HomeScreen() {
           });
           
           await activeMatches.updateTripRequest(currentTripRequestId, {
+            destination: preferences.destinationAddress || 'Destination',
+            destinationType: preferences.transport === "car" ? "By Car" : 
+                            preferences.transport === "walk" ? "By Walk" : "By Transit",
             routeCoordinates: validCoords,
             startLocation: {
               latitude: preferences.startCoordinates.latitude,

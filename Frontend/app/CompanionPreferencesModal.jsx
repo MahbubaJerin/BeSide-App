@@ -79,6 +79,8 @@ export default function CompanionPreferencesModal({
     onSubmit({
       startCoordinates,
       destinationCoordinates,
+      startAddress: startText,
+      destinationAddress: destText,
       transport,
       gender,
       talk,

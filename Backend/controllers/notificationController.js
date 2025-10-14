@@ -424,15 +424,38 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             console.log('📍 [SENDER LOCATION] Added sender location to response:', responseData.senderCurrentLocation);
         } else {
             console.warn('⚠️ [SENDER LOCATION] No valid location found for sender:', tripRequest.user.userId);
+            console.warn('⚠️ [SENDER LOCATION] Sender location data:', senderLocation);
+            
+            // Fallback: use a default location or the trip request coordinates if available
+            if (tripRequest.startLocation && tripRequest.startLocation.latitude && tripRequest.startLocation.longitude) {
+                responseData.senderCurrentLocation = {
+                    latitude: tripRequest.startLocation.latitude,
+                    longitude: tripRequest.startLocation.longitude
+                };
+                console.log('📍 [SENDER LOCATION] Using stored start location as fallback:', responseData.senderCurrentLocation);
+            }
         }
         
         // Enhanced route data with destination text for geocoding
         responseData.routeData = {
             ...responseData.routeData,
-            destinationText: tripRequest.destination, // Text address for geocoding
+            destinationText: tripRequest.destination || 'Destination', // Text address for geocoding
             senderName: tripRequest.user.userName,
             receiverName: req.user.userName
         };
+        
+        console.log('🎯 [ROUTE DATA] Enhanced route data being sent to receiver:', {
+            destinationText: responseData.routeData.destinationText,
+            hasStartLocation: !!responseData.routeData.startLocation,
+            hasDestinationLocation: !!responseData.routeData.destinationLocation,
+            transportMode: responseData.routeData.transportMode,
+            hasSenderLocation: !!responseData.senderCurrentLocation,
+            hasReceiverLocation: !!responseData.receiverLocation,
+            senderCoords: responseData.senderCurrentLocation ? 
+                `${responseData.senderCurrentLocation.latitude},${responseData.senderCurrentLocation.longitude}` : 'N/A',
+            receiverCoords: responseData.receiverLocation ? 
+                `${responseData.receiverLocation.latitude},${responseData.receiverLocation.longitude}` : 'N/A'
+        });
     }
 
     res.status(200).json({

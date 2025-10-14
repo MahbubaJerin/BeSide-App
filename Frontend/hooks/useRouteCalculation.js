@@ -5,8 +5,13 @@ const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 // Debug the API key
 console.log('🔑 [GOOGLE MAPS] API Key available:', !!GOOGLE_MAPS_KEY);
+console.log('🔑 [GOOGLE MAPS] API Key length:', GOOGLE_MAPS_KEY ? GOOGLE_MAPS_KEY.length : 0);
+console.log('🔑 [GOOGLE MAPS] API Key preview:', GOOGLE_MAPS_KEY ? `${GOOGLE_MAPS_KEY.substring(0, 10)}...` : 'N/A');
+
 if (!GOOGLE_MAPS_KEY) {
   console.error('❌ [GOOGLE MAPS] API Key is missing!');
+} else if (GOOGLE_MAPS_KEY.length < 30) {
+  console.warn('⚠️ [GOOGLE MAPS] API Key seems too short, might be invalid');
 }
 
 // Geocoding utility to convert address text to coordinates
@@ -14,24 +19,45 @@ const geocodeAddress = async (address) => {
   try {
     console.log('🌍 [GEOCODING] Converting address to coordinates:', address);
     
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_KEY}`;
-    const response = await fetch(url);
-    const data = await response.json();
+    if (!GOOGLE_MAPS_KEY) {
+      throw new Error('Google Maps API key is not configured');
+    }
     
-    if (data.results && data.results[0]) {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_KEY}`;
+    console.log('🌐 [GEOCODING] Request URL:', url);
+    
+    const response = await fetch(url);
+    console.log('📡 [GEOCODING] Response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`Geocoding API request failed with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('📊 [GEOCODING] API Response:', JSON.stringify(data, null, 2));
+    
+    if (data.status !== 'OK') {
+      console.warn('⚠️ [GEOCODING] API returned error status:', data.status);
+      if (data.error_message) {
+        console.warn('⚠️ [GEOCODING] Error message:', data.error_message);
+      }
+      throw new Error(`Geocoding failed: ${data.status} - ${data.error_message || 'Unknown error'}`);
+    }
+    
+    if (data.results && data.results.length > 0) {
       const location = data.results[0].geometry.location;
       const coordinates = {
         latitude: location.lat,
         longitude: location.lng,
         address: data.results[0].formatted_address
       };
-      console.log('✅ [GEOCODING] Address converted:', coordinates);
+      console.log('✅ [GEOCODING] Address converted successfully:', coordinates);
       return coordinates;
     }
     
     throw new Error('No geocoding results found');
   } catch (error) {
-    console.error('💥 [GEOCODING] Error:', error);
+    console.error('💥 [GEOCODING] Error:', error.message);
     throw error;
   }
 };
@@ -81,6 +107,31 @@ const decodePolyline = (encoded) => {
 export function useRouteCalculation() {
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState(null);
+
+  // Test Google Maps API key validity
+  const testApiKey = useCallback(async () => {
+    try {
+      if (!GOOGLE_MAPS_KEY) {
+        throw new Error('No API key configured');
+      }
+      
+      // Simple geocoding test with a well-known address
+      const testUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=Melbourne&key=${GOOGLE_MAPS_KEY}`;
+      const response = await fetch(testUrl);
+      const data = await response.json();
+      
+      if (data.status === 'OK') {
+        console.log('✅ [API TEST] Google Maps API key is valid');
+        return true;
+      } else {
+        console.error('❌ [API TEST] API key test failed:', data.status, data.error_message);
+        return false;
+      }
+    } catch (error) {
+      console.error('💥 [API TEST] API key test error:', error);
+      return false;
+    }
+  }, []);
 
   // Calculate route from receiver's location to sender's destination
   const calculateReceiverRoute = useCallback(async (receiverLocation, destinationLocation, transportMode = "walking") => {
@@ -252,28 +303,48 @@ export function useRouteCalculation() {
         destinationCoords = routeData.destinationLocation;
       }
       // Option 2: Geocode destination text
-      else if (routeData.destinationText && routeData.destinationText !== 'Placeholder') {
+      else if (routeData.destinationText && 
+               routeData.destinationText !== 'Placeholder' && 
+               routeData.destinationText !== 'Find Companion' &&
+               routeData.destinationText !== 'Destination') {
         console.log('🌍 [ENHANCED ROUTE] Geocoding destination text:', routeData.destinationText);
-        try {
-          destinationCoords = await geocodeAddress(routeData.destinationText);
-        } catch (geocodeError) {
-          console.warn('⚠️ [ENHANCED ROUTE] Geocoding failed:', geocodeError);
+        
+        // Test API key first if this is the first geocoding attempt
+        const isApiValid = await testApiKey();
+        if (!isApiValid) {
+          console.warn('⚠️ [ENHANCED ROUTE] API key test failed, skipping geocoding');
+        } else {
+          try {
+            destinationCoords = await geocodeAddress(routeData.destinationText);
+          } catch (geocodeError) {
+            console.warn('⚠️ [ENHANCED ROUTE] Geocoding failed:', geocodeError);
+          }
         }
+      } else {
+        console.log('⚠️ [ENHANCED ROUTE] Skipping geocoding for placeholder destination:', routeData.destinationText);
       }
 
       // Option 3: Fallback to sender's current location as destination
-      if (!destinationCoords && senderCurrentLocation) {
+      if (!destinationCoords && senderCurrentLocation && senderCurrentLocation.latitude && senderCurrentLocation.longitude) {
         console.log('🔄 [ENHANCED ROUTE] Using sender current location as fallback destination');
         destinationCoords = {
           latitude: senderCurrentLocation.latitude,
           longitude: senderCurrentLocation.longitude,
-          address: `${routeData.senderName || 'Sender'}'s current location`
+          address: `${routeData.senderName || 'Sender'}'s location`
         };
       }
 
+      // Option 4: Use a default location as last resort (Melbourne CBD as example)
       if (!destinationCoords) {
-        throw new Error('No valid destination found for route calculation');
+        console.log('🏙️ [ENHANCED ROUTE] Using default location as last resort');
+        destinationCoords = {
+          latitude: -37.8136,
+          longitude: 144.9631,
+          address: 'Melbourne CBD (Default destination)'
+        };
       }
+
+      console.log('✅ [ENHANCED ROUTE] Final destination determined:', destinationCoords);
 
       console.log('🎯 [ENHANCED ROUTE] Final destination coordinates:', destinationCoords);
 
@@ -313,6 +384,7 @@ export function useRouteCalculation() {
     calculateReceiverRouteEnhanced,
     geocodeAddress,
     getMapRegion,
+    testApiKey,
     clearError: () => setError(null)
   };
 }

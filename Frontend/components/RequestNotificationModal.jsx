@@ -135,7 +135,7 @@ export default function RequestNotificationModal({
   const [refreshing, setRefreshing] = useState(false);
   const [respondingTo, setRespondingTo] = useState(null);
 
-  const { calculateReceiverRoute, calculateTwoStepRoute, calculateReceiverRouteEnhanced, getMapRegion, calculating } = useRouteCalculation();
+  const { calculateReceiverRoute, getMapRegion, calculating } = useRouteCalculation();
 
   useEffect(() => {
     if (visible) {
@@ -217,59 +217,68 @@ export default function RequestNotificationModal({
 
       if (result.status === "success") {
         if (response === "accepted") {
-          // Calculate route from receiver's location to destination using enhanced method
-          if (currentLocation && onRouteUpdate) {
+          // Simple, direct route calculation to sender's current location
+          if (currentLocation && result.data.senderCurrentLocation && onRouteUpdate) {
             try {
-              console.log('� [ENHANCED RECEIVER ROUTE] Starting enhanced route calculation...');
-              console.log('� [ENHANCED RECEIVER ROUTE] Receiver location:', currentLocation);
-              console.log('� [ENHANCED RECEIVER ROUTE] Backend response data:', result.data);
+              console.log('🚀 [SIMPLE ROUTE] Starting simple route calculation...');
+              console.log('📍 [SIMPLE ROUTE] Receiver location:', currentLocation);
+              console.log('📍 [SIMPLE ROUTE] Sender location:', result.data.senderCurrentLocation);
               
-              // Use enhanced route calculation with fallback options
-              const enhancedRoute = await calculateReceiverRouteEnhanced(
-                result.data.routeData || {},
+              // Calculate direct route from receiver to sender's current location
+              const simpleRoute = await calculateReceiverRoute(
                 currentLocation,
-                result.data.senderCurrentLocation
+                result.data.senderCurrentLocation,
+                'walking'
               );
               
-              // Update parent map with receiver's route
+              console.log('✅ [SIMPLE ROUTE] Route calculated successfully');
+              
+              // Update parent map with receiver's route to sender
               onRouteUpdate({
-                receiverRoute: enhancedRoute,
-                routeType: enhancedRoute.routeType || 'direct',
-                destination: enhancedRoute.destinationInfo,
+                receiverRoute: simpleRoute,
+                routeType: 'direct',
+                destination: {
+                  coordinates: result.data.senderCurrentLocation,
+                  address: `${result.data.routeData?.senderName || 'Companion'}'s location`,
+                  senderName: result.data.routeData?.senderName || 'Companion'
+                },
                 mapRegion: getMapRegion([
                   currentLocation,
-                  enhancedRoute.destinationInfo.coordinates
+                  result.data.senderCurrentLocation
                 ])
               });
               
-              console.log('✅ [ENHANCED RECEIVER ROUTE] Route calculated and map updated successfully');
-              
-              // Show success message with destination info
-              const destinationName = enhancedRoute.destinationInfo.address || 
-                                    result.data.routeData?.destinationText || 
-                                    'destination';
+              // Show success message
+              const companionName = result.data.routeData?.senderName || 'your companion';
               
               Alert.alert(
-                "🎉 Route Calculated!", 
-                `Your route to ${destinationName} has been calculated and displayed on the map.`,
-                [{ text: "Great!" }]
+                "🎉 Match Found!", 
+                `Route calculated! Navigate to ${companionName}'s current location to meet up.`,
+                [{ text: "Let's go!" }]
               );
               
             } catch (routeError) {
-              console.warn('⚠️ [ENHANCED RECEIVER ROUTE] Route calculation failed:', routeError);
+              console.warn('⚠️ [SIMPLE ROUTE] Route calculation failed:', routeError);
               
-              // Show user that route calculation failed but match was successful
               Alert.alert(
-                "Match Successful! ✅", 
-                "Your trip match was successful! However, we couldn't calculate the route automatically. Please use your preferred navigation app to get directions.",
+                "✅ Match Successful!", 
+                "Your match was successful! Please coordinate with your companion to meet up.",
                 [{ text: "OK" }]
               );
             }
           } else {
-            console.warn('⚠️ [ENHANCED RECEIVER ROUTE] Missing required data:', {
+            console.warn('⚠️ [SIMPLE ROUTE] Missing data for route calculation:', {
               hasCurrentLocation: !!currentLocation,
+              hasSenderLocation: !!result.data.senderCurrentLocation,
               hasOnRouteUpdate: !!onRouteUpdate
             });
+            
+            // Still show success even without route calculation
+            Alert.alert(
+              "✅ Match Successful!", 
+              "You've been matched with a companion! Please coordinate to meet up.",
+              [{ text: "Great!" }]
+            );
           }
 
           Alert.alert(

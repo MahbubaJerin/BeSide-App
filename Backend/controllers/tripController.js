@@ -135,6 +135,8 @@ exports.updateTripRequest = catchAsync(async (req, res, next) => {
 
   console.log('✅ [UPDATE TRIP] Trip request updated successfully');
   console.log('📍 [UPDATE TRIP] Updated route data:', {
+    destination: tripRequest.destination,
+    destinationType: tripRequest.destinationType,
     hasStartLocation: !!tripRequest.startLocation,
     hasDestinationLocation: !!tripRequest.destinationLocation,
     routeCoordinatesCount: tripRequest.routeCoordinates?.length || 0,
@@ -305,7 +307,7 @@ exports.uploadTripPhoto = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.updateTripRequest = catchAsync(async (req, res, next) => {
+exports.updateTripRequestBasic = catchAsync(async (req, res, next) => {
   const { tripReqId } = req.params;
   const { destination, destinationType, date, time, genderPreference } = req.body;
 
