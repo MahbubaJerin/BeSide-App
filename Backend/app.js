@@ -27,9 +27,9 @@ if (process.env.NODE_ENV === "development") {
 }
 
 const limiter = rateLimit({
-  max: 100,
-  windowMs: 60 * 60 * 1000,
-  message: "Too many requests from this IP, please try again in an hour!",
+  max: process.env.RATE_LIMIT_MAX || 500, // Increased for development
+  windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes for development
+  message: "Too many requests from this IP, please try again later!",
 });
 app.use("/api", limiter);
 

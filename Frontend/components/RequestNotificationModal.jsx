@@ -219,11 +219,36 @@ export default function RequestNotificationModal({
       console.log('🔥 [DEBUG] API Response Status:', apiResponse.status);
       console.log('🔥 [DEBUG] API Response OK:', apiResponse.ok);
       
-      const result = await apiResponse.json();
-      console.log('🔥 [DEBUG] API Result:', JSON.stringify(result, null, 2));
+      // Handle non-JSON error responses (like 429 Too Many Requests)
+      let result;
+      try {
+        const responseText = await apiResponse.text();
+        console.log('🔥 [DEBUG] Raw response text:', responseText);
+        
+        // Try to parse as JSON
+        result = JSON.parse(responseText);
+        console.log('🔥 [DEBUG] Parsed JSON result:', JSON.stringify(result, null, 2));
+      } catch (parseError) {
+        console.error('💥 [DEBUG] Failed to parse response as JSON:', parseError.message);
+        
+        // Handle specific HTTP status codes without JSON
+        if (apiResponse.status === 429) {
+          console.error("❌ Too many requests - rate limited");
+          Alert.alert("Too Many Requests", "Please wait a moment before trying again. The server is busy.");
+          return;
+        } else if (apiResponse.status === 500) {
+          console.error("❌ Server error");
+          Alert.alert("Server Error", "There was an issue with the server. Please try again later.");
+          return;
+        } else {
+          console.error("❌ Non-JSON error response");
+          Alert.alert("Connection Error", "Unable to process your request. Please check your connection and try again.");
+          return;
+        }
+      }
       
       if (!apiResponse.ok) {
-        // Handle specific error cases
+        // Handle specific error cases with JSON responses
         if (apiResponse.status === 404) {
           console.error("❌ Trip request not found - may have been cancelled or expired");
           Alert.alert("Request Expired", "This trip request is no longer available.");
@@ -240,7 +265,7 @@ export default function RequestNotificationModal({
           setRequests(prev => prev.filter(req => req.tripReqId !== tripReqId));
           return;
         }
-        throw new Error(result.message || "Failed to respond to request");
+        throw new Error(result?.message || "Failed to respond to request");
       }
 
       if (result.status === "success") {
