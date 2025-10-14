@@ -15,6 +15,7 @@ import { ThemedButton } from "@/components/ThemedButton";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { BASE_URL } from "../config";
+import { useRouteCalculation } from "@/hooks/useRouteCalculation";
 
 // Separate component for each request card to properly handle hooks
 function RequestCard({ request, onMarkViewed, onResponse, respondingTo, formatDate, formatTimeRemaining }) {
@@ -74,6 +75,35 @@ function RequestCard({ request, onMarkViewed, onResponse, respondingTo, formatDa
             Prefers: {request.genderPreference === "any" ? "Anyone" : request.genderPreference}
           </ThemedText>
         </View>
+
+        {/* Route Information */}
+        {request.startLocation && request.destinationLocation && (
+          <>
+            <View style={styles.routeInfo}>
+              <ThemedText style={styles.routeTitle}>📍 Route Preview</ThemedText>
+              <ThemedText style={styles.routeDetail}>
+                From: {request.startLocation.address || 'Start location'}
+              </ThemedText>
+              <ThemedText style={styles.routeDetail}>
+                To: {request.destinationLocation.address || request.destination}
+              </ThemedText>
+              {request.transportMode && (
+                <ThemedText style={styles.routeDetail}>
+                  Mode: {request.transportMode.charAt(0).toUpperCase() + request.transportMode.slice(1)}
+                </ThemedText>
+              )}
+            </View>
+            
+            {request.meetingPoint && request.meetingPoint.isSelected && (
+              <View style={styles.meetingInfo}>
+                <ThemedText style={styles.meetingTitle}>🤝 Meeting Point Set</ThemedText>
+                <ThemedText style={styles.meetingDetail}>
+                  {request.meetingPoint.address || 'Meeting location selected'}
+                </ThemedText>
+              </View>
+            )}
+          </>
+        )}
       </View>
 
       <View style={styles.actionButtons}>
@@ -94,11 +124,19 @@ function RequestCard({ request, onMarkViewed, onResponse, respondingTo, formatDa
   );
 }
 
-export default function RequestNotificationModal({ visible, onClose, onRequestAccepted }) {
+export default function RequestNotificationModal({ 
+  visible, 
+  onClose, 
+  onRequestAccepted,
+  onRouteUpdate, // New prop to update parent map with receiver's route
+  currentLocation // Receiver's current location
+}) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [respondingTo, setRespondingTo] = useState(null);
+
+  const { calculateReceiverRoute, calculateTwoStepRoute, getMapRegion, calculating } = useRouteCalculation();
 
   useEffect(() => {
     if (visible) {
@@ -158,12 +196,69 @@ export default function RequestNotificationModal({ visible, onClose, onRequestAc
       const result = await apiResponse.json();
       if (result.status === "success") {
         if (response === "accepted") {
+          // Calculate route from receiver's location to destination
+          if (currentLocation && result.data.routeData && onRouteUpdate) {
+            try {
+              console.log('🗺️ [RECEIVER ROUTE] Calculating receiver route to destination...');
+              
+              const { destinationLocation, transportMode, meetingPoint } = result.data.routeData;
+              
+              if (meetingPoint && meetingPoint.isSelected) {
+                // Two-step route: receiver → meeting point → destination
+                console.log('📍 Using two-step route with meeting point');
+                const twoStepRoute = await calculateTwoStepRoute(
+                  currentLocation,
+                  meetingPoint,
+                  destinationLocation,
+                  transportMode
+                );
+                
+                // Update parent map with receiver's complete journey
+                onRouteUpdate({
+                  receiverRoute: twoStepRoute,
+                  routeType: 'two-step',
+                  meetingPoint: meetingPoint,
+                  destination: destinationLocation,
+                  mapRegion: getMapRegion([
+                    currentLocation,
+                    meetingPoint,
+                    destinationLocation
+                  ])
+                });
+              } else {
+                // Direct route: receiver → destination
+                console.log('📍 Using direct route to destination');
+                const directRoute = await calculateReceiverRoute(
+                  currentLocation,
+                  destinationLocation,
+                  transportMode
+                );
+                
+                // Update parent map with receiver's route
+                onRouteUpdate({
+                  receiverRoute: directRoute,
+                  routeType: 'direct',
+                  destination: destinationLocation,
+                  mapRegion: getMapRegion([
+                    currentLocation,
+                    destinationLocation
+                  ])
+                });
+              }
+              
+              console.log('✅ [RECEIVER ROUTE] Route calculated and map updated');
+            } catch (routeError) {
+              console.warn('⚠️ [RECEIVER ROUTE] Failed to calculate route:', routeError);
+              // Still show success but without route update
+            }
+          }
+
           Alert.alert(
             "🎉 Match Found!", 
-            "You've successfully joined this trip! The trip organizer has been notified.",
+            "You've successfully joined this trip! Your route to the destination has been calculated and displayed on the map.",
             [
               { 
-                text: "Great!", 
+                text: "View Route", 
                 onPress: () => {
                   onRequestAccepted?.(result.data.tripRequest);
                   onClose();
@@ -421,6 +516,45 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.light.text,
     flex: 1,
+  },
+  routeInfo: {
+    backgroundColor: Colors.light.tint + "10",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.light.tint,
+  },
+  routeTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.tint,
+    marginBottom: 6,
+  },
+  routeDetail: {
+    fontSize: 12,
+    color: Colors.light.text,
+    marginBottom: 2,
+    opacity: 0.8,
+  },
+  meetingInfo: {
+    backgroundColor: "#28a745" + "10",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: "#28a745",
+  },
+  meetingTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#28a745",
+    marginBottom: 4,
+  },
+  meetingDetail: {
+    fontSize: 12,
+    color: Colors.light.text,
+    opacity: 0.8,
   },
   actionButtons: {
     flexDirection: "row",

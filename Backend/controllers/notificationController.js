@@ -289,10 +289,28 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
         isMatched: response === "accepted"
     };
 
-    // If accepted, include match information
+    // If accepted, include match information and receiver's route
     if (response === "accepted") {
         const createdMatch = await TripMatch.findOne({ matchId: tripRequest.matchedTripId });
         responseData.tripMatch = createdMatch;
+        
+        // Include route information for receiver's map update
+        responseData.routeData = {
+            startLocation: tripRequest.startLocation,
+            destinationLocation: tripRequest.destinationLocation,
+            routeCoordinates: tripRequest.routeCoordinates,
+            transportMode: tripRequest.transportMode,
+            meetingPoint: tripRequest.meetingPoint
+        };
+
+        // Get receiver's current location for route calculation
+        const receiverLocation = await UserLocation.findOne({ userId: userId });
+        if (receiverLocation) {
+            responseData.receiverLocation = {
+                latitude: receiverLocation.currentLocation.coordinates[1],
+                longitude: receiverLocation.currentLocation.coordinates[0]
+            };
+        }
     }
 
     res.status(200).json({

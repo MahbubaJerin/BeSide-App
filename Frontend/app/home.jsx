@@ -1075,8 +1075,45 @@ export default function HomeScreen() {
       <RequestNotificationModal
         visible={requestNotificationVisible}
         onClose={() => setRequestNotificationVisible(false)}
+        currentLocation={currentLocation}
         onRequestAccepted={(tripRequest) => {
           console.log("Request accepted:", tripRequest);
+          // Refresh active matches to show the new match
+          activeMatches.refresh();
+        }}
+        onRouteUpdate={(routeData) => {
+          console.log("🗺️ [HOME] Updating map with receiver route:", routeData);
+          
+          // Update map markers and route
+          if (routeData.routeType === 'two-step') {
+            // Display two-step route: receiver → meeting point → destination
+            const allCoords = [
+              ...routeData.receiverRoute.step1.coordinates,
+              ...routeData.receiverRoute.step2.coordinates
+            ];
+            setRouteCoordinates(allCoords);
+            
+            // Set markers for meeting point and destination
+            if (routeData.meetingPoint) {
+              setStartMarker(routeData.meetingPoint);
+            }
+            if (routeData.destination) {
+              setEndMarker(routeData.destination);
+            }
+          } else {
+            // Display direct route: receiver → destination
+            setRouteCoordinates(routeData.receiverRoute.coordinates);
+            setStartMarker(currentLocation);
+            setEndMarker(routeData.destination);
+          }
+          
+          // Fit map to show the complete route
+          if (routeData.mapRegion && mapRef.current) {
+            mapRef.current.animateToRegion(routeData.mapRegion, 1000);
+          }
+          
+          // Show route overlay
+          setShowRadius(true);
         }}
       />
       <ActiveMatchModal
