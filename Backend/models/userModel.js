@@ -10,12 +10,13 @@ const UserSchema = new Schema(
       default: function () {
         return this._id.toString();
       },
-    },       
+    },
     userName: {
       type: String,
       required: [true, "Username is required"],
       unique: true,
       trim: true,
+      lowercase: true,
     },
     email: {
       type: String,
@@ -93,7 +94,7 @@ const UserSchema = new Schema(
     },
 
     emailVerificationToken: String,
-    emailVerficationExpires: Date,
+    emailVerificationExpires: Date,
     passwordResetToken: String,
     passwordResetExpires: Date,
     otpCode: String,

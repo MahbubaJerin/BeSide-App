@@ -1,4 +1,3 @@
-// app/register.jsx
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -68,12 +67,18 @@ function getPasswordChecks(pw) {
   ];
 }
 
+  // --- Username Helpers ---
+const isValidUsername = (v) => /^[a-z0-9._-]{3,20}$/i.test((v || "").trim());
+const toUsername = (v) => (v || "").trim().toLowerCase();
+
+
 /* ---------------- Main Screen ---------------- */
 export default function RegisterScreen() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
+  const [usernameErr, setUsernameErr] = useState("");
   const [mobileNo, setMobileNo] = useState("");
   const [password, setPassword] = useState("");
   const [gender, setGender] = useState(null);
@@ -110,7 +115,7 @@ export default function RegisterScreen() {
   const validateStep = () => {
     if (step === 0)
       return firstName && lastName && emailValid && dob && calcAge(dob) >= 13;
-    if (step === 1) return mobileNo;
+    if (step === 1) return mobileNo && isValidUsername(username);
     if (step === 2) return password.length >= 8;
     if (step === 3) return termsAccepted;
     return true;
@@ -127,7 +132,7 @@ export default function RegisterScreen() {
 
     try {
       const payload = {
-        userName: username || email,
+        userName: toUsername(username), // save real lowercase username
         email: email.trim().toLowerCase(),
         mobileNo: mobileNo.trim(),
         password,
@@ -154,12 +159,12 @@ export default function RegisterScreen() {
 
       const registerData = await registerResponse.json();
       if (!registerResponse.ok) {
-        Alert.alert(
-          "Registration Failed",
-          registerData.message || "Try again."
-        );
+        const msg = registerData.message || "Try again.";
+        if (/user.?name/i.test(msg)) setUsernameErr("Username is already taken.");
+        Alert.alert("Registration Failed", msg);
         return;
       }
+
 
       const otpResponse = await fetch(`${BASE_URL}api/v1/auth/send-otp`, {
         method: "POST",
@@ -369,22 +374,37 @@ export default function RegisterScreen() {
                   keyboardType="phone-pad"
                 />
               </View>
-            </View>
+                </View>
 
-            <ThemedText style={styles.label}>Username (optional)</ThemedText>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  borderColor: border,
-                  color: text,
-                  backgroundColor: surface,
-                },
-              ]}
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-            />
+                <ThemedText style={styles.label}>Username*</ThemedText>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      borderColor: usernameErr ? "#B00020" : border,
+                      color: text,
+                      backgroundColor: surface,
+                    },
+                  ]}
+                  value={username}
+                  onChangeText={(v) => {
+                    setUsername(v);
+                    if (usernameErr) setUsernameErr("");
+                  }}
+                  onBlur={() => {
+                    if (!isValidUsername(username)) {
+                      setUsernameErr("Use 3–20 chars: letters, numbers, . _ -");
+                    }
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {!!username && !isValidUsername(username) && (
+                  <ThemedText style={{ fontSize: 12, color: "#B00020" }}>
+                    Use 3–20 chars: letters, numbers, . _ -
+                  </ThemedText>
+                )}
+
 
             <ThemedText style={styles.label}>Gender</ThemedText>
             <View style={styles.pickerWrap}>

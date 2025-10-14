@@ -85,19 +85,23 @@ const createSendToken = (user, statusCode, res) => {
 exports.login = catchAsync(async (req, res, next) => {
   const { userName, email, password } = req.body;
 
-  // Allow login via either username or email
   if ((!userName && !email) || !password) {
     return next(new AppError("Please provide username/email and password", 400));
   }
 
-  const query = userName ? { userName } : { email };
-  const user = await User.findOne(query).select("+password");
+  // normalize the identifier to lowercase & trim
+  const identifier = String(userName || email).trim().toLowerCase();
+
+  // find by either username or email, case-insensitive by normalization
+  const user = await User.findOne({
+    $or: [{ email: identifier }, { userName: identifier }],
+  }).select("+password");
 
   if (!user || !(await bcrypt.compare(password, user.password))) {
     return next(new AppError("Incorrect username/email or password", 401));
   }
 
-  createSendToken(user, 200, res);
+  return createSendToken(user, 200, res);
 });
 
 
@@ -191,16 +195,20 @@ exports.verifyUser = catchAsync(async (req, res, next) => {
  * @route POST /api/v1/auth/register
  */
 exports.registerUser = catchAsync(async (req, res, next) => {
-  const {
-    userName,
-    email,
-    mobileNo,
-    password,
-    firstName,
-    lastName,
-    gender,
-    address = {},
-  } = req.body;
+  let {
+  userName,
+  email,
+  mobileNo,
+  password,
+  firstName,
+  lastName,
+  gender,
+  address = {},
+} = req.body;
+
+// Normalize username and email to lowercase
+userName = String(userName || "").trim().toLowerCase();
+email = String(email || "").trim().toLowerCase();
 
   // Check required fields
   if (
