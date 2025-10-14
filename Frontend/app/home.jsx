@@ -42,6 +42,7 @@ import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";
 import { useActiveMatches } from "../hooks/useActiveMatches";
 import { useTripNotifications } from "../hooks/useTripNotifications";
+import { useRouteCalculation } from "../hooks/useRouteCalculation";
 
 // ========= Inline hooks (single-file edition) =========
 
@@ -273,6 +274,7 @@ export default function HomeScreen() {
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [startMarker, setStartMarker] = useState(null);
   const [endMarker, setEndMarker] = useState(null);
+  const [currentNavigationRoute, setCurrentNavigationRoute] = useState(null);
 
   const loadingAnimation = useRef(new Animated.Value(0)).current;
   const mapRef = useRef(null);
@@ -285,6 +287,7 @@ export default function HomeScreen() {
   const requestPolling = useRequestPolling(30000, true); // Poll every 30 seconds (reduced from 10s)
   const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds
   const tripNotifications = useTripNotifications();
+  const { openGoogleMapsNavigation, getNavigationInstructions } = useRouteCalculation();
 
   const currentLocation = locationTracking.currentLocation;
   const isSearching = companionSearch.isSearching;
@@ -982,6 +985,55 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Navigation Button - appears when route is active */}
+      {currentNavigationRoute && (
+        <View style={styles.navigationContainer}>
+          <View style={styles.navigationInfo}>
+            <ThemedText type="defaultSemiBold" style={styles.navigationTitle}>
+              🗺️ Navigation to {currentNavigationRoute.destinationAddress}
+            </ThemedText>
+            {currentNavigationRoute.routeInfo && (
+              <ThemedText type="caption" style={styles.navigationDetails}>
+                Distance: {currentNavigationRoute.routeInfo.distance} • 
+                Duration: {currentNavigationRoute.routeInfo.duration}
+              </ThemedText>
+            )}
+            {currentNavigationRoute.companion && (
+              <ThemedText type="caption" style={styles.navigationDetails}>
+                Meeting {currentNavigationRoute.companion}
+              </ThemedText>
+            )}
+          </View>
+          <View style={styles.navigationButtons}>
+            <ThemedButton 
+              title="📱 Open Maps" 
+              onPress={() => {
+                try {
+                  openGoogleMapsNavigation(
+                    currentNavigationRoute.destination,
+                    currentNavigationRoute.origin,
+                    'walking'
+                  );
+                } catch (error) {
+                  Alert.alert('Navigation Error', 'Could not open navigation app. Please ensure Google Maps is installed.');
+                }
+              }} 
+              style={styles.navigationButton} 
+            />
+            <ThemedButton 
+              title="✕" 
+              onPress={() => {
+                setCurrentNavigationRoute(null);
+                setRouteCoordinates([]);
+                setStartMarker(null);
+                setEndMarker(null);
+              }} 
+              style={styles.closeNavigationButton} 
+            />
+          </View>
+        </View>
+      )}
+
       {/* Bottom Navigation Bar (hidden while searching) */}
       {!isSearching && (
         <View style={[styles.navContainer, { paddingBottom: insets.bottom || 10 }]}>
@@ -1145,6 +1197,16 @@ export default function HomeScreen() {
             // Show receiver's current location as start
             setStartMarker(currentLocation);
             
+            // Store navigation data for the navigation button
+            setCurrentNavigationRoute({
+              destination: routeData.meetingPoint?.coordinates,
+              destinationAddress: routeData.meetingPoint?.address || 'Meeting Point',
+              origin: currentLocation,
+              routeInfo: routeData.receiverRoute,
+              companion: routeData.companion,
+              type: 'to-meeting-point'
+            });
+            
           } else if (routeData.routeType === 'two-step') {
             // Display two-step route: receiver → meeting point → destination
             const allCoords = [
@@ -1160,11 +1222,32 @@ export default function HomeScreen() {
             if (routeData.destination) {
               setEndMarker(routeData.destination);
             }
+            
+            // Store navigation data for two-step route
+            setCurrentNavigationRoute({
+              destination: routeData.destination?.coordinates,
+              destinationAddress: routeData.destination?.address || 'Final Destination',
+              meetingPoint: routeData.meetingPoint?.coordinates,
+              meetingPointAddress: routeData.meetingPoint?.address || 'Meeting Point',
+              origin: currentLocation,
+              routeInfo: routeData.receiverRoute,
+              type: 'two-step'
+            });
+            
           } else {
             // Display direct route: receiver → destination
             setRouteCoordinates(routeData.receiverRoute.coordinates);
             setStartMarker(currentLocation);
             setEndMarker(routeData.destination);
+            
+            // Store navigation data for direct route
+            setCurrentNavigationRoute({
+              destination: routeData.destination?.coordinates,
+              destinationAddress: routeData.destination?.address || 'Destination',
+              origin: currentLocation,
+              routeInfo: routeData.receiverRoute,
+              type: 'direct'
+            });
           }
           
           // Fit map to show the complete route
@@ -1433,5 +1516,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.light.text,
     opacity: 0.8,
+  },
+  
+  // Navigation styles
+  navigationContainer: {
+    position: 'absolute',
+    bottom: 120,
+    left: 16,
+    right: 16,
+    backgroundColor: Colors.light.surface,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  navigationInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  navigationTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.light.text,
+    marginBottom: 4,
+  },
+  navigationDetails: {
+    fontSize: 12,
+    color: Colors.light.text,
+    opacity: 0.8,
+    marginBottom: 2,
+  },
+  navigationButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  navigationButton: {
+    backgroundColor: Colors.light.tint,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  closeNavigationButton: {
+    backgroundColor: '#FF5722',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 40,
   },
 });

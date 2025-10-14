@@ -139,7 +139,13 @@ export default function RequestNotificationModal({
   const [refreshing, setRefreshing] = useState(false);
   const [respondingTo, setRespondingTo] = useState(null);
 
-  const { calculateReceiverRoute, getMapRegion, calculating } = useRouteCalculation();
+  const { 
+    calculateReceiverRoute, 
+    getMapRegion, 
+    calculating, 
+    openGoogleMapsNavigation, 
+    getNavigationInstructions 
+  } = useRouteCalculation();
 
   useEffect(() => {
     if (visible) {
@@ -324,14 +330,39 @@ export default function RequestNotificationModal({
                 ])
               });
               
-              // Show success message with meeting point info
+              // Show success message with navigation options
               const companionName = result.data.routeData?.senderName || 'your companion';
               const meetingAddress = meetingPoint.address || 'the meeting point';
               
               Alert.alert(
                 "🎉 Match Found!", 
-                `Route calculated! Navigate to ${meetingAddress} to meet ${companionName}, then travel together to your destination.`,
-                [{ text: "Let's go!" }]
+                `Route calculated! Distance: ${routeToMeetingPoint.distance}, Duration: ${routeToMeetingPoint.duration}\n\nNavigate to ${meetingAddress} to meet ${companionName}.`,
+                [
+                  { 
+                    text: "View Route", 
+                    style: "default",
+                    onPress: () => {
+                      console.log('📱 [NAVIGATION] User chose to view route in-app');
+                      // Route is already displayed on map via onRouteUpdate
+                    }
+                  },
+                  { 
+                    text: "Open Maps", 
+                    style: "default",
+                    onPress: () => {
+                      try {
+                        console.log('🗺️ [NAVIGATION] Opening Google Maps navigation');
+                        openGoogleMapsNavigation(meetingPoint, currentLocation, 'walking');
+                      } catch (error) {
+                        Alert.alert('Navigation Error', 'Could not open navigation app. Please ensure Google Maps is installed.');
+                      }
+                    }
+                  },
+                  { 
+                    text: "Got it!", 
+                    style: "default" 
+                  }
+                ]
               );
               
             } catch (routeError) {

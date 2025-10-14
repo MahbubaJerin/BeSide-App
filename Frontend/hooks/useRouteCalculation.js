@@ -149,27 +149,46 @@ export function useRouteCalculation() {
     setError(null);
 
     try {
+      // Enhanced Google Maps Directions API request with navigation details
       const url = `https://maps.googleapis.com/maps/api/directions/json?` +
         `origin=${receiverLocation.latitude},${receiverLocation.longitude}` +
         `&destination=${destinationLocation.latitude},${destinationLocation.longitude}` +
         `&mode=${transportMode}` +
+        `&alternatives=true` +  // Get alternative routes
+        `&optimize=true` +      // Optimize waypoints
+        `&avoid=tolls` +        // Avoid tolls for better user experience
+        `&units=metric` +       // Use metric units
+        `&language=en` +        // English instructions
+        `&region=au` +          // Australia region
         `&key=${GOOGLE_MAPS_KEY}`;
 
-      console.log('🗺️ [ROUTE CALC] Calculating route for receiver...');
-      console.log('- From:', receiverLocation);
-      console.log('- To:', destinationLocation);
+      console.log('🗺️ [NAVIGATION] Calculating detailed navigation route...');
+      console.log('- From:', `${receiverLocation.latitude}, ${receiverLocation.longitude}`);
+      console.log('- To:', `${destinationLocation.latitude}, ${destinationLocation.longitude}`);
       console.log('- Mode:', transportMode);
-      console.log('- URL:', url);
+      console.log('- URL:', url.replace(GOOGLE_MAPS_KEY, 'API_KEY_HIDDEN'));
 
       const response = await fetch(url);
-      console.log('📡 [ROUTE CALC] Response status:', response.status);
-      console.log('📡 [ROUTE CALC] Response ok:', response.ok);
+      console.log('📡 [NAVIGATION] Response status:', response.status);
+      console.log('📡 [NAVIGATION] Response ok:', response.ok);
+      
+      if (!response.ok) {
+        throw new Error(`Google Maps API error: ${response.status} ${response.statusText}`);
+      }
       
       const data = await response.json();
-      console.log('📊 [ROUTE CALC] Response data:', JSON.stringify(data, null, 2));
+      console.log('📊 [NAVIGATION] API Status:', data.status);
+      
+      if (data.status !== 'OK') {
+        console.error('❌ [NAVIGATION] API Error:', data.error_message || data.status);
+        throw new Error(`Navigation error: ${data.status} - ${data.error_message || 'Unknown error'}`);
+      }
 
-      if (data.routes && data.routes[0]) {
-        const route = data.routes[0];
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0]; // Use the best route
+        const leg = route.legs[0];    // First (and usually only) leg of the journey
+        
+        // Extract polyline coordinates for route display
         const points = route.overview_polyline.points;
         const coordinates = decodePolyline(points);
         
@@ -182,18 +201,63 @@ export function useRouteCalculation() {
             c.longitude <= 180
         );
 
+        // Extract turn-by-turn navigation steps
+        const navigationSteps = leg.steps.map((step, index) => ({
+          stepNumber: index + 1,
+          instruction: step.html_instructions.replace(/<[^>]*>/g, ''), // Remove HTML tags
+          distance: step.distance.text,
+          duration: step.duration.text,
+          maneuver: step.maneuver || 'straight',
+          startLocation: {
+            latitude: step.start_location.lat,
+            longitude: step.start_location.lng
+          },
+          endLocation: {
+            latitude: step.end_location.lat,
+            longitude: step.end_location.lng
+          },
+          polyline: step.polyline ? decodePolyline(step.polyline.points) : []
+        }));
+
         const routeInfo = {
+          // Basic route information
           coordinates: validCoords,
-          distance: route.legs[0]?.distance?.text || 'Unknown',
-          duration: route.legs[0]?.duration?.text || 'Unknown',
-          distanceValue: route.legs[0]?.distance?.value || 0,
-          durationValue: route.legs[0]?.duration?.value || 0
+          distance: leg.distance?.text || 'Unknown',
+          duration: leg.duration?.text || 'Unknown',
+          distanceValue: leg.distance?.value || 0,
+          durationValue: leg.duration?.value || 0,
+          
+          // Navigation-specific data
+          navigationSteps: navigationSteps,
+          startAddress: leg.start_address,
+          endAddress: leg.end_address,
+          
+          // Route bounds for map fitting
+          bounds: {
+            northeast: route.bounds.northeast,
+            southwest: route.bounds.southwest
+          },
+          
+          // Alternative routes (if available)
+          alternativeRoutes: data.routes.slice(1).map(altRoute => ({
+            distance: altRoute.legs[0]?.distance?.text || 'Unknown',
+            duration: altRoute.legs[0]?.duration?.text || 'Unknown',
+            coordinates: decodePolyline(altRoute.overview_polyline.points)
+          })),
+          
+          // Metadata
+          transportMode: transportMode,
+          apiProvider: 'google-maps'
         };
 
-        console.log('✅ [ROUTE CALC] Route calculated successfully');
-        console.log('- Coordinates:', validCoords.length);
+        console.log('✅ [NAVIGATION] Detailed route calculated successfully');
+        console.log('- Total coordinates:', validCoords.length);
+        console.log('- Navigation steps:', navigationSteps.length);
         console.log('- Distance:', routeInfo.distance);
         console.log('- Duration:', routeInfo.duration);
+        console.log('- Start:', routeInfo.startAddress);
+        console.log('- End:', routeInfo.endAddress);
+        console.log('- Alternative routes:', routeInfo.alternativeRoutes.length);
 
         return routeInfo;
       } else {
@@ -284,7 +348,87 @@ export function useRouteCalculation() {
     };
   }, []);
 
-  // Removed enhanced route calculation - using simple direct routing instead
+  // Function to open Google Maps navigation
+  const openGoogleMapsNavigation = useCallback((destination, origin = null, transportMode = 'walking') => {
+    try {
+      console.log('🗺️ [NAVIGATION] Opening Google Maps for navigation...');
+      
+      let navigationUrl;
+      
+      if (origin) {
+        // Navigation from specific origin to destination
+        navigationUrl = `https://www.google.com/maps/dir/?api=1` +
+          `&origin=${origin.latitude},${origin.longitude}` +
+          `&destination=${destination.latitude},${destination.longitude}` +
+          `&travelmode=${transportMode === 'walking' ? 'walking' : transportMode === 'driving' ? 'driving' : 'transit'}`;
+      } else {
+        // Navigation from current location to destination
+        navigationUrl = `https://www.google.com/maps/dir/?api=1` +
+          `&destination=${destination.latitude},${destination.longitude}` +
+          `&travelmode=${transportMode === 'walking' ? 'walking' : transportMode === 'driving' ? 'driving' : 'transit'}`;
+      }
+      
+      console.log('🔗 [NAVIGATION] Google Maps URL:', navigationUrl);
+      
+      // Open Google Maps navigation
+      import('expo-linking').then(({ default: Linking }) => {
+        Linking.openURL(navigationUrl).catch(err => {
+          console.error('❌ [NAVIGATION] Failed to open Google Maps:', err);
+          
+          // Fallback: Try opening with different URL scheme
+          const fallbackUrl = `google.navigation:q=${destination.latitude},${destination.longitude}&mode=${transportMode}`;
+          Linking.openURL(fallbackUrl).catch(fallbackErr => {
+            console.error('❌ [NAVIGATION] Fallback also failed:', fallbackErr);
+            throw new Error('Unable to open navigation app. Please check if Google Maps is installed.');
+          });
+        });
+      });
+      
+    } catch (error) {
+      console.error('❌ [NAVIGATION] Error opening navigation:', error);
+      throw error;
+    }
+  }, []);
+
+  // Function to get navigation instructions as text (useful for in-app display)
+  const getNavigationInstructions = useCallback((routeInfo) => {
+    if (!routeInfo || !routeInfo.navigationSteps) {
+      return [];
+    }
+    
+    return routeInfo.navigationSteps.map(step => ({
+      step: step.stepNumber,
+      instruction: step.instruction,
+      distance: step.distance,
+      duration: step.duration,
+      icon: getNavigationIcon(step.maneuver)
+    }));
+  }, []);
+
+  // Helper function to get navigation icons
+  const getNavigationIcon = (maneuver) => {
+    const iconMap = {
+      'turn-left': '↰',
+      'turn-right': '↱',
+      'turn-slight-left': '↖',
+      'turn-slight-right': '↗',
+      'turn-sharp-left': '↙',
+      'turn-sharp-right': '↘',
+      'uturn-left': '↶',
+      'uturn-right': '↷',
+      'straight': '↑',
+      'ramp-left': '↰',
+      'ramp-right': '↱',
+      'merge': '↗',
+      'fork-left': '↖',
+      'fork-right': '↗',
+      'ferry': '🚢',
+      'roundabout-left': '↺',
+      'roundabout-right': '↻'
+    };
+    
+    return iconMap[maneuver] || '↑';
+  };
 
   return {
     calculating,
@@ -294,6 +438,8 @@ export function useRouteCalculation() {
     geocodeAddress,
     getMapRegion,
     testApiKey,
+    openGoogleMapsNavigation,
+    getNavigationInstructions,
     clearError: () => setError(null)
   };
 }
