@@ -1,4 +1,5 @@
 const TripRequest = require("../models/tripRequestModel");
+const TripMatch = require("../models/tripMatchModel");
 const UserLocation = require("../models/userLocationModel");
 const User = require("../models/userModel");
 const AppError = require("../utils/AppError");
@@ -202,13 +203,14 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
 
     recipient.responseStatus = response;
 
-    // If accepted, update trip request status and set acceptedBy
+    // If accepted, update trip request status, set acceptedBy, and create match
     if (response === "accepted") {
         // Check if someone else already accepted
         if (tripRequest.status === "accepted") {
             return next(new AppError("This request has already been accepted by someone else", 409));
         }
 
+        // Update trip request
         tripRequest.status = "accepted";
         tripRequest.acceptedBy = {
             userId: userId,
@@ -216,23 +218,89 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             acceptedAt: new Date()
         };
 
-        // Mark all other recipients as expired
+        // Mark all other recipients as declined
         tripRequest.recipients.forEach(r => {
             if (r.userId !== userId && ["notified", "viewed"].includes(r.responseStatus)) {
                 r.responseStatus = "declined"; // Auto-decline others
             }
         });
+
+        // ✅ CREATE TRIP MATCH
+        console.log("🎯 [MATCH CREATION] Creating trip match...");
+        
+        // Get organizer info (original requester)
+        const organizer = await User.findOne({ _id: tripRequest.user.userId });
+        if (!organizer) {
+            return next(new AppError("Original trip organizer not found", 404));
+        }
+
+        // Generate unique match ID
+        const matchId = TripMatch.generateMatchId();
+
+        // Create the trip match
+        const tripMatch = new TripMatch({
+            matchId: matchId,
+            originalTripRequest: {
+                tripReqId: tripRequest.tripReqId,
+                ref: tripRequest._id
+            },
+            organizer: {
+                userId: tripRequest.user.userId,
+                userName: tripRequest.user.userName,
+                userImage: tripRequest.user.userImage,
+                joinedAt: new Date(tripRequest.createdAt)
+            },
+            companion: {
+                userId: userId,
+                userName: req.user.userName,
+                userImage: req.user.userImage || "default.jpg",
+                joinedAt: new Date()
+            },
+            tripDetails: {
+                destination: tripRequest.destination,
+                destinationType: tripRequest.destinationType,
+                startCoordinates: {
+                    latitude: tripRequest.startCoordinates?.latitude || 0,
+                    longitude: tripRequest.startCoordinates?.longitude || 0
+                },
+                plannedDate: tripRequest.date,
+                plannedTime: tripRequest.time,
+                genderPreference: tripRequest.genderPreference
+            },
+            status: "active"
+        });
+
+        await tripMatch.save();
+        
+        // Link match to trip request
+        tripRequest.matchedTripId = matchId;
+
+        console.log("✅ [MATCH CREATION] Match created successfully:");
+        console.log("- Match ID:", matchId);
+        console.log("- Organizer:", tripRequest.user.userName);
+        console.log("- Companion:", req.user.userName);
     }
 
     await tripRequest.save();
 
+    // Prepare response data
+    let responseData = { 
+        tripRequest,
+        isMatched: response === "accepted"
+    };
+
+    // If accepted, include match information
+    if (response === "accepted") {
+        const createdMatch = await TripMatch.findOne({ matchId: tripRequest.matchedTripId });
+        responseData.tripMatch = createdMatch;
+    }
+
     res.status(200).json({
         status: "success",
-        message: `Request ${response} successfully`,
-        data: { 
-            tripRequest,
-            isMatched: response === "accepted"
-        }
+        message: response === "accepted" 
+            ? "🎉 Trip request accepted! Match created successfully!"
+            : `Request ${response} successfully`,
+        data: responseData
     });
 });
 
@@ -275,5 +343,115 @@ exports.cancelTripRequest = catchAsync(async (req, res, next) => {
         status: "success",
         message: "Trip request cancelled successfully",
         data: { tripRequest }
+    });
+});
+
+// 🎯 NEW MATCH MANAGEMENT APIs
+
+// Get active matches for current user
+exports.getActiveMatches = catchAsync(async (req, res, next) => {
+    const userId = req.user._id.toString();
+
+    console.log("🔍 [BACKEND] Getting active matches for user:", userId);
+
+    const activeMatches = await TripMatch.findUserActiveMatches(userId);
+
+    console.log("📋 [BACKEND] Found active matches:", activeMatches.length);
+
+    res.status(200).json({
+        status: "success",
+        results: activeMatches.length,
+        data: { matches: activeMatches }
+    });
+});
+
+// Get match history for current user
+exports.getMatchHistory = catchAsync(async (req, res, next) => {
+    const userId = req.user._id.toString();
+    const limit = parseInt(req.query.limit) || 10;
+
+    console.log("🔍 [BACKEND] Getting match history for user:", userId);
+
+    const matchHistory = await TripMatch.findUserMatchHistory(userId, limit);
+
+    console.log("📋 [BACKEND] Found match history:", matchHistory.length);
+
+    res.status(200).json({
+        status: "success",
+        results: matchHistory.length,
+        data: { matches: matchHistory }
+    });
+});
+
+// Get specific match details
+exports.getMatchDetails = catchAsync(async (req, res, next) => {
+    const { matchId } = req.params;
+    const userId = req.user._id.toString();
+
+    console.log("🔍 [BACKEND] Getting match details:", matchId, "for user:", userId);
+
+    const match = await TripMatch.findOne({ matchId });
+
+    if (!match) {
+        return next(new AppError("Match not found", 404));
+    }
+
+    // Check if user is part of this match
+    if (!match.includesUser(userId)) {
+        return next(new AppError("You are not authorized to view this match", 403));
+    }
+
+    console.log("✅ [BACKEND] Match details retrieved successfully");
+
+    res.status(200).json({
+        status: "success",
+        data: { match }
+    });
+});
+
+// Update match status (start trip, complete trip, etc.)
+exports.updateMatchStatus = catchAsync(async (req, res, next) => {
+    const { matchId } = req.params;
+    const { status } = req.body;
+    const userId = req.user._id.toString();
+
+    // Validate status
+    const validStatuses = ['active', 'in-progress', 'completed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+        return next(new AppError("Invalid status. Must be one of: " + validStatuses.join(', '), 400));
+    }
+
+    console.log("🔄 [BACKEND] Updating match status:", matchId, "to:", status);
+
+    const match = await TripMatch.findOne({ matchId });
+
+    if (!match) {
+        return next(new AppError("Match not found", 404));
+    }
+
+    // Check if user is part of this match
+    if (!match.includesUser(userId)) {
+        return next(new AppError("You are not authorized to update this match", 403));
+    }
+
+    // Update status and progression timestamps
+    match.status = status;
+    
+    if (status === 'in-progress' && !match.progression.started) {
+        match.progression.started = new Date();
+    } else if (status === 'completed' && !match.progression.completed) {
+        match.progression.completed = new Date();
+    } else if (status === 'cancelled' && !match.progression.cancelled) {
+        match.progression.cancelled = new Date();
+    }
+
+    await match.save();
+
+    console.log("✅ [BACKEND] Match status updated successfully");
+
+    res.status(200).json({
+        status: "success",
+        message: `Match status updated to ${status}`,
+        data: { match }
     });
 });

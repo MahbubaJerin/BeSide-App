@@ -33,9 +33,11 @@ import CompanionPreferencesModal from "./CompanionPreferencesModal";
 import PhotoUploadModal from "./PhotoUploadModal";
 import SentRequestStatusModal from "@/components/SentRequestStatusModal";
 import RequestNotificationModal from "@/components/RequestNotificationModal";
+import ActiveMatchModal from "@/components/ActiveMatchModal";
 import BeSideLogo from "../assets/images/BeSide.png";
 import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";
+import { useActiveMatches } from "../hooks/useActiveMatches";
 
 // ========= Inline hooks (single-file edition) =========
 
@@ -252,6 +254,7 @@ export default function HomeScreen() {
   const [preferencesVisible, setPreferencesVisible] = useState(false);
   const [sentRequestStatusVisible, setSentRequestStatusVisible] = useState(false);
   const [requestNotificationVisible, setRequestNotificationVisible] = useState(false);
+  const [activeMatchModalVisible, setActiveMatchModalVisible] = useState(false);
 
   const [consent, setConsent] = useState({ noTouch: false, respectful: false, safety: false });
   const [photoUrl, setPhotoUrl] = useState(null);
@@ -270,6 +273,7 @@ export default function HomeScreen() {
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
   const requestPolling = useRequestPolling(10000, true); // Poll every 10 seconds
+  const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds
 
   const currentLocation = locationTracking.currentLocation;
   const isSearching = companionSearch.isSearching;
@@ -574,6 +578,53 @@ export default function HomeScreen() {
     }
   };
 
+  // Match management functions
+  const handleViewActiveMatches = () => {
+    setActiveMatchModalVisible(true);
+  };
+
+  const handleUpdateMatchStatus = async (matchId, newStatus) => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        Alert.alert("Error", "Authentication required");
+        return;
+      }
+
+      const API_URL = BASE_URL.replace(/\/+$/, "");
+      const response = await fetch(`${API_URL}/api/v1/trip/update-match-status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ matchId, status: newStatus }),
+      });
+
+      const result = await response.json();
+      if (result.status !== "success") {
+        throw new Error(result.message || "Failed to update match status");
+      }
+
+      // Refresh the active matches
+      activeMatches.refresh();
+    } catch (error) {
+      console.error("Error updating match status:", error);
+      throw error;
+    }
+  };
+
+  const handleViewMatchDetails = (match) => {
+    Alert.alert(
+      `Trip Details - ${match.tripDetails.destination}`,
+      `Status: ${match.status}\n` +
+      `Companion: ${match.companion.userName}\n` +
+      `Planned: ${new Date(match.tripDetails.plannedDate).toLocaleDateString()}\n` +
+      `Transport: ${match.tripDetails.destinationType}`,
+      [{ text: "OK" }]
+    );
+  };
+
   const handleSOS = async (num = "000") => {
     const url = Platform.OS === "ios" ? `telprompt:${num}` : `tel:${num}`;
     try {
@@ -848,6 +899,17 @@ export default function HomeScreen() {
               <Ionicons name="paper-plane-outline" size={24} color="#fff" />
               <ThemedText style={styles.navLabel}>My Requests</ThemedText>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.navButton} onPress={handleViewActiveMatches}>
+              <View style={styles.notificationIconContainer}>
+                <Ionicons name="people" size={24} color="#fff" />
+                {activeMatches.length > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <ThemedText style={styles.badgeText}>{activeMatches.length}</ThemedText>
+                  </View>
+                )}
+              </View>
+              <ThemedText style={styles.navLabel}>Active Trips</ThemedText>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.navButton}
               onPress={() => {
@@ -954,6 +1016,15 @@ export default function HomeScreen() {
         onRequestAccepted={(tripRequest) => {
           console.log("Request accepted:", tripRequest);
         }}
+      />
+      <ActiveMatchModal
+        visible={activeMatchModalVisible}
+        onClose={() => setActiveMatchModalVisible(false)}
+        matches={activeMatches?.matches || []}
+        isLoading={activeMatches?.loading || false}
+        onRefresh={activeMatches?.refresh}
+        onUpdateStatus={handleUpdateMatchStatus}
+        onViewDetails={handleViewMatchDetails}
       />
     </View>
   );

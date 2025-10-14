@@ -69,4 +69,25 @@ router.post(
   notificationController.cancelTripRequest
 );
 
+// 🎯 MATCH MANAGEMENT ROUTES
+router.get(
+  "/active-matches",
+  notificationController.getActiveMatches
+);
+
+router.get(
+  "/match-history",
+  notificationController.getMatchHistory
+);
+
+router.get(
+  "/match/:matchId",
+  notificationController.getMatchDetails
+);
+
+router.patch(
+  "/match/:matchId/status",
+  notificationController.updateMatchStatus
+);
+
 module.exports = router;
