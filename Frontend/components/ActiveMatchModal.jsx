@@ -26,6 +26,7 @@ export default function ActiveMatchModal({
   onViewDetails,
   onSetMeetingPoint,
   currentLocation,
+  currentUserId,
 }) {
   const [meetingPointModalVisible, setMeetingPointModalVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
@@ -146,8 +147,14 @@ export default function ActiveMatchModal({
               </View>
             ) : (
               matches.map((match) => {
+                // Safety checks
+                if (!match?.organizer?.userId || !match?.companion?.userId || !currentUserId) {
+                  console.warn('⚠️ Missing user data in match:', match);
+                  return null;
+                }
+                
                 // Determine if current user is organizer or companion
-                const isOrganizer = match.organizer.userId === match.currentUserId;
+                const isOrganizer = match.organizer.userId === currentUserId;
                 const otherUser = isOrganizer ? match.companion : match.organizer;
                 const myRole = isOrganizer ? 'Organizer' : 'Companion';
 
@@ -156,7 +163,7 @@ export default function ActiveMatchModal({
                     <View style={styles.matchHeader}>
                       <View style={styles.matchInfo}>
                         <ThemedText style={styles.matchTitle}>
-                          Trip to {match.tripDetails.destination}
+                          Trip to {match.tripDetails?.destination || 'Unknown destination'}
                         </ThemedText>
                         <View style={styles.statusContainer}>
                           <Ionicons 
@@ -185,14 +192,14 @@ export default function ActiveMatchModal({
                       <View style={styles.detailRow}>
                         <Ionicons name="location-outline" size={16} color={Colors.light.tabIconDefault} />
                         <ThemedText style={styles.detailText}>
-                          {match.tripDetails.destination} • {match.tripDetails.destinationType}
+                          {match.tripDetails?.destination || 'Unknown'} • {match.tripDetails?.destinationType || 'Unknown type'}
                         </ThemedText>
                       </View>
 
                       <View style={styles.detailRow}>
                         <Ionicons name="time-outline" size={16} color={Colors.light.tabIconDefault} />
                         <ThemedText style={styles.detailText}>
-                          Planned: {formatDate(match.tripDetails.plannedDate)}
+                          Planned: {match.tripDetails?.plannedDate ? formatDate(match.tripDetails.plannedDate) : 'Not set'}
                         </ThemedText>
                       </View>
 

@@ -160,10 +160,14 @@ export default function MeetingPointModal({
           {/* Trip Info */}
           <View style={styles.tripInfo}>
             <Text style={styles.sectionTitle}>Trip Details</Text>
-            <Text style={styles.tripDetail}>From: {match.trip.from}</Text>
-            <Text style={styles.tripDetail}>To: {match.trip.to}</Text>
             <Text style={styles.tripDetail}>
-              Time: {new Date(match.trip.departureTime).toLocaleString()}
+              To: {match.tripDetails?.destination || 'Unknown destination'}
+            </Text>
+            <Text style={styles.tripDetail}>
+              Date: {match.tripDetails?.plannedDate ? new Date(match.tripDetails.plannedDate).toLocaleDateString() : 'Not set'}
+            </Text>
+            <Text style={styles.tripDetail}>
+              Time: {match.tripDetails?.plannedTime || 'Not set'}
             </Text>
           </View>
 

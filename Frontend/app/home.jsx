@@ -585,42 +585,21 @@ export default function HomeScreen() {
 
   const handleUpdateMatchStatus = async (matchId, newStatus) => {
     try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        Alert.alert("Error", "Authentication required");
-        return;
-      }
-
-      const API_URL = BASE_URL.replace(/\/+$/, "");
-      const response = await fetch(`${API_URL}/api/v1/trip/update-match-status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ matchId, status: newStatus }),
-      });
-
-      const result = await response.json();
-      if (result.status !== "success") {
-        throw new Error(result.message || "Failed to update match status");
-      }
-
-      // Refresh the active matches
-      activeMatches.refresh();
+      await activeMatches.updateMatchStatus(matchId, newStatus);
+      console.log(`✅ Trip ${matchId} status updated to ${newStatus}`);
     } catch (error) {
       console.error("Error updating match status:", error);
-      throw error;
+      throw error; // Re-throw to let ActiveMatchModal handle the alert
     }
   };
 
   const handleViewMatchDetails = (match) => {
     Alert.alert(
-      `Trip Details - ${match.tripDetails.destination}`,
-      `Status: ${match.status}\n` +
-      `Companion: ${match.companion.userName}\n` +
-      `Planned: ${new Date(match.tripDetails.plannedDate).toLocaleDateString()}\n` +
-      `Transport: ${match.tripDetails.destinationType}`,
+      `Trip Details - ${match.tripDetails?.destination || 'Unknown'}`,
+      `Status: ${match.status || 'Unknown'}\n` +
+      `Companion: ${match.companion?.userName || 'Unknown'}\n` +
+      `Planned: ${match.tripDetails?.plannedDate ? new Date(match.tripDetails.plannedDate).toLocaleDateString() : 'Not set'}\n` +
+      `Transport: ${match.tripDetails?.destinationType || 'Unknown'}`,
       [{ text: "OK" }]
     );
   };
@@ -1027,6 +1006,7 @@ export default function HomeScreen() {
         onViewDetails={handleViewMatchDetails}
         onSetMeetingPoint={activeMatches?.setMeetingPoint}
         currentLocation={currentLocation}
+        currentUserId={user?._id}
       />
     </View>
   );
