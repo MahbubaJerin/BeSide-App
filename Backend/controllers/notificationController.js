@@ -422,15 +422,29 @@ exports.updateMatchStatus = catchAsync(async (req, res, next) => {
     }
 
     console.log("🔄 [BACKEND] Updating match status:", matchId, "to:", status);
+    console.log("🔍 [BACKEND] Request user ID:", userId);
 
     const match = await TripMatch.findOne({ matchId });
 
     if (!match) {
+        console.log("❌ [BACKEND] Match not found:", matchId);
         return next(new AppError("Match not found", 404));
     }
 
+    console.log("✅ [BACKEND] Match found:", {
+        matchId: match.matchId,
+        organizer: match.organizer.userId.toString(),
+        companion: match.companion.userId.toString(),
+        status: match.status
+    });
+
     // Check if user is part of this match
     if (!match.includesUser(userId)) {
+        console.log("❌ [BACKEND] User not authorized for match:", {
+            userId,
+            organizer: match.organizer.userId.toString(),
+            companion: match.companion.userId.toString()
+        });
         return next(new AppError("You are not authorized to update this match", 403));
     }
 
@@ -453,5 +467,63 @@ exports.updateMatchStatus = catchAsync(async (req, res, next) => {
         status: "success",
         message: `Match status updated to ${status}`,
         data: { match }
+    });
+});
+
+// Set meeting point for a match
+exports.setMeetingPoint = catchAsync(async (req, res, next) => {
+    const { matchId } = req.params;
+    const { name, description, latitude, longitude, type } = req.body;
+    const userId = req.user._id.toString();
+
+    console.log("📍 [BACKEND] Setting meeting point for match:", matchId);
+
+    // Validate required fields
+    if (!name || !latitude || !longitude) {
+        return next(new AppError("Meeting point name, latitude, and longitude are required", 400));
+    }
+
+    const match = await TripMatch.findOne({ matchId });
+
+    if (!match) {
+        return next(new AppError("Match not found", 404));
+    }
+
+    // Check if user is part of this match
+    if (!match.includesUser(userId)) {
+        return next(new AppError("You are not authorized to set meeting point for this match", 403));
+    }
+
+    // Set meeting point
+    match.meetingPoint = {
+        name: name.trim(),
+        description: description || '',
+        location: {
+            latitude: parseFloat(latitude),
+            longitude: parseFloat(longitude)
+        },
+        type: type || 'custom',
+        setBy: userId,
+        setAt: new Date()
+    };
+
+    await match.save();
+
+    // Notify other user about meeting point
+    const otherUser = match.getOtherUser(userId);
+    if (otherUser && otherUser.userId) {
+        // Here you could send a push notification about the meeting point
+        console.log("📱 [BACKEND] Notifying user about meeting point:", otherUser.userId);
+    }
+
+    console.log("✅ [BACKEND] Meeting point set successfully");
+
+    res.status(200).json({
+        status: "success",
+        message: "Meeting point set successfully",
+        data: { 
+            match,
+            meetingPoint: match.meetingPoint
+        }
     });
 });

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../config';
 
-export function useActiveMatches(pollingInterval = 15000) {
+export function useActiveMatches(pollingInterval = 30000) {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -33,6 +33,11 @@ export function useActiveMatches(pollingInterval = 15000) {
           'Content-Type': 'application/json'
         }
       });
+
+      if (response.status === 429) {
+        console.log('⚠️ [MATCH POLLING] Rate limited, waiting...');
+        return; // Skip this poll cycle
+      }
 
       const result = await response.json();
 
@@ -121,6 +126,10 @@ export function useActiveMatches(pollingInterval = 15000) {
         body: JSON.stringify({ status })
       });
 
+      if (response.status === 429) {
+        throw new Error('Too many requests. Please try again later.');
+      }
+
       const result = await response.json();
 
       if (!response.ok) {
@@ -168,6 +177,52 @@ export function useActiveMatches(pollingInterval = 15000) {
     }
   }, []);
 
+  // Set meeting point for a match
+  const setMeetingPoint = useCallback(async (matchId, meetingPoint) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const API_URL = BASE_URL.replace(/\/+$/, '');
+      const response = await fetch(`${API_URL}/api/v1/trip/match/${matchId}/meeting-point`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: meetingPoint.name,
+          description: meetingPoint.description,
+          latitude: meetingPoint.latitude,
+          longitude: meetingPoint.longitude,
+          type: meetingPoint.type
+        })
+      });
+
+      if (response.status === 429) {
+        throw new Error('Too many requests. Please try again later.');
+      }
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to set meeting point');
+      }
+
+      console.log('📍 [MEETING POINT] Meeting point set:', meetingPoint.name);
+      
+      // Refresh matches after setting meeting point
+      await fetchActiveMatches();
+      
+      return result.data.meetingPoint;
+    } catch (err) {
+      console.error('❌ [MEETING POINT] Error setting meeting point:', err.message);
+      throw err;
+    }
+  }, [fetchActiveMatches]);
+
   // Setup and cleanup effects
   useEffect(() => {
     isActiveRef.current = true;
@@ -192,6 +247,7 @@ export function useActiveMatches(pollingInterval = 15000) {
     markAsViewed,
     updateMatchStatus,
     getMatchDetails,
+    setMeetingPoint,
     startPolling,
     stopPolling
   };

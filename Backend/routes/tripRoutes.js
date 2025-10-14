@@ -90,4 +90,9 @@ router.patch(
   notificationController.updateMatchStatus
 );
 
+router.post(
+  "/match/:matchId/meeting-point",
+  notificationController.setMeetingPoint
+);
+
 module.exports = router;

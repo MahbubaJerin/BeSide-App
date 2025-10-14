@@ -1025,6 +1025,8 @@ export default function HomeScreen() {
         onRefresh={activeMatches?.refresh}
         onUpdateStatus={handleUpdateMatchStatus}
         onViewDetails={handleViewMatchDetails}
+        onSetMeetingPoint={activeMatches?.setMeetingPoint}
+        currentLocation={currentLocation}
       />
     </View>
   );

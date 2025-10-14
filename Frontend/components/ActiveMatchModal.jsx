@@ -14,6 +14,7 @@ import { ThemedButton } from "@/components/ThemedButton";
 import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/Colors";
+import MeetingPointModal from "./MeetingPointModal";
 
 export default function ActiveMatchModal({
   visible,
@@ -23,7 +24,11 @@ export default function ActiveMatchModal({
   onRefresh,
   onUpdateStatus,
   onViewDetails,
+  onSetMeetingPoint,
+  currentLocation,
 }) {
+  const [meetingPointModalVisible, setMeetingPointModalVisible] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState(null);
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString() + " at " + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -199,19 +204,39 @@ export default function ActiveMatchModal({
                       </View>
                     </View>
 
+                    {/* Meeting Point Info */}
+                    {match.meetingPoint && (
+                      <View style={styles.meetingInfo}>
+                        <Ionicons name="location" size={16} color={Colors.light.primary} />
+                        <ThemedText style={styles.meetingText}>
+                          Meeting at: {match.meetingPoint.name}
+                        </ThemedText>
+                      </View>
+                    )}
+
                     <View style={styles.actionButtons}>
                       <ThemedButton
                         title="📱 View Details"
                         onPress={() => onViewDetails(match)}
                         style={[styles.actionButton, styles.detailsButton]}
                       />
-                      
+
                       {match.status === 'active' && (
-                        <ThemedButton
-                          title="▶️ Start Trip"
-                          onPress={() => handleStatusUpdate(match, 'in-progress')}
-                          style={[styles.actionButton, styles.startButton]}
-                        />
+                        <>
+                          <ThemedButton
+                            title="📍 Set Meeting Point"
+                            onPress={() => {
+                              setSelectedMatch(match);
+                              setMeetingPointModalVisible(true);
+                            }}
+                            style={[styles.actionButton, styles.meetingButton]}
+                          />
+                          <ThemedButton
+                            title="▶️ Start Trip"
+                            onPress={() => handleStatusUpdate(match, 'in-progress')}
+                            style={[styles.actionButton, styles.startButton]}
+                          />
+                        </>
                       )}
                       
                       {match.status === 'in-progress' && (
@@ -248,6 +273,18 @@ export default function ActiveMatchModal({
           </View>
         </View>
       </View>
+
+      {/* Meeting Point Modal */}
+      <MeetingPointModal
+        visible={meetingPointModalVisible}
+        onClose={() => {
+          setMeetingPointModalVisible(false);
+          setSelectedMatch(null);
+        }}
+        match={selectedMatch}
+        onSetMeetingPoint={onSetMeetingPoint}
+        currentLocation={currentLocation}
+      />
     </Modal>
   );
 }
@@ -424,11 +461,28 @@ const styles = StyleSheet.create({
   startButton: {
     backgroundColor: "#4CAF50",
   },
+  meetingButton: {
+    backgroundColor: "#FF9800",
+  },
   completeButton: {
     backgroundColor: "#2196F3",
   },
   cancelButton: {
     backgroundColor: "#F44336",
+  },
+  meetingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E3F2FD',
+  },
+  meetingText: {
+    fontSize: 12,
+    color: Colors.light.tint,
+    marginLeft: 6,
+    fontWeight: '500',
   },
   footer: {
     paddingHorizontal: 20,

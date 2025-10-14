@@ -77,6 +77,23 @@ const tripMatchSchema = new mongoose.Schema({
     checkInInterval: { type: Number, default: 1800000 } // 30 minutes in ms
   },
   
+  // Meeting point
+  meetingPoint: {
+    name: { type: String },
+    description: { type: String },
+    location: {
+      latitude: { type: Number },
+      longitude: { type: Number }
+    },
+    type: { 
+      type: String, 
+      enum: ['midpoint', 'organizer', 'companion', 'current', 'custom'],
+      default: 'custom'
+    },
+    setBy: { type: String },
+    setAt: { type: Date }
+  },
+
   // Location sharing
   liveLocationSharing: {
     enabled: { type: Boolean, default: false },
@@ -163,9 +180,10 @@ tripMatchSchema.statics.findUserMatchHistory = function(userId, limit = 10) {
 
 // Instance method to get the other user in the match
 tripMatchSchema.methods.getOtherUser = function(currentUserId) {
-  if (this.organizer.userId === currentUserId) {
+  const userIdStr = currentUserId.toString();
+  if (this.organizer.userId.toString() === userIdStr) {
     return this.companion;
-  } else if (this.companion.userId === currentUserId) {
+  } else if (this.companion.userId.toString() === userIdStr) {
     return this.organizer;
   }
   return null;
@@ -173,7 +191,8 @@ tripMatchSchema.methods.getOtherUser = function(currentUserId) {
 
 // Instance method to check if user is part of this match
 tripMatchSchema.methods.includesUser = function(userId) {
-  return this.organizer.userId === userId || this.companion.userId === userId;
+  const userIdStr = userId.toString();
+  return this.organizer.userId.toString() === userIdStr || this.companion.userId.toString() === userIdStr;
 };
 
 const TripMatch = mongoose.model('TripMatch', tripMatchSchema);
