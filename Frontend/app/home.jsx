@@ -32,6 +32,9 @@ import ConsentModal from "./ConsentModal";
 import CompanionPreferencesModal from "./CompanionPreferencesModal";
 import PhotoUploadModal from "./PhotoUploadModal";
 import SentRequestStatusModal from "@/components/SentRequestStatusModal";
+import EnhancedConsentModal from "@/components/EnhancedConsentModal";
+import TwoStepTripModal from "@/components/TwoStepTripModal";
+import { usePersistentSearch } from "@/hooks/usePersistentSearch";
 import RequestNotificationModal from "@/components/RequestNotificationModal";
 import ActiveMatchModal from "@/components/ActiveMatchModal";
 import BeSideLogo from "../assets/images/BeSide.png";
@@ -254,6 +257,12 @@ export default function HomeScreen() {
   const [consentVisible, setConsentVisible] = useState(false);
   const [preferencesVisible, setPreferencesVisible] = useState(false);
   const [sentRequestStatusVisible, setSentRequestStatusVisible] = useState(false);
+  const [enhancedConsentVisible, setEnhancedConsentVisible] = useState(false);
+  const [twoStepTripVisible, setTwoStepTripVisible] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+
+  // Enhanced persistent search hook
+  const persistentSearch = usePersistentSearch();
   const [requestNotificationVisible, setRequestNotificationVisible] = useState(false);
   const [activeMatchModalVisible, setActiveMatchModalVisible] = useState(false);
 
@@ -462,7 +471,7 @@ export default function HomeScreen() {
       setEndMarker(preferences.destinationCoordinates);
       setShowRadius(true);
 
-      // Route (Google Directions)
+      // Calculate route
       const url =
         "https://maps.googleapis.com/maps/api/directions/json" +
         `?origin=${preferences.startCoordinates.latitude},${preferences.startCoordinates.longitude}` +
@@ -488,6 +497,26 @@ export default function HomeScreen() {
             c.longitude <= 180
         );
         setRouteCoordinates(validCoords);
+        
+        // Update trip request with route data for persistence
+        if (currentTripRequestId && validCoords.length > 0) {
+          await activeMatches.updateTripRequest(currentTripRequestId, {
+            routeCoordinates: validCoords,
+            startLocation: {
+              latitude: preferences.startCoordinates.latitude,
+              longitude: preferences.startCoordinates.longitude,
+              address: preferences.startAddress || 'Start location'
+            },
+            destinationLocation: {
+              latitude: preferences.destinationCoordinates.latitude,
+              longitude: preferences.destinationCoordinates.longitude,
+              address: preferences.destinationAddress || 'Destination'
+            },
+            transportMode: preferences.transport === "car" ? "driving" : 
+                          preferences.transport === "walk" ? "walking" : "transit"
+          });
+        }
+        
         if (validCoords.length > 0) {
           mapRef.current?.fitToCoordinates(validCoords, {
             edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
@@ -495,7 +524,7 @@ export default function HomeScreen() {
           });
         }
 
-        // ✅ Start companion search ONLY now
+        // Start companion search and maintain route visibility
         await companionSearch.startSearch(preferences.startCoordinates, searchRadius, 30000);
 
         // Send trip request to nearby users
@@ -510,12 +539,35 @@ export default function HomeScreen() {
     }
   };
 
+  // Enhanced cancel search - keeps route but stops search
   const cancelSearch = async () => {
     await companionSearch.stopSearch();
-    setRouteCoordinates([]);
-    setStartMarker(null);
-    setEndMarker(null);
-    setShowRadius(false);
+    
+    // Ask user if they want to keep the route visible
+    Alert.alert(
+      "Search Cancelled",
+      "Would you like to keep your route visible for when you search again?",
+      [
+        {
+          text: "Clear Route",
+          style: "destructive",
+          onPress: () => {
+            setRouteCoordinates([]);
+            setStartMarker(null);
+            setEndMarker(null);
+            setShowRadius(false);
+            setCurrentTripRequestId(null);
+          }
+        },
+        {
+          text: "Keep Route",
+          onPress: () => {
+            // Route stays visible, only stop searching
+            setShowRadius(false);
+          }
+        }
+      ]
+    );
   };
 
   const handleSendRequest = async (selectedUser) => {
@@ -851,6 +903,18 @@ export default function HomeScreen() {
         </TouchableOpacity>
       ) : (
         <View style={styles.searchingContainer}>
+          {/* Persistent Search Status */}
+          {persistentSearch.isSearchActive && (
+            <View style={styles.searchStatusContainer}>
+              <View style={styles.searchStatusInfo}>
+                <ThemedText style={styles.searchStatusTitle}>🔍 Search Active</ThemedText>
+                <ThemedText style={styles.searchStatusTime}>
+                  Expires in: {persistentSearch.formatRemainingTime(persistentSearch.remainingTime)}
+                </ThemedText>
+              </View>
+            </View>
+          )}
+          
           <View style={styles.loadingBarContainer}>
             <Animated.View
               style={[
@@ -1027,6 +1091,46 @@ export default function HomeScreen() {
         currentLocation={currentLocation}
         currentUserId={user?._id}
       />
+
+      {/* Enhanced Consent Modal for Receivers */}
+      <EnhancedConsentModal
+        visible={enhancedConsentVisible}
+        onClose={() => setEnhancedConsentVisible(false)}
+        onSubmit={(consentData) => {
+          // Handle receiver consent submission
+          if (selectedRequest) {
+            activeMatches.completeReceiverConsent(selectedRequest.tripReqId, user._id)
+              .then(() => {
+                Alert.alert("Success", "Consent completed! You can now proceed with the trip.");
+                setEnhancedConsentVisible(false);
+                setTwoStepTripVisible(true); // Open meeting point selection
+              })
+              .catch((error) => {
+                Alert.alert("Error", "Failed to complete consent: " + error.message);
+              });
+          }
+        }}
+        userRole="receiver"
+        requestDetails={selectedRequest}
+      />
+
+      {/* Two-Step Trip Planning Modal */}
+      <TwoStepTripModal
+        visible={twoStepTripVisible}
+        onClose={() => setTwoStepTripVisible(false)}
+        onConfirmTrip={(tripPlan) => {
+          // Handle two-step trip confirmation
+          console.log("Two-step trip plan confirmed:", tripPlan);
+          Alert.alert(
+            "Trip Plan Confirmed! 🎉",
+            "Step 1: Meet at the designated point\nStep 2: Travel together to destination\n\nBoth users will receive notifications with meeting details.",
+            [{ text: "OK", onPress: () => setTwoStepTripVisible(false) }]
+          );
+        }}
+        tripData={selectedRequest}
+        userLocation={currentLocation}
+        companionLocation={selectedRequest?.user?.location}
+      />
     </View>
   );
 }
@@ -1191,4 +1295,28 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   badgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
+  
+  // Enhanced persistent search styles
+  searchStatusContainer: {
+    backgroundColor: Colors.light.tint + "10",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.tint + "30",
+  },
+  searchStatusInfo: {
+    alignItems: "center",
+  },
+  searchStatusTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.light.tint,
+    marginBottom: 4,
+  },
+  searchStatusTime: {
+    fontSize: 14,
+    color: Colors.light.text,
+    opacity: 0.8,
+  },
 });

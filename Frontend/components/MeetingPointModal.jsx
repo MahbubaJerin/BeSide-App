@@ -1,254 +1,274 @@
-// Frontend/components/MeetingPointModal.jsx
-import React, { useState, useEffect } from 'react';
+// Frontend/components/MeetingPointModal.jsx - Enhanced with Two-Step Meeting System
+import React, { useState, useEffect } from "react";
 import {
-  Modal,
   View,
   Text,
+  Modal,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  TextInput,
   Alert,
-  ActivityIndicator
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as Location from 'expo-location';
-import { Colors } from '../constants/Colors';
+  Dimensions,
+} from "react-native";
+import MapView, { Marker, Polyline, Circle } from "react-native-maps";
+import { ThemedButton } from "@/components/ThemedButton";
+import { Colors } from "@/constants/Colors";
+
+const { width, height } = Dimensions.get('window');
 
 export default function MeetingPointModal({
   visible,
   onClose,
-  match,
-  onSetMeetingPoint,
-  currentLocation
+  onSelectMeetingPoint,
+  startLocation,
+  destinationLocation,
+  companionLocation, // Other user's current location
+  routeCoordinates = [],
 }) {
-  const [customLocation, setCustomLocation] = useState('');
-  const [isSettingPoint, setIsSettingPoint] = useState(false);
+  const [selectedPoint, setSelectedPoint] = useState(null);
   const [suggestedPoints, setSuggestedPoints] = useState([]);
 
-  useEffect(() => {
-    if (visible && currentLocation) {
-      generateSuggestedMeetingPoints();
-    }
-  }, [visible, currentLocation]);
-
-  const generateSuggestedMeetingPoints = () => {
-    if (!currentLocation || !match) return;
-
-    // Calculate midpoint between organizer and companion locations
-    const org = match.organizer.location || currentLocation;
-    const comp = match.companion.location || currentLocation;
+  // Calculate midpoint between two locations
+  const calculateMidpoint = (loc1, loc2) => {
+    if (!loc1 || !loc2) return null;
     
-    const midLat = (org.latitude + comp.latitude) / 2;
-    const midLng = (org.longitude + comp.longitude) / 2;
+    return {
+      latitude: (loc1.latitude + loc2.latitude) / 2,
+      longitude: (loc1.longitude + loc2.longitude) / 2,
+    };
+  };
 
-    // Generate suggested meeting points around the midpoint
-    const suggestions = [
-      {
-        id: 1,
-        name: 'Midpoint Location',
-        description: 'Halfway between both locations',
-        latitude: midLat,
-        longitude: midLng,
-        type: 'midpoint'
-      },
-      {
-        id: 2,
-        name: 'Organizer\'s Location',
-        description: 'Meet at trip organizer\'s location',
-        latitude: org.latitude,
-        longitude: org.longitude,
-        type: 'organizer'
-      },
-      {
-        id: 3,
-        name: 'Companion\'s Location', 
-        description: 'Meet at companion\'s location',
-        latitude: comp.latitude,
-        longitude: comp.longitude,
-        type: 'companion'
+  // Find points along the route for meeting suggestions
+  const findRoutePoints = () => {
+    if (routeCoordinates.length === 0) return [];
+    
+    const points = [];
+    const totalPoints = routeCoordinates.length;
+    
+    // Get points at 25%, 50%, and 75% of the route
+    [0.25, 0.5, 0.75].forEach(ratio => {
+      const index = Math.floor(totalPoints * ratio);
+      if (routeCoordinates[index]) {
+        points.push({
+          ...routeCoordinates[index],
+          type: `${Math.round(ratio * 100)}% along route`,
+        });
       }
-    ];
+    });
+    
+    return points;
+  };
+
+  // Calculate suggested meeting points
+  useEffect(() => {
+    if (!startLocation || !companionLocation) return;
+
+    const suggestions = [];
+
+    // 1. Midpoint between users' current locations
+    const midpoint = calculateMidpoint(startLocation, companionLocation);
+    if (midpoint) {
+      suggestions.push({
+        ...midpoint,
+        type: "Midpoint between current locations",
+        description: "Equal distance from both users",
+      });
+    }
+
+    // 2. Points along the planned route
+    const routePoints = findRoutePoints();
+    routePoints.forEach(point => {
+      suggestions.push({
+        ...point,
+        description: "Meeting point on planned route",
+      });
+    });
+
+    // 3. Closer to companion if they're far from start
+    if (companionLocation) {
+      const closerToCompanion = calculateMidpoint(startLocation, companionLocation);
+      if (closerToCompanion) {
+        suggestions.push({
+          latitude: closerToCompanion.latitude + (companionLocation.latitude - startLocation.latitude) * 0.3,
+          longitude: closerToCompanion.longitude + (companionLocation.longitude - startLocation.longitude) * 0.3,
+          type: "Closer to companion",
+          description: "More convenient for your companion",
+        });
+      }
+    }
 
     setSuggestedPoints(suggestions);
-  };
-
-  const handleSetMeetingPoint = async (point) => {
-    setIsSettingPoint(true);
-    try {
-      await onSetMeetingPoint(match.matchId, point);
-      
-      Alert.alert(
-        'Meeting Point Set!',
-        'Both users will be notified of the meeting location.',
-        [{ text: 'OK', onPress: onClose }]
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to set meeting point. Please try again.');
-    } finally {
-      setIsSettingPoint(false);
+    
+    // Auto-select the midpoint as default
+    if (midpoint) {
+      setSelectedPoint({
+        ...midpoint,
+        type: "Midpoint between current locations",
+      });
     }
+  }, [startLocation, companionLocation, routeCoordinates]);
+
+  const handleMapPress = (event) => {
+    const coordinate = event.nativeEvent.coordinate;
+    setSelectedPoint({
+      ...coordinate,
+      type: "Custom location",
+      description: "Manually selected meeting point",
+    });
   };
 
-  const handleUseCurrentLocation = async () => {
-    if (!currentLocation) {
-      Alert.alert('Error', 'Current location not available');
+  const handleConfirm = () => {
+    if (!selectedPoint) {
+      Alert.alert("No Selection", "Please select a meeting point");
       return;
     }
 
-    const point = {
-      name: 'Current Location',
-      description: 'My current location',
-      latitude: currentLocation.latitude,
-      longitude: currentLocation.longitude,
-      type: 'current'
-    };
-
-    await handleSetMeetingPoint(point);
+    onSelectMeetingPoint({
+      latitude: selectedPoint.latitude,
+      longitude: selectedPoint.longitude,
+      address: selectedPoint.description || "Selected meeting point",
+    });
+    
+    onClose();
   };
 
-  const handleCustomLocation = async () => {
-    if (!customLocation.trim()) {
-      Alert.alert('Error', 'Please enter a location');
-      return;
-    }
+  const renderSuggestedPoints = () => (
+    <ScrollView horizontal style={styles.suggestionsContainer} showsHorizontalScrollIndicator={false}>
+      {suggestedPoints.map((point, index) => (
+        <TouchableOpacity
+          key={index}
+          style={[
+            styles.suggestionCard,
+            selectedPoint && 
+            selectedPoint.latitude === point.latitude && 
+            selectedPoint.longitude === point.longitude && 
+            styles.selectedCard
+          ]}
+          onPress={() => setSelectedPoint(point)}
+        >
+          <Text style={styles.suggestionType}>{point.type}</Text>
+          <Text style={styles.suggestionDescription}>{point.description}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
 
-    try {
-      // Geocode the custom location
-      const geocoded = await Location.geocodeAsync(customLocation);
-      
-      if (geocoded.length === 0) {
-        Alert.alert('Error', 'Location not found. Please try a different address.');
-        return;
-      }
-
-      const location = geocoded[0];
-      const point = {
-        name: customLocation,
-        description: 'Custom meeting point',
-        latitude: location.latitude,
-        longitude: location.longitude,
-        type: 'custom'
-      };
-
-      await handleSetMeetingPoint(point);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to find location. Please try again.');
-    }
-  };
-
-  if (!match) return null;
+  const mapRegion = startLocation ? {
+    latitude: startLocation.latitude,
+    longitude: startLocation.longitude,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  } : null;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide">
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color={Colors.light.text} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Set Meeting Point</Text>
-          <View style={styles.placeholder} />
+          <Text style={styles.title}>Select Meeting Point</Text>
+          <Text style={styles.subtitle}>Choose where you and your companion will meet</Text>
         </View>
 
-        <ScrollView style={styles.content}>
-          {/* Trip Info */}
-          <View style={styles.tripInfo}>
-            <Text style={styles.sectionTitle}>Trip Details</Text>
-            <Text style={styles.tripDetail}>
-              To: {match.tripDetails?.destination || 'Unknown destination'}
-            </Text>
-            <Text style={styles.tripDetail}>
-              Date: {match.tripDetails?.plannedDate ? new Date(match.tripDetails.plannedDate).toLocaleDateString() : 'Not set'}
-            </Text>
-            <Text style={styles.tripDetail}>
-              Time: {match.tripDetails?.plannedTime || 'Not set'}
-            </Text>
-          </View>
-
-          {/* Current Meeting Point */}
-          {match.meetingPoint && (
-            <View style={styles.currentMeeting}>
-              <Text style={styles.sectionTitle}>Current Meeting Point</Text>
-              <View style={styles.meetingCard}>
-                <Ionicons name="location" size={20} color={Colors.light.tint} />
-                <View style={styles.meetingInfo}>
-                  <Text style={styles.meetingName}>{match.meetingPoint.name}</Text>
-                  <Text style={styles.meetingDesc}>{match.meetingPoint.description}</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Suggested Points */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Suggested Meeting Points</Text>
-            {suggestedPoints.map((point) => (
-              <TouchableOpacity
-                key={point.id}
-                style={styles.suggestionCard}
-                onPress={() => handleSetMeetingPoint(point)}
-                disabled={isSettingPoint}
-              >
-                <Ionicons 
-                  name={point.type === 'midpoint' ? 'git-merge' : 'location'} 
-                  size={20} 
-                  color={Colors.light.tint} 
-                />
-                <View style={styles.suggestionInfo}>
-                  <Text style={styles.suggestionName}>{point.name}</Text>
-                  <Text style={styles.suggestionDesc}>{point.description}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={Colors.light.tabIconDefault} />
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Quick Actions */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleUseCurrentLocation}
-              disabled={isSettingPoint || !currentLocation}
-            >
-              <Ionicons name="locate" size={20} color={Colors.light.tint} />
-              <Text style={styles.actionText}>Use My Current Location</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Custom Location */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Custom Location</Text>
-            <View style={styles.customInput}>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter address or location name"
-                value={customLocation}
-                onChangeText={setCustomLocation}
-                multiline
-                numberOfLines={2}
+        {mapRegion && (
+          <MapView
+            style={styles.map}
+            region={mapRegion}
+            onPress={handleMapPress}
+          >
+            {/* Start location marker */}
+            {startLocation && (
+              <Marker
+                coordinate={startLocation}
+                title="Your Location"
+                description="Your current position"
+                pinColor="blue"
               />
-              <TouchableOpacity
-                style={[styles.setButton, !customLocation.trim() && styles.setButtonDisabled]}
-                onPress={handleCustomLocation}
-                disabled={isSettingPoint || !customLocation.trim()}
-              >
-                {isSettingPoint ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text style={styles.setButtonText}>Set Point</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            )}
+
+            {/* Companion location marker */}
+            {companionLocation && (
+              <Marker
+                coordinate={companionLocation}
+                title="Companion Location"
+                description="Your companion's position"
+                pinColor="green"
+              />
+            )}
+
+            {/* Destination marker */}
+            {destinationLocation && (
+              <Marker
+                coordinate={destinationLocation}
+                title="Destination"
+                description="Final destination"
+                pinColor="red"
+              />
+            )}
+
+            {/* Route polyline */}
+            {routeCoordinates.length > 0 && (
+              <Polyline
+                coordinates={routeCoordinates}
+                strokeColor={Colors.light.tint}
+                strokeWidth={3}
+                strokePattern={[5, 5]}
+              />
+            )}
+
+            {/* Suggested meeting points */}
+            {suggestedPoints.map((point, index) => (
+              <Marker
+                key={index}
+                coordinate={point}
+                title={point.type}
+                description={point.description}
+                pinColor="orange"
+              />
+            ))}
+
+            {/* Selected meeting point */}
+            {selectedPoint && (
+              <>
+                <Marker
+                  coordinate={selectedPoint}
+                  title="Selected Meeting Point"
+                  description="Tap confirm to set this location"
+                  pinColor="purple"
+                />
+                <Circle
+                  center={selectedPoint}
+                  radius={50}
+                  fillColor="rgba(128, 0, 128, 0.2)"
+                  strokeColor="purple"
+                  strokeWidth={2}
+                />
+              </>
+            )}
+          </MapView>
+        )}
+
+        {renderSuggestedPoints()}
+
+        <View style={styles.footer}>
+          <Text style={styles.instruction}>
+            Tap on the map or choose a suggested point below
+          </Text>
+          
+          <View style={styles.buttonContainer}>
+            <ThemedButton
+              title="Cancel"
+              onPress={onClose}
+              style={[styles.button, styles.cancelButton]}
+              textStyle={styles.cancelButtonText}
+            />
+            
+            <ThemedButton
+              title="Confirm Meeting Point"
+              onPress={handleConfirm}
+              disabled={!selectedPoint}
+              style={[styles.button, styles.confirmButton]}
+            />
           </View>
-        </ScrollView>
+        </View>
       </View>
     </Modal>
   );
@@ -257,90 +277,90 @@ export default function MeetingPointModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: "#fff",
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
+    padding: 20,
+    paddingTop: 40,
+    backgroundColor: Colors.light.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#E3F2FD',
-  },
-  closeButton: {
-    padding: 4,
+    borderBottomColor: "#eee",
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: "bold",
     color: Colors.light.text,
+    textAlign: "center",
   },
-  placeholder: {
-    width: 32,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  tripInfo: {
-    backgroundColor: Colors.light.surface,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  sectionTitle: {
+  subtitle: {
     fontSize: 16,
-    fontWeight: '600',
     color: Colors.light.text,
-    marginBottom: 12,
+    textAlign: "center",
+    marginTop: 8,
+    opacity: 0.7,
   },
-  tripDetail: {
-    fontSize: 14,
-    color: Colors.light.tabIconDefault,
-    marginBottom: 4,
-  },
-  currentMeeting: {
-    marginBottom: 20,
-  },
-  meetingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.light.tint + '10',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.light.tint + '20',
-  },
-  meetingInfo: {
+  map: {
     flex: 1,
-    marginLeft: 12,
   },
-  meetingName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.light.text,
-  },
-  meetingDesc: {
-    fontSize: 12,
-    color: Colors.light.tabIconDefault,
-    marginTop: 2,
-  },
-  section: {
-    marginBottom: 24,
+  suggestionsContainer: {
+    maxHeight: 120,
+    backgroundColor: "#f8f9fa",
+    paddingVertical: 10,
   },
   suggestionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.light.surface,
+    backgroundColor: "#fff",
+    margin: 8,
     padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    borderRadius: 12,
+    minWidth: 160,
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
-  suggestionInfo: {
+  selectedCard: {
+    borderColor: Colors.light.tint,
+    borderWidth: 2,
+    backgroundColor: Colors.light.tint + "10",
+  },
+  suggestionType: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.text,
+    marginBottom: 4,
+  },
+  suggestionDescription: {
+    fontSize: 12,
+    color: Colors.light.text,
+    opacity: 0.7,
+  },
+  footer: {
+    padding: 20,
+    backgroundColor: "#f8f9fa",
+  },
+  instruction: {
+    fontSize: 14,
+    color: Colors.light.text,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  button: {
     flex: 1,
-    marginLeft: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  cancelButton: {
+    backgroundColor: "#6c757d",
+  },
+  cancelButtonText: {
+    color: "#fff",
+  },
+  confirmButton: {
+    backgroundColor: Colors.light.tint,
+  },
+});
   },
   suggestionName: {
     fontSize: 14,

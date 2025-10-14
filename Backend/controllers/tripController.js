@@ -7,7 +7,19 @@ const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
 
   exports.createTripReq = catchAsync(async (req, res, next) => {
-    const { user, destination, destinationType, date, time, genderPreference } = req.body;
+    const { 
+      user, 
+      destination, 
+      destinationType, 
+      date, 
+      time, 
+      genderPreference,
+      startLocation,
+      destinationLocation,
+      routeCoordinates,
+      transportMode,
+      searchDuration = 30 * 60 * 1000 // Default 30 minutes
+    } = req.body;
   
     if (!user || !user.userName) {
       return next(new AppError("User name is required", 400));
@@ -26,7 +38,7 @@ const catchAsync = require("../utils/catchAsync");
     const newTripRequest = await TripRequest.create({
       tripReqId,
       user: {
-        userId: existingUser._id.toString(), // Inject required field
+        userId: existingUser._id.toString(),
         userName: existingUser.userName,
         userImage: existingUser.profilePhoto || "default.jpg"
       },
@@ -34,7 +46,18 @@ const catchAsync = require("../utils/catchAsync");
       destinationType,
       date,
       time,
-      genderPreference
+      genderPreference,
+      startLocation,
+      destinationLocation,
+      routeCoordinates: routeCoordinates || [],
+      transportMode,
+      searchDuration,
+      expiresAt: new Date(Date.now() + searchDuration),
+      consent: {
+        senderConsent: true, // Set when sender completes consent form
+        noTouchAgreed: false,
+        receiverConsent: false
+      }
     });
   
     res.status(201).json({
@@ -87,6 +110,103 @@ exports.createTrip = catchAsync(async (req, res, next) => {
     status: "success",
     data: {
       trip: newTrip
+    }
+  });
+});
+
+// Update trip request with route and location data
+exports.updateTripRequest = catchAsync(async (req, res, next) => {
+  const { tripReqId } = req.params;
+  const updateData = req.body;
+
+  const tripRequest = await TripRequest.findOneAndUpdate(
+    { tripReqId },
+    updateData,
+    { new: true, runValidators: true }
+  );
+
+  if (!tripRequest) {
+    return next(new AppError("Trip request not found", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      tripRequest
+    }
+  });
+});
+
+// Set meeting point for trip request
+exports.setMeetingPoint = catchAsync(async (req, res, next) => {
+  const { tripReqId } = req.params;
+  const { meetingPoint } = req.body;
+
+  const tripRequest = await TripRequest.findOneAndUpdate(
+    { tripReqId },
+    { 
+      meetingPoint: {
+        ...meetingPoint,
+        isSelected: true
+      }
+    },
+    { new: true }
+  );
+
+  if (!tripRequest) {
+    return next(new AppError("Trip request not found", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      tripRequest
+    }
+  });
+});
+
+// Complete consent form for receiver
+exports.completeReceiverConsent = catchAsync(async (req, res, next) => {
+  const { tripReqId } = req.params;
+  const { userId } = req.body;
+
+  const tripRequest = await TripRequest.findOneAndUpdate(
+    { tripReqId },
+    { 
+      'consent.receiverConsent': true,
+      'consent.noTouchAgreed': true,
+      'consent.consentCompletedAt': new Date()
+    },
+    { new: true }
+  );
+
+  if (!tripRequest) {
+    return next(new AppError("Trip request not found", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    message: "Consent completed successfully",
+    data: {
+      tripRequest
+    }
+  });
+});
+
+// Get active trip request for user (to maintain persistent search)
+exports.getActiveRequest = catchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+
+  const activeRequest = await TripRequest.findOne({
+    'user.userId': userId,
+    status: 'pending',
+    expiresAt: { $gt: new Date() }
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      activeRequest
     }
   });
 });

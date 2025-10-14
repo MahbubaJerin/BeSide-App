@@ -303,6 +303,85 @@ export function useActiveMatches(pollingInterval = 30000) {
     };
   }, [startPolling, stopPolling]);
 
+  // Get active request for persistent search
+  const getActiveRequest = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return null;
+
+      const API_URL = BASE_URL.replace(/\/+$/, '');
+      const response = await fetch(`${API_URL}/api/v1/trip/active-request`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        return result.data.activeRequest;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching active request:', error);
+      return null;
+    }
+  }, []);
+
+  // Update trip request with route and location data
+  const updateTripRequest = useCallback(async (tripReqId, updateData) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+
+      const API_URL = BASE_URL.replace(/\/+$/, '');
+      const response = await fetch(`${API_URL}/api/v1/trip/${tripReqId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        return result.data.tripRequest;
+      }
+      throw new Error(result.message || 'Failed to update trip request');
+    } catch (error) {
+      console.error('Error updating trip request:', error);
+      throw error;
+    }
+  }, []);
+
+  // Complete receiver consent
+  const completeReceiverConsent = useCallback(async (tripReqId, userId) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+
+      const API_URL = BASE_URL.replace(/\/+$/, '');
+      const response = await fetch(`${API_URL}/api/v1/trip/${tripReqId}/receiver-consent`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ userId })
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        return result.data.tripRequest;
+      }
+      throw new Error(result.message || 'Failed to complete consent');
+    } catch (error) {
+      console.error('Error completing receiver consent:', error);
+      throw error;
+    }
+  }, []);
+
   return {
     // State
     matches,
@@ -320,6 +399,9 @@ export function useActiveMatches(pollingInterval = 30000) {
     updateLiveLocation,
     getLiveLocations,
     startPolling,
-    stopPolling
+    stopPolling,
+    getActiveRequest,
+    updateTripRequest,
+    completeReceiverConsent,
   };
 }

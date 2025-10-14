@@ -109,7 +109,49 @@ const TripReqSchema = new Schema(
 
     expiresAt: {
         type: Date,
-        default: () => new Date(Date.now() + 10 * 60 * 1000) // 10 minutes from creation
+        default: () => new Date(Date.now() + 30 * 60 * 1000) // 30 minutes from creation (extended for better UX)
+    },
+
+    searchDuration: {
+        type: Number,
+        default: 30 * 60 * 1000 // 30 minutes in milliseconds
+    },
+
+    routeCoordinates: [{
+        latitude: { type: Number, required: true },
+        longitude: { type: Number, required: true }
+    }],
+
+    startLocation: {
+        latitude: { type: Number },
+        longitude: { type: Number },
+        address: { type: String }
+    },
+
+    destinationLocation: {
+        latitude: { type: Number },
+        longitude: { type: Number },
+        address: { type: String }
+    },
+
+    transportMode: {
+        type: String,
+        enum: ["walking", "driving", "transit"],
+        default: "walking"
+    },
+
+    meetingPoint: {
+        latitude: { type: Number },
+        longitude: { type: Number },
+        address: { type: String },
+        isSelected: { type: Boolean, default: false }
+    },
+
+    consent: {
+        noTouchAgreed: { type: Boolean, default: false },
+        senderConsent: { type: Boolean, default: false },
+        receiverConsent: { type: Boolean, default: false },
+        consentCompletedAt: { type: Date }
     },
 
     matchedTripId: {

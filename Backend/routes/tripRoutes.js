@@ -38,6 +38,22 @@ router.put(
   tripController.updateTripRequest
 );
 
+// New enhanced routes
+router.put(
+  "/:tripReqId/meeting-point",
+  tripController.setMeetingPoint
+);
+
+router.put(
+  "/:tripReqId/receiver-consent",
+  tripController.completeReceiverConsent
+);
+
+router.get(
+  "/active-request",
+  tripController.getActiveRequest
+);
+
 // Notification routes for companion matching
 router.post(
   "/send-to-nearby",
