@@ -119,6 +119,9 @@ exports.updateTripRequest = catchAsync(async (req, res, next) => {
   const { tripReqId } = req.params;
   const updateData = req.body;
 
+  console.log('🔄 [UPDATE TRIP] Updating trip request:', tripReqId);
+  console.log('🔄 [UPDATE TRIP] Update data:', JSON.stringify(updateData, null, 2));
+
   const tripRequest = await TripRequest.findOneAndUpdate(
     { tripReqId },
     updateData,
@@ -126,8 +129,17 @@ exports.updateTripRequest = catchAsync(async (req, res, next) => {
   );
 
   if (!tripRequest) {
+    console.log('❌ [UPDATE TRIP] Trip request not found:', tripReqId);
     return next(new AppError("Trip request not found", 404));
   }
+
+  console.log('✅ [UPDATE TRIP] Trip request updated successfully');
+  console.log('📍 [UPDATE TRIP] Updated route data:', {
+    hasStartLocation: !!tripRequest.startLocation,
+    hasDestinationLocation: !!tripRequest.destinationLocation,
+    routeCoordinatesCount: tripRequest.routeCoordinates?.length || 0,
+    transportMode: tripRequest.transportMode
+  });
 
   res.status(200).json({
     status: "success",

@@ -282,7 +282,7 @@ export default function HomeScreen() {
   // hooks
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
-  const requestPolling = useRequestPolling(10000, true); // Poll every 10 seconds
+  const requestPolling = useRequestPolling(30000, true); // Poll every 30 seconds (reduced from 10s)
   const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds
   const tripNotifications = useTripNotifications();
 
@@ -360,11 +360,15 @@ export default function HomeScreen() {
         },
         body: JSON.stringify({
           user: { userId: parsed._id, userName: parsed.userName, userImage: parsed.userImage || "default.jpg" },
-          destination: "Placeholder",
-          destinationType: "By Walk",
+          destination: "Find Companion", // Will be updated with actual preferences
+          destinationType: "By Walk", // Will be updated with actual preferences  
           date: new Date(),
           time: "12:00",
-          genderPreference: "any",
+          genderPreference: "any", // Will be updated with actual preferences
+          startLocation: null, // Will be updated when preferences are submitted
+          destinationLocation: null, // Will be updated when preferences are submitted
+          routeCoordinates: [], // Will be updated when route is calculated
+          transportMode: "walking" // Will be updated when preferences are submitted
         }),
       });
       const result = await response.json();
@@ -484,8 +488,13 @@ export default function HomeScreen() {
             : "transit"
         }` +
         `&key=${GOOGLE_MAPS_KEY}`;
+      console.log('🗺️ [ROUTE CALC] Making Google Maps API call:', url);
       const response = await fetch(url);
+      console.log('📡 [ROUTE CALC] Response status:', response.status);
+      
       const data = await response.json();
+      console.log('📊 [ROUTE CALC] Google Maps response:', JSON.stringify(data, null, 2));
+      
       if (data.routes && data.routes[0]) {
         const points = data.routes[0].overview_polyline.points;
         const coords = decodePolyline(points);
@@ -500,6 +509,15 @@ export default function HomeScreen() {
         
         // Update trip request with route data for persistence
         if (currentTripRequestId && validCoords.length > 0) {
+          console.log('📍 [ROUTE UPDATE] Updating trip request with route data:', {
+            tripReqId: currentTripRequestId,
+            routePoints: validCoords.length,
+            transportMode: preferences.transport === "car" ? "driving" : 
+                          preferences.transport === "walk" ? "walking" : "transit",
+            startCoords: preferences.startCoordinates,
+            destCoords: preferences.destinationCoordinates
+          });
+          
           await activeMatches.updateTripRequest(currentTripRequestId, {
             routeCoordinates: validCoords,
             startLocation: {
@@ -514,6 +532,13 @@ export default function HomeScreen() {
             },
             transportMode: preferences.transport === "car" ? "driving" : 
                           preferences.transport === "walk" ? "walking" : "transit"
+          });
+          
+          console.log('✅ [ROUTE UPDATE] Trip request updated successfully');
+        } else {
+          console.warn('⚠️ [ROUTE UPDATE] Cannot update trip request:', {
+            hasTripRequestId: !!currentTripRequestId,
+            routePointsCount: validCoords.length
           });
         }
         
@@ -532,7 +557,16 @@ export default function HomeScreen() {
           await sendTripRequestToNearby(preferences.startCoordinates);
         }
       } else {
-        Alert.alert("Error", "No route found between the selected locations");
+        console.warn('⚠️ [ROUTE CALC] No routes found in Google Maps response');
+        Alert.alert(
+          "Route Not Found", 
+          "We couldn't calculate a route between these locations. You can still send the request manually."
+        );
+        
+        // Still send trip request even without route
+        if (currentTripRequestId) {
+          await sendTripRequestToNearby(preferences.startCoordinates);
+        }
       }
     } catch (error) {
       Alert.alert("Error", "Failed to fetch route information");
@@ -986,8 +1020,18 @@ export default function HomeScreen() {
                     <ThemedText style={styles.badgeText}>{requestPolling.requestCount}</ThemedText>
                   </View>
                 )}
+                {requestPolling.networkError && (
+                  <View style={styles.errorIndicator}>
+                    <Ionicons name="warning-outline" size={12} color="#ff4444" />
+                  </View>
+                )}
               </View>
-              <ThemedText style={styles.navLabel}>Notifications</ThemedText>
+              <ThemedText style={styles.navLabel}>
+                Notifications
+                {requestPolling.isRateLimited && (
+                  <ThemedText style={styles.rateLimitText}> (Limited)</ThemedText>
+                )}
+              </ThemedText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.navButton} onPress={() => handleSOS("000")}>
               <Ionicons name="alert" size={24} color="#fff" />
@@ -1332,6 +1376,24 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   badgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
+  
+  // Network status indicators
+  errorIndicator: {
+    position: "absolute",
+    top: -4,
+    left: -4,
+    backgroundColor: "#ff4444",
+    borderRadius: 6,
+    width: 12,
+    height: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  rateLimitText: {
+    fontSize: 8,
+    color: "#ffaa00",
+    fontWeight: "bold",
+  },
   
   // Enhanced persistent search styles
   searchStatusContainer: {

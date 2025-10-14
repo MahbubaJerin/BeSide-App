@@ -5,6 +5,37 @@ const User = require("../models/userModel");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
 
+// Schedule automatic cleanup every 10 minutes
+let cleanupInterval = null;
+
+const startCleanupScheduler = () => {
+    if (cleanupInterval) return; // Already running
+    
+    console.log("🕐 [SCHEDULER] Starting automatic cleanup scheduler...");
+    cleanupInterval = setInterval(async () => {
+        try {
+            await exports.cleanupExpiredRequests();
+        } catch (error) {
+            console.error("❌ [SCHEDULER] Cleanup error:", error);
+        }
+    }, 10 * 60 * 1000); // Every 10 minutes
+};
+
+const stopCleanupScheduler = () => {
+    if (cleanupInterval) {
+        clearInterval(cleanupInterval);
+        cleanupInterval = null;
+        console.log("⏹️ [SCHEDULER] Stopped cleanup scheduler");
+    }
+};
+
+// Export scheduler functions
+exports.startCleanupScheduler = startCleanupScheduler;
+exports.stopCleanupScheduler = stopCleanupScheduler;
+
+// Start scheduler when module loads
+startCleanupScheduler();
+
 // Send trip request to nearby users
 exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
     const { tripReqId, startCoordinates, searchRadius = 500 } = req.body;
@@ -116,10 +147,47 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
 });
 
 // Get pending requests for current user
+// Cleanup expired requests
+exports.cleanupExpiredRequests = catchAsync(async () => {
+    console.log("🧹 [BACKEND] Cleaning up expired requests...");
+    
+    const expiredRequests = await TripRequest.find({
+        status: "pending",
+        expiresAt: { $lt: new Date() }
+    });
+
+    if (expiredRequests.length > 0) {
+        const updateResult = await TripRequest.updateMany(
+            { 
+                status: "pending", 
+                expiresAt: { $lt: new Date() } 
+            },
+            { 
+                status: "expired",
+                $push: {
+                    recipients: { 
+                        $each: [], 
+                        $set: { 
+                            responseStatus: "declined" 
+                        } 
+                    }
+                }
+            }
+        );
+        
+        console.log(`✅ [BACKEND] Marked ${updateResult.modifiedCount} requests as expired`);
+    } else {
+        console.log("✅ [BACKEND] No expired requests found");
+    }
+});
+
 exports.getPendingRequests = catchAsync(async (req, res, next) => {
     const userId = req.user._id.toString();
 
     console.log("🔍 [BACKEND] Getting pending requests for user:", userId);
+    
+    // Cleanup expired requests first
+    await exports.cleanupExpiredRequests();
 
     const requests = await TripRequest.find({
         "recipients.userId": userId,
@@ -179,20 +247,41 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
     const { tripReqId, response } = req.body;
     const userId = req.user._id.toString();
 
+    console.log("🎯 [BACKEND] Responding to trip request:", tripReqId, "with:", response);
+
     // Validate response
     if (!["accepted", "declined"].includes(response)) {
         return next(new AppError("Response must be either 'accepted' or 'declined'", 400));
     }
 
-    const tripRequest = await TripRequest.findOne({ 
+    // First, cleanup expired requests
+    await exports.cleanupExpiredRequests();
+
+    // Find the trip request with more detailed checking
+    let tripRequest = await TripRequest.findOne({ 
         tripReqId,
-        "recipients.userId": userId,
-        status: "pending",
-        expiresAt: { $gt: new Date() }
+        "recipients.userId": userId
     });
 
+    console.log("📋 [BACKEND] Found trip request:", !!tripRequest);
+
     if (!tripRequest) {
-        return next(new AppError("Trip request not found or has expired", 404));
+        console.log("❌ [BACKEND] Trip request not found for user:", userId);
+        return next(new AppError("Trip request not found", 404));
+    }
+
+    // Check if request has expired
+    if (tripRequest.expiresAt <= new Date()) {
+        console.log("⏰ [BACKEND] Trip request has expired");
+        tripRequest.status = "expired";
+        await tripRequest.save();
+        return next(new AppError("Trip request has expired", 410));
+    }
+
+    // Check if request is still pending
+    if (tripRequest.status !== "pending") {
+        console.log("❌ [BACKEND] Trip request is no longer pending. Status:", tripRequest.status);
+        return next(new AppError(`Trip request is ${tripRequest.status}`, 409));
     }
 
     // Update recipient response
@@ -302,15 +391,48 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             transportMode: tripRequest.transportMode,
             meetingPoint: tripRequest.meetingPoint
         };
+        
+        console.log('🗺️ [BACKEND ROUTE DATA] Sending route data to receiver:', {
+            hasStartLocation: !!tripRequest.startLocation,
+            hasDestinationLocation: !!tripRequest.destinationLocation,
+            destinationCoords: tripRequest.destinationLocation ? 
+                `${tripRequest.destinationLocation.latitude},${tripRequest.destinationLocation.longitude}` : 'N/A',
+            transportMode: tripRequest.transportMode,
+            hasMeetingPoint: !!tripRequest.meetingPoint,
+            meetingPointSelected: tripRequest.meetingPoint?.isSelected
+        });
 
-        // Get receiver's current location for route calculation
+        // Get both receiver's and sender's current locations for route calculation
         const receiverLocation = await UserLocation.findOne({ userId: userId });
-        if (receiverLocation) {
+        const senderLocation = await UserLocation.findOne({ userId: tripRequest.user.userId });
+        
+        if (receiverLocation && receiverLocation.currentLocation && receiverLocation.currentLocation.coordinates) {
             responseData.receiverLocation = {
                 latitude: receiverLocation.currentLocation.coordinates[1],
                 longitude: receiverLocation.currentLocation.coordinates[0]
             };
+            console.log('📍 [RECEIVER LOCATION] Added receiver location to response:', responseData.receiverLocation);
+        } else {
+            console.warn('⚠️ [RECEIVER LOCATION] No valid location found for receiver:', userId);
         }
+        
+        if (senderLocation && senderLocation.currentLocation && senderLocation.currentLocation.coordinates) {
+            responseData.senderCurrentLocation = {
+                latitude: senderLocation.currentLocation.coordinates[1],
+                longitude: senderLocation.currentLocation.coordinates[0]
+            };
+            console.log('📍 [SENDER LOCATION] Added sender location to response:', responseData.senderCurrentLocation);
+        } else {
+            console.warn('⚠️ [SENDER LOCATION] No valid location found for sender:', tripRequest.user.userId);
+        }
+        
+        // Enhanced route data with destination text for geocoding
+        responseData.routeData = {
+            ...responseData.routeData,
+            destinationText: tripRequest.destination, // Text address for geocoding
+            senderName: tripRequest.user.userName,
+            receiverName: req.user.userName
+        };
     }
 
     res.status(200).json({

@@ -5,7 +5,6 @@ const tripMatchSchema = new mongoose.Schema({
   // Unique identifier for the match
   matchId: {
     type: String,
-    unique: true,
     required: true
   },
   

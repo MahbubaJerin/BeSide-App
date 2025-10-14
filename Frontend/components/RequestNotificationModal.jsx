@@ -77,32 +77,31 @@ function RequestCard({ request, onMarkViewed, onResponse, respondingTo, formatDa
         </View>
 
         {/* Route Information */}
-        {request.startLocation && request.destinationLocation && (
-          <>
-            <View style={styles.routeInfo}>
-              <ThemedText style={styles.routeTitle}>📍 Route Preview</ThemedText>
-              <ThemedText style={styles.routeDetail}>
-                From: {request.startLocation.address || 'Start location'}
-              </ThemedText>
-              <ThemedText style={styles.routeDetail}>
-                To: {request.destinationLocation.address || request.destination}
-              </ThemedText>
-              {request.transportMode && (
-                <ThemedText style={styles.routeDetail}>
-                  Mode: {request.transportMode.charAt(0).toUpperCase() + request.transportMode.slice(1)}
-                </ThemedText>
-              )}
-            </View>
-            
-            {request.meetingPoint && request.meetingPoint.isSelected && (
-              <View style={styles.meetingInfo}>
-                <ThemedText style={styles.meetingTitle}>🤝 Meeting Point Set</ThemedText>
-                <ThemedText style={styles.meetingDetail}>
-                  {request.meetingPoint.address || 'Meeting location selected'}
-                </ThemedText>
-              </View>
-            )}
-          </>
+        <View style={styles.routeInfo}>
+          <ThemedText style={styles.routeTitle}>📍 Trip Information</ThemedText>
+          <ThemedText style={styles.routeDetail}>
+            Destination: {request.destination || 'Not specified'}
+          </ThemedText>
+          <ThemedText style={styles.routeDetail}>
+            Transport: {request.destinationType || 'Walking'}
+          </ThemedText>
+          {request.transportMode && (
+            <ThemedText style={styles.routeDetail}>
+              Mode: {request.transportMode.charAt(0).toUpperCase() + request.transportMode.slice(1)}
+            </ThemedText>
+          )}
+          <ThemedText style={styles.routeHelp}>
+            💡 Route will be calculated when you accept
+          </ThemedText>
+        </View>
+        
+        {request.meetingPoint && request.meetingPoint.isSelected && (
+          <View style={styles.meetingInfo}>
+            <ThemedText style={styles.meetingTitle}>🤝 Meeting Point Set</ThemedText>
+            <ThemedText style={styles.meetingDetail}>
+              {request.meetingPoint.address || 'Meeting location selected'}
+            </ThemedText>
+          </View>
         )}
       </View>
 
@@ -136,7 +135,7 @@ export default function RequestNotificationModal({
   const [refreshing, setRefreshing] = useState(false);
   const [respondingTo, setRespondingTo] = useState(null);
 
-  const { calculateReceiverRoute, calculateTwoStepRoute, getMapRegion, calculating } = useRouteCalculation();
+  const { calculateReceiverRoute, calculateTwoStepRoute, calculateReceiverRouteEnhanced, getMapRegion, calculating } = useRouteCalculation();
 
   useEffect(() => {
     if (visible) {
@@ -194,63 +193,83 @@ export default function RequestNotificationModal({
       });
 
       const result = await apiResponse.json();
+      
+      if (!apiResponse.ok) {
+        // Handle specific error cases
+        if (apiResponse.status === 404) {
+          console.error("❌ Trip request not found - may have been cancelled or expired");
+          Alert.alert("Request Expired", "This trip request is no longer available.");
+          setRequests(prev => prev.filter(req => req.tripReqId !== tripReqId));
+          return;
+        } else if (apiResponse.status === 409) {
+          console.error("❌ Trip request already processed");
+          Alert.alert("Request Unavailable", "This request has already been accepted by someone else.");
+          setRequests(prev => prev.filter(req => req.tripReqId !== tripReqId));
+          return;
+        } else if (apiResponse.status === 410) {
+          console.error("❌ Trip request has expired");
+          Alert.alert("Request Expired", "This trip request has expired.");
+          setRequests(prev => prev.filter(req => req.tripReqId !== tripReqId));
+          return;
+        }
+        throw new Error(result.message || "Failed to respond to request");
+      }
+
       if (result.status === "success") {
         if (response === "accepted") {
-          // Calculate route from receiver's location to destination
-          if (currentLocation && result.data.routeData && onRouteUpdate) {
+          // Calculate route from receiver's location to destination using enhanced method
+          if (currentLocation && onRouteUpdate) {
             try {
-              console.log('🗺️ [RECEIVER ROUTE] Calculating receiver route to destination...');
+              console.log('� [ENHANCED RECEIVER ROUTE] Starting enhanced route calculation...');
+              console.log('� [ENHANCED RECEIVER ROUTE] Receiver location:', currentLocation);
+              console.log('� [ENHANCED RECEIVER ROUTE] Backend response data:', result.data);
               
-              const { destinationLocation, transportMode, meetingPoint } = result.data.routeData;
+              // Use enhanced route calculation with fallback options
+              const enhancedRoute = await calculateReceiverRouteEnhanced(
+                result.data.routeData || {},
+                currentLocation,
+                result.data.senderCurrentLocation
+              );
               
-              if (meetingPoint && meetingPoint.isSelected) {
-                // Two-step route: receiver → meeting point → destination
-                console.log('📍 Using two-step route with meeting point');
-                const twoStepRoute = await calculateTwoStepRoute(
+              // Update parent map with receiver's route
+              onRouteUpdate({
+                receiverRoute: enhancedRoute,
+                routeType: enhancedRoute.routeType || 'direct',
+                destination: enhancedRoute.destinationInfo,
+                mapRegion: getMapRegion([
                   currentLocation,
-                  meetingPoint,
-                  destinationLocation,
-                  transportMode
-                );
-                
-                // Update parent map with receiver's complete journey
-                onRouteUpdate({
-                  receiverRoute: twoStepRoute,
-                  routeType: 'two-step',
-                  meetingPoint: meetingPoint,
-                  destination: destinationLocation,
-                  mapRegion: getMapRegion([
-                    currentLocation,
-                    meetingPoint,
-                    destinationLocation
-                  ])
-                });
-              } else {
-                // Direct route: receiver → destination
-                console.log('📍 Using direct route to destination');
-                const directRoute = await calculateReceiverRoute(
-                  currentLocation,
-                  destinationLocation,
-                  transportMode
-                );
-                
-                // Update parent map with receiver's route
-                onRouteUpdate({
-                  receiverRoute: directRoute,
-                  routeType: 'direct',
-                  destination: destinationLocation,
-                  mapRegion: getMapRegion([
-                    currentLocation,
-                    destinationLocation
-                  ])
-                });
-              }
+                  enhancedRoute.destinationInfo.coordinates
+                ])
+              });
               
-              console.log('✅ [RECEIVER ROUTE] Route calculated and map updated');
+              console.log('✅ [ENHANCED RECEIVER ROUTE] Route calculated and map updated successfully');
+              
+              // Show success message with destination info
+              const destinationName = enhancedRoute.destinationInfo.address || 
+                                    result.data.routeData?.destinationText || 
+                                    'destination';
+              
+              Alert.alert(
+                "🎉 Route Calculated!", 
+                `Your route to ${destinationName} has been calculated and displayed on the map.`,
+                [{ text: "Great!" }]
+              );
+              
             } catch (routeError) {
-              console.warn('⚠️ [RECEIVER ROUTE] Failed to calculate route:', routeError);
-              // Still show success but without route update
+              console.warn('⚠️ [ENHANCED RECEIVER ROUTE] Route calculation failed:', routeError);
+              
+              // Show user that route calculation failed but match was successful
+              Alert.alert(
+                "Match Successful! ✅", 
+                "Your trip match was successful! However, we couldn't calculate the route automatically. Please use your preferred navigation app to get directions.",
+                [{ text: "OK" }]
+              );
             }
+          } else {
+            console.warn('⚠️ [ENHANCED RECEIVER ROUTE] Missing required data:', {
+              hasCurrentLocation: !!currentLocation,
+              hasOnRouteUpdate: !!onRouteUpdate
+            });
           }
 
           Alert.alert(
@@ -536,6 +555,13 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
     marginBottom: 2,
     opacity: 0.8,
+  },
+  routeHelp: {
+    fontSize: 11,
+    color: Colors.light.tabIconDefault,
+    fontStyle: 'italic',
+    marginTop: 6,
+    opacity: 0.7,
   },
   meetingInfo: {
     backgroundColor: "#28a745" + "10",

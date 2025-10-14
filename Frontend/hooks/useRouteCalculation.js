@@ -3,6 +3,39 @@ import { useState, useCallback } from 'react';
 
 const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+// Debug the API key
+console.log('🔑 [GOOGLE MAPS] API Key available:', !!GOOGLE_MAPS_KEY);
+if (!GOOGLE_MAPS_KEY) {
+  console.error('❌ [GOOGLE MAPS] API Key is missing!');
+}
+
+// Geocoding utility to convert address text to coordinates
+const geocodeAddress = async (address) => {
+  try {
+    console.log('🌍 [GEOCODING] Converting address to coordinates:', address);
+    
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_KEY}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.results && data.results[0]) {
+      const location = data.results[0].geometry.location;
+      const coordinates = {
+        latitude: location.lat,
+        longitude: location.lng,
+        address: data.results[0].formatted_address
+      };
+      console.log('✅ [GEOCODING] Address converted:', coordinates);
+      return coordinates;
+    }
+    
+    throw new Error('No geocoding results found');
+  } catch (error) {
+    console.error('💥 [GEOCODING] Error:', error);
+    throw error;
+  }
+};
+
 // Polyline decoder utility
 const decodePolyline = (encoded) => {
   const coordinates = [];
@@ -55,6 +88,12 @@ export function useRouteCalculation() {
       throw new Error('Both receiver location and destination are required');
     }
 
+    // Validate coordinates exist
+    if (!receiverLocation.latitude || !receiverLocation.longitude || 
+        !destinationLocation.latitude || !destinationLocation.longitude) {
+      throw new Error('Invalid coordinates provided');
+    }
+
     setCalculating(true);
     setError(null);
 
@@ -69,9 +108,14 @@ export function useRouteCalculation() {
       console.log('- From:', receiverLocation);
       console.log('- To:', destinationLocation);
       console.log('- Mode:', transportMode);
+      console.log('- URL:', url);
 
       const response = await fetch(url);
+      console.log('📡 [ROUTE CALC] Response status:', response.status);
+      console.log('📡 [ROUTE CALC] Response ok:', response.ok);
+      
       const data = await response.json();
+      console.log('📊 [ROUTE CALC] Response data:', JSON.stringify(data, null, 2));
 
       if (data.routes && data.routes[0]) {
         const route = data.routes[0];
@@ -120,6 +164,13 @@ export function useRouteCalculation() {
 
     try {
       console.log('🗺️ [TWO-STEP ROUTE] Calculating two-step route...');
+      
+      // Validate all locations have coordinates
+      if (!receiverLocation?.latitude || !receiverLocation?.longitude ||
+          !meetingPoint?.latitude || !meetingPoint?.longitude ||
+          !destinationLocation?.latitude || !destinationLocation?.longitude) {
+        throw new Error('Invalid coordinates for two-step route calculation');
+      }
       
       // Step 1: Receiver to meeting point
       const step1Route = await calculateReceiverRoute(receiverLocation, meetingPoint, "walking");
@@ -182,11 +233,85 @@ export function useRouteCalculation() {
     };
   }, []);
 
+  // Enhanced function to calculate receiver route with multiple fallback options
+  const calculateReceiverRouteEnhanced = useCallback(async (routeData, receiverLocation, senderCurrentLocation) => {
+    setCalculating(true);
+    setError(null);
+
+    try {
+      console.log('🚀 [ENHANCED ROUTE] Starting enhanced route calculation...');
+      console.log('📍 [ENHANCED ROUTE] Receiver location:', receiverLocation);
+      console.log('📍 [ENHANCED ROUTE] Sender current location:', senderCurrentLocation);
+      console.log('📊 [ENHANCED ROUTE] Route data:', routeData);
+
+      let destinationCoords = null;
+
+      // Option 1: Use stored destination coordinates if available
+      if (routeData.destinationLocation && routeData.destinationLocation.latitude && routeData.destinationLocation.longitude) {
+        console.log('✅ [ENHANCED ROUTE] Using stored destination coordinates');
+        destinationCoords = routeData.destinationLocation;
+      }
+      // Option 2: Geocode destination text
+      else if (routeData.destinationText && routeData.destinationText !== 'Placeholder') {
+        console.log('🌍 [ENHANCED ROUTE] Geocoding destination text:', routeData.destinationText);
+        try {
+          destinationCoords = await geocodeAddress(routeData.destinationText);
+        } catch (geocodeError) {
+          console.warn('⚠️ [ENHANCED ROUTE] Geocoding failed:', geocodeError);
+        }
+      }
+
+      // Option 3: Fallback to sender's current location as destination
+      if (!destinationCoords && senderCurrentLocation) {
+        console.log('🔄 [ENHANCED ROUTE] Using sender current location as fallback destination');
+        destinationCoords = {
+          latitude: senderCurrentLocation.latitude,
+          longitude: senderCurrentLocation.longitude,
+          address: `${routeData.senderName || 'Sender'}'s current location`
+        };
+      }
+
+      if (!destinationCoords) {
+        throw new Error('No valid destination found for route calculation');
+      }
+
+      console.log('🎯 [ENHANCED ROUTE] Final destination coordinates:', destinationCoords);
+
+      // Calculate the route
+      const route = await calculateReceiverRoute(receiverLocation, destinationCoords, routeData.transportMode || 'walking');
+
+      // Enhanced route data
+      const enhancedRoute = {
+        ...route,
+        routeType: 'receiver-to-destination',
+        destinationInfo: {
+          coordinates: destinationCoords,
+          address: destinationCoords.address || routeData.destinationText || 'Destination',
+          senderName: routeData.senderName,
+          receiverName: routeData.receiverName
+        },
+        transportMode: routeData.transportMode || 'walking'
+      };
+
+      console.log('✅ [ENHANCED ROUTE] Enhanced route calculated successfully');
+      return enhancedRoute;
+
+    } catch (error) {
+      console.error('💥 [ENHANCED ROUTE] Enhanced route calculation failed:', error);
+      setError(error.message);
+      throw error;
+    } finally {
+      setCalculating(false);
+    }
+  }, [calculateReceiverRoute]);
+
   return {
     calculating,
     error,
     calculateReceiverRoute,
     calculateTwoStepRoute,
+    calculateReceiverRouteEnhanced,
+    geocodeAddress,
     getMapRegion,
     clearError: () => setError(null)
   };

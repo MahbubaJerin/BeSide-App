@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../config';
 
-export function useActiveMatches(pollingInterval = 30000) {
+export function useActiveMatches(pollingInterval = 45000) { // Increased from 30s to 45s
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -13,10 +13,18 @@ export function useActiveMatches(pollingInterval = 30000) {
   const pollRef = useRef(null);
   const lastMatchCountRef = useRef(0);
   const isActiveRef = useRef(true);
+  const rateLimitRef = useRef(false);
+  const errorCountRef = useRef(0);
 
   // Fetch active matches from API
   const fetchActiveMatches = useCallback(async () => {
     try {
+      // Skip if rate limited
+      if (rateLimitRef.current) {
+        console.log('⏳ [MATCH POLLING] Rate limited, skipping...');
+        return;
+      }
+
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         setError('No authentication token found');
@@ -31,12 +39,19 @@ export function useActiveMatches(pollingInterval = 30000) {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        timeout: 15000 // 15 second timeout
       });
 
       if (response.status === 429) {
-        console.log('⚠️ [MATCH POLLING] Rate limited, waiting...');
-        return; // Skip this poll cycle
+        console.log('⚠️ [MATCH POLLING] Rate limited by server');
+        rateLimitRef.current = true;
+        
+        // Back off for 60 seconds
+        setTimeout(() => {
+          rateLimitRef.current = false;
+        }, 60000);
+        return;
       }
 
       const result = await response.json();
@@ -49,6 +64,9 @@ export function useActiveMatches(pollingInterval = 30000) {
         const newMatches = result.data.matches || [];
         
         console.log('🎯 [MATCH POLLING] Active matches fetched:', newMatches.length);
+        
+        // Reset error count on success
+        errorCountRef.current = 0;
         
         // Check for new matches
         if (newMatches.length > lastMatchCountRef.current) {
@@ -64,7 +82,24 @@ export function useActiveMatches(pollingInterval = 30000) {
       }
     } catch (err) {
       console.error('❌ [MATCH POLLING] Error fetching matches:', err.message);
-      setError(err.message);
+      errorCountRef.current += 1;
+      
+      // Implement exponential backoff for errors
+      if (errorCountRef.current >= 3) {
+        console.log('💀 [MATCH POLLING] Too many errors, backing off...');
+        setError(`Network issues - reducing poll frequency (${errorCountRef.current} errors)`);
+        rateLimitRef.current = true;
+        
+        // Back off for increasing duration
+        const backoffTime = Math.min(errorCountRef.current * 30000, 300000); // Max 5 minutes
+        setTimeout(() => {
+          rateLimitRef.current = false;
+          errorCountRef.current = Math.max(0, errorCountRef.current - 1);
+        }, backoffTime);
+      } else {
+        setError(`${err.message} (${errorCountRef.current}/3)`);
+      }
+      
       setMatches([]);
       setMatchCount(0);
     } finally {
@@ -331,11 +366,17 @@ export function useActiveMatches(pollingInterval = 30000) {
   // Update trip request with route and location data
   const updateTripRequest = useCallback(async (tripReqId, updateData) => {
     try {
+      console.log('🔄 [FRONTEND UPDATE] Updating trip request:', tripReqId);
+      console.log('🔄 [FRONTEND UPDATE] Update data:', JSON.stringify(updateData, null, 2));
+      
       const token = await AsyncStorage.getItem('token');
       if (!token) throw new Error('No authentication token found');
 
       const API_URL = BASE_URL.replace(/\/+$/, '');
-      const response = await fetch(`${API_URL}/api/v1/trip/${tripReqId}`, {
+      const url = `${API_URL}/api/v1/trip/${tripReqId}`;
+      console.log('🌐 [FRONTEND UPDATE] Request URL:', url);
+      
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -344,13 +385,17 @@ export function useActiveMatches(pollingInterval = 30000) {
         body: JSON.stringify(updateData)
       });
 
+      console.log('📡 [FRONTEND UPDATE] Response status:', response.status);
       const result = await response.json();
+      console.log('📊 [FRONTEND UPDATE] Response data:', JSON.stringify(result, null, 2));
+      
       if (result.status === 'success') {
+        console.log('✅ [FRONTEND UPDATE] Trip request updated successfully');
         return result.data.tripRequest;
       }
       throw new Error(result.message || 'Failed to update trip request');
     } catch (error) {
-      console.error('Error updating trip request:', error);
+      console.error('💥 [FRONTEND UPDATE] Error updating trip request:', error);
       throw error;
     }
   }, []);

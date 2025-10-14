@@ -65,6 +65,12 @@ router.get(
   notificationController.getPendingRequests
 );
 
+// Admin/debug endpoint to manually cleanup expired requests
+router.post(
+  "/cleanup-expired",
+  notificationController.cleanupExpiredRequests
+);
+
 router.post(
   "/mark-viewed",
   notificationController.markRequestAsViewed
