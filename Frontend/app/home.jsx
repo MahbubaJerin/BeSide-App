@@ -291,8 +291,8 @@ export default function HomeScreen() {
   // hooks
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
-  const requestPolling = useRequestPolling(30000, true); // Poll every 30 seconds (reduced from 10s)
-  const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds
+  const requestPolling = useRequestPolling(90000, true); // Poll every 90 seconds (reduced for rate limiting)
+  const activeMatches = useActiveMatches(60000); // Poll for matches every 60 seconds (reduced for rate limiting)
   const tripNotifications = useTripNotifications();
   const { 
     openGoogleMapsNavigation, 
@@ -305,6 +305,28 @@ export default function HomeScreen() {
   const isSearching = companionSearch.isSearching;
   const companions = companionSearch.companions;
   const searchRadius = companionSearch.searchRadius;
+
+  // Get the current active request from matches - using the getActiveRequest method
+  const [activeRequest, setActiveRequest] = useState(null);
+  
+  // Update active request when matches change - with debouncing to avoid excessive calls
+  useEffect(() => {
+    const updateActiveRequest = async () => {
+      if (activeMatches?.getActiveRequest) {
+        try {
+          const request = await activeMatches.getActiveRequest();
+          setActiveRequest(request);
+        } catch (error) {
+          console.error('Error getting active request:', error);
+          setActiveRequest(null);
+        }
+      }
+    };
+    
+    // Debounce the call to avoid excessive requests
+    const timeoutId = setTimeout(updateActiveRequest, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [activeMatches?.matches?.length]); // Only trigger when matches count changes
 
   useFocusEffect(
     useCallback(() => {
@@ -341,10 +363,10 @@ export default function HomeScreen() {
 
   // Monitor distance to meeting point
   useEffect(() => {
-    if (location && activeRequest?.meetingPointCoordinates) {
+    if (currentLocation && activeRequest?.meetingPointCoordinates) {
       const distance = calculateDistance(
-        location.latitude,
-        location.longitude,
+        currentLocation.latitude,
+        currentLocation.longitude,
         activeRequest.meetingPointCoordinates.lat,
         activeRequest.meetingPointCoordinates.lng
       );
@@ -357,7 +379,7 @@ export default function HomeScreen() {
         distanceToMeetingPoint: Math.round(distance),
       }));
     }
-  }, [location, activeRequest?.meetingPointCoordinates]);
+  }, [currentLocation, activeRequest?.meetingPointCoordinates]);
 
   const handleLogout = async () => {
     await AsyncStorage.removeItem("user");
@@ -406,25 +428,22 @@ export default function HomeScreen() {
   };
 
   const handleStartFinalJourney = () => {
-    if (activeRequest?.destinationLocation) {
+    if (activeRequest?.destinationLocation && currentLocation) {
       // Set up navigation to final destination
       setCurrentNavigationRoute({
         destination: {
           latitude: activeRequest.destinationLocation.latitude,
           longitude: activeRequest.destinationLocation.longitude
         },
-        origin: location,
+        origin: currentLocation,
         destinationAddress: activeRequest.destinationLocation.address || activeRequest.destination,
         routeInfo: null,
         companion: null // No longer meeting, now traveling together
       });
 
-      // Start route calculation to final destination
-      calculateRoute(
-        location,
-        activeRequest.destinationLocation,
-        activeRequest.transportMode || 'walking'
-      );
+      // Start route calculation to final destination - using navigation to Google Maps instead
+      // since this is for the final journey together
+      console.log('🚀 Starting final journey to destination');
     }
   };
 

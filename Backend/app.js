@@ -27,9 +27,11 @@ if (process.env.NODE_ENV === "development") {
 }
 
 const limiter = rateLimit({
-  max: process.env.RATE_LIMIT_MAX || 500, // Increased for development
+  max: process.env.RATE_LIMIT_MAX || 1000, // Increased further for development 
   windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes for development
   message: "Too many requests from this IP, please try again later!",
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
 app.use("/api", limiter);
 
