@@ -387,3 +387,157 @@ exports.markArrived = catchAsync(async (req, res, next) => {
     }
   });
 });
+
+exports.startTrip = catchAsync(async (req, res, next) => {
+  const { requestId } = req.body;
+  const userId = req.user._id.toString();
+
+  if (!requestId) {
+    return next(new AppError("Request ID is required", 400));
+  }
+
+  const tripRequest = await TripRequest.findById(requestId);
+  if (!tripRequest) {
+    return next(new AppError("Trip request not found", 404));
+  }
+
+  // Initialize startedUsers array if it doesn't exist
+  if (!tripRequest.startedUsers) {
+    tripRequest.startedUsers = [];
+  }
+
+  // Check if user already marked as started
+  if (tripRequest.startedUsers.includes(userId)) {
+    return res.status(200).json({
+      status: "success",
+      message: "Already marked as started",
+      data: { bothUsersReady: tripRequest.tripStarted }
+    });
+  }
+
+  // Add user to started list
+  tripRequest.startedUsers.push(userId);
+
+  // Check if both users are ready to start (sender and receiver)
+  const bothUsersReady = tripRequest.startedUsers.includes(tripRequest.user.userId) && 
+                        tripRequest.receiverConsent && 
+                        tripRequest.startedUsers.includes(tripRequest.receiverConsent.receiverId);
+
+  if (bothUsersReady) {
+    tripRequest.tripStarted = true;
+    tripRequest.tripStartedAt = new Date();
+  }
+
+  await tripRequest.save();
+
+  res.status(200).json({
+    status: "success",
+    message: bothUsersReady ? "Both users ready! Trip started!" : "Ready to start trip",
+    data: {
+      startedUsers: tripRequest.startedUsers,
+      bothUsersReady: tripRequest.tripStarted
+    }
+  });
+});
+
+exports.cancelTrip = catchAsync(async (req, res, next) => {
+  const { requestId } = req.body;
+  const userId = req.user._id.toString();
+
+  if (!requestId) {
+    return next(new AppError("Request ID is required", 400));
+  }
+
+  const tripRequest = await TripRequest.findById(requestId);
+  if (!tripRequest) {
+    return next(new AppError("Trip request not found", 404));
+  }
+
+  // Check if user is part of this trip
+  const isOrganizerOrCompanion = tripRequest.user.userId === userId || 
+                                 (tripRequest.receiverConsent && tripRequest.receiverConsent.receiverId === userId);
+  
+  if (!isOrganizerOrCompanion) {
+    return next(new AppError("You are not authorized to cancel this trip", 403));
+  }
+
+  // Update status to cancelled
+  tripRequest.status = 'cancelled';
+  tripRequest.cancelledBy = userId;
+  tripRequest.cancelledAt = new Date();
+
+  await tripRequest.save();
+
+  res.status(200).json({
+    status: "success",
+    message: "Trip cancelled successfully"
+  });
+});
+
+exports.endTrip = catchAsync(async (req, res, next) => {
+  const { requestId } = req.body;
+  const userId = req.user._id.toString();
+
+  if (!requestId) {
+    return next(new AppError("Request ID is required", 400));
+  }
+
+  const tripRequest = await TripRequest.findById(requestId);
+  if (!tripRequest) {
+    return next(new AppError("Trip request not found", 404));
+  }
+
+  // Check if user is part of this trip
+  const isOrganizerOrCompanion = tripRequest.user.userId === userId || 
+                                 (tripRequest.receiverConsent && tripRequest.receiverConsent.receiverId === userId);
+  
+  if (!isOrganizerOrCompanion) {
+    return next(new AppError("You are not authorized to end this trip", 403));
+  }
+
+  // Update status to completed
+  tripRequest.status = 'completed';
+  tripRequest.completedAt = new Date();
+
+  await tripRequest.save();
+
+  res.status(200).json({
+    status: "success",
+    message: "Trip completed successfully"
+  });
+});
+
+exports.expireRequest = catchAsync(async (req, res, next) => {
+  const { tripReqId } = req.params;
+  const userId = req.user._id.toString();
+
+  if (!tripReqId) {
+    return next(new AppError("Trip Request ID is required", 400));
+  }
+
+  const tripRequest = await TripRequest.findOne({ tripReqId });
+  if (!tripRequest) {
+    return next(new AppError("Trip request not found", 404));
+  }
+
+  // Only the sender can expire their own request
+  if (tripRequest.user.userId !== userId) {
+    return next(new AppError("You can only expire your own requests", 403));
+  }
+
+  // Only expire if still pending
+  if (tripRequest.status === 'pending') {
+    tripRequest.status = 'expired';
+    await tripRequest.save();
+
+    res.status(200).json({
+      status: "success",
+      message: "Trip request expired successfully"
+    });
+  } else {
+    res.status(200).json({
+      status: "success", 
+      message: `Request already ${tripRequest.status}`
+    });
+  }
+});

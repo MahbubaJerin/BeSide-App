@@ -54,6 +54,26 @@ router.post(
   tripController.markArrived
 );
 
+router.post(
+  "/startTrip",
+  tripController.startTrip
+);
+
+router.post(
+  "/cancelTrip",
+  tripController.cancelTrip
+);
+
+router.post(
+  "/endTrip",
+  tripController.endTrip
+);
+
+router.put(
+  "/:tripReqId/expire",
+  tripController.expireRequest
+);
+
 router.get(
   "/active-request",
   tripController.getActiveRequest

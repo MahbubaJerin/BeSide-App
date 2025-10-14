@@ -458,6 +458,10 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
         });
     }
 
+    // TODO: Send notification to sender about the response
+    // This would be implemented with push notifications or websockets in production
+    console.log(`📱 [SENDER NOTIFICATION] Sender ${tripRequest.user.userName} should be notified: Request ${response} by ${req.user.userName}`);
+
     res.status(200).json({
         status: "success",
         message: response === "accepted" 

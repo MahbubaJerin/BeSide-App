@@ -283,6 +283,12 @@ export default function HomeScreen() {
     bothUsersArrived: false
   });
 
+  const [tripStatus, setTripStatus] = useState({
+    userReady: false,
+    bothUsersReady: false,
+    tripStarted: false
+  });
+
   const loadingAnimation = useRef(new Animated.Value(0)).current;
   const mapRef = useRef(null);
   const [currentTripRequestId, setCurrentTripRequestId] = useState(null);
@@ -300,6 +306,44 @@ export default function HomeScreen() {
     calculateDistance,
     checkArrivalAtMeetingPoint 
   } = useRouteCalculation();
+
+  // State for sender notifications
+  const [senderRequestStatus, setSenderRequestStatus] = useState(null);
+
+  // Poll for sender request status
+  const pollSenderStatus = useCallback(async () => {
+    if (!currentTripRequestId) return;
+    
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) return;
+
+      const API_URL = BASE_URL.replace(/\/+$/, "");
+      const response = await fetch(`${API_URL}/api/v1/trip/sent-requests-status`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const myRequest = result.data.requests.find(req => req.tripReqId === currentTripRequestId);
+        
+        if (myRequest && myRequest.status !== senderRequestStatus?.status) {
+          setSenderRequestStatus(myRequest);
+          
+          // Show notification if status changed
+          if (myRequest.status === 'accepted') {
+            Alert.alert(
+              "Request Accepted! 🎉",
+              `${myRequest.acceptedBy?.userName || 'Someone'} has accepted your companion request! You can now set a meeting point.`,
+              [{ text: "OK" }]
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error polling sender status:', error);
+    }
+  }, [currentTripRequestId, senderRequestStatus?.status]);
 
   const currentLocation = locationTracking.currentLocation;
   const isSearching = companionSearch.isSearching;
@@ -327,6 +371,19 @@ export default function HomeScreen() {
     const timeoutId = setTimeout(updateActiveRequest, 1000);
     return () => clearTimeout(timeoutId);
   }, [activeMatches?.matches?.length]); // Only trigger when matches count changes
+
+  // Poll sender status when there's an active trip request
+  useEffect(() => {
+    if (!currentTripRequestId) return;
+
+    // Poll immediately
+    pollSenderStatus();
+
+    // Then poll every 15 seconds while request is active
+    const pollInterval = setInterval(pollSenderStatus, 15000);
+    
+    return () => clearInterval(pollInterval);
+  }, [currentTripRequestId, pollSenderStatus]);
 
   useFocusEffect(
     useCallback(() => {
@@ -427,6 +484,60 @@ export default function HomeScreen() {
     }
   };
 
+  const handleStartTrip = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token || !activeRequest) return;
+
+      // Mark this user as ready to start the trip
+      const response = await fetch(`${BASE_URL}/api/v1/trip/startTrip`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          requestId: activeRequest._id,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Update local trip status
+        setTripStatus({
+          userReady: true,
+          bothUsersReady: result.data.bothUsersReady,
+          tripStarted: result.data.bothUsersReady
+        });
+        
+        if (result.data.bothUsersReady) {
+          // Both users are ready - show confirmation and start route
+          Alert.alert(
+            "Trip Started! 🚀",
+            "Both companions are ready! Navigate together to your destination using Google Maps.",
+            [
+              {
+                text: "Open Google Maps",
+                onPress: () => handleStartFinalJourney()
+              },
+              { text: "OK" }
+            ]
+          );
+        } else {
+          Alert.alert(
+            "Ready to Start! ✅",
+            "You're ready to start the trip. Waiting for your companion to also press 'Start Trip'.",
+            [{ text: "OK" }]
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error starting trip:", error);
+      Alert.alert("Error", "Failed to start trip. Please try again.");
+    }
+  };
+
   const handleStartFinalJourney = () => {
     if (activeRequest?.destinationLocation && currentLocation) {
       // Set up navigation to final destination
@@ -445,6 +556,127 @@ export default function HomeScreen() {
       // since this is for the final journey together
       console.log('🚀 Starting final journey to destination');
     }
+  };
+
+  const handleCancelTrip = async () => {
+    Alert.alert(
+      "Cancel Trip?",
+      "Are you sure you want to cancel this trip? This will notify your companion.",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem("token");
+              if (!token || !activeRequest) return;
+
+              const response = await fetch(`${BASE_URL}/api/v1/trip/cancelTrip`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  requestId: activeRequest._id,
+                }),
+              });
+
+              if (response.ok) {
+                Alert.alert(
+                  "Trip Cancelled",
+                  "The trip has been cancelled successfully. Your companion has been notified.",
+                  [{ text: "OK" }]
+                );
+                
+                // Reset all states
+                setCurrentNavigationRoute(null);
+                setRouteCoordinates([]);
+                setStartMarker(null);
+                setEndMarker(null);
+                setActiveRequest(null);
+                setArrivalStatus({
+                  isNearMeetingPoint: false,
+                  hasArrivedAtMeetingPoint: false,
+                  distanceToMeetingPoint: null,
+                  canStartFinalJourney: false,
+                  bothUsersArrived: false
+                });
+                setTripStatus({
+                  userReady: false,
+                  bothUsersReady: false,
+                  tripStarted: false
+                });
+              }
+            } catch (error) {
+              console.error("Error cancelling trip:", error);
+              Alert.alert("Error", "Failed to cancel trip. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleEndTrip = async () => {
+    Alert.alert(
+      "End Trip?",
+      "Are you sure you want to end this trip? This indicates you've reached your destination safely.",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes, End Trip",
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem("token");
+              if (!token || !activeRequest) return;
+
+              const response = await fetch(`${BASE_URL}/api/v1/trip/endTrip`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  requestId: activeRequest._id,
+                }),
+              });
+
+              if (response.ok) {
+                Alert.alert(
+                  "Trip Completed! 🎉",
+                  "Thank you for using our companion service! We hope you had a safe journey.",
+                  [{ text: "OK" }]
+                );
+                
+                // Reset all states
+                setCurrentNavigationRoute(null);
+                setRouteCoordinates([]);
+                setStartMarker(null);
+                setEndMarker(null);
+                setActiveRequest(null);
+                setArrivalStatus({
+                  isNearMeetingPoint: false,
+                  hasArrivedAtMeetingPoint: false,
+                  distanceToMeetingPoint: null,
+                  canStartFinalJourney: false,
+                  bothUsersArrived: false
+                });
+                setTripStatus({
+                  userReady: false,
+                  bothUsersReady: false,
+                  tripStarted: false
+                });
+              }
+            } catch (error) {
+              console.error("Error ending trip:", error);
+              Alert.alert("Error", "Failed to end trip. Please try again.");
+            }
+          }
+        }
+      ]
+    );
   };
 
   // ⬇️ CHANGED: no search starts here; only createTripReq + open modal
@@ -574,9 +806,12 @@ export default function HomeScreen() {
       if (result.status === "success") {
         Alert.alert(
           "Request Sent! 🚀",
-          `Your companion request has been sent to ${result.data.recipientCount} nearby users\n\nDEBUG INFO:\n- Trip ID: ${currentTripRequestId}\n- Coordinates: ${startCoordinates.latitude}, ${startCoordinates.longitude}\n- Recipients: ${result.data.recipientCount}`,
+          `Your companion request has been sent to ${result.data.recipientCount} active users within 500m radius.\n\nThe request is valid for 2 minutes. You'll be notified when someone accepts your request.`,
           [{ text: "OK" }]
         );
+        
+        // Stop any searching animation since request is sent
+        await companionSearch.stopSearch();
       } else {
         Alert.alert("API Error", result.message || "Failed to send request");
         throw new Error(result.message || "Failed to send request to nearby users");
@@ -669,12 +904,33 @@ export default function HomeScreen() {
           });
         }
 
-        // Start companion search and maintain route visibility
-        await companionSearch.startSearch(preferences.startCoordinates, searchRadius, 30000);
-
-        // Send trip request to nearby users
+        // Send trip request to nearby users (no persistent searching)
         if (currentTripRequestId) {
           await sendTripRequestToNearby(preferences.startCoordinates);
+          
+          // Set 2-minute timeout for the request
+          setTimeout(async () => {
+            try {
+              const token = await AsyncStorage.getItem("token");
+              if (token && currentTripRequestId) {
+                await fetch(`${BASE_URL}/api/v1/trip/${currentTripRequestId}/expire`, {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  }
+                });
+                
+                Alert.alert(
+                  "Request Expired ⏰",
+                  "Your companion request has expired after 2 minutes. You can send a new request if needed.",
+                  [{ text: "OK" }]
+                );
+              }
+            } catch (error) {
+              console.error('Error expiring request:', error);
+            }
+          }, 2 * 60 * 1000); // 2 minutes
         }
       } else {
         console.warn('⚠️ [ROUTE CALC] No routes found in Google Maps response');
@@ -1115,19 +1371,43 @@ export default function HomeScreen() {
                 ✅ Arrived - Waiting for companion
               </ThemedText>
             )}
-            {arrivalStatus.bothUsersArrived && (
+            {arrivalStatus.bothUsersArrived && !tripStatus.userReady && (
               <ThemedText type="caption" style={[styles.navigationDetails, { color: '#FF6B35' }]}>
-                🎉 Both companions ready! Ready to start final journey
+                🎉 Both companions arrived! Ready to start trip
+              </ThemedText>
+            )}
+            {tripStatus.userReady && !tripStatus.bothUsersReady && (
+              <ThemedText type="caption" style={[styles.navigationDetails, { color: '#FFA500' }]}>
+                ⏳ You're ready - Waiting for companion to start trip
+              </ThemedText>
+            )}
+            {tripStatus.bothUsersReady && (
+              <ThemedText type="caption" style={[styles.navigationDetails, { color: '#4CAF50' }]}>
+                🚀 Trip started! Navigate to destination together
               </ThemedText>
             )}
           </View>
           <View style={styles.navigationButtons}>
             {/* Show different buttons based on arrival status */}
-            {arrivalStatus.bothUsersArrived && (
+            {arrivalStatus.bothUsersArrived && !tripStatus.userReady && (
               <ThemedButton 
-                title="🚀 Start Final Journey" 
-                onPress={handleStartFinalJourney}
+                title="🚀 Start Trip" 
+                onPress={handleStartTrip}
                 style={[styles.navigationButton, { backgroundColor: '#FF6B35' }]} 
+              />
+            )}
+            {tripStatus.userReady && !tripStatus.bothUsersReady && (
+              <ThemedButton 
+                title="⏳ Waiting for Companion" 
+                disabled={true}
+                style={[styles.navigationButton, { backgroundColor: '#FFA500', opacity: 0.7 }]} 
+              />
+            )}
+            {tripStatus.bothUsersReady && (
+              <ThemedButton 
+                title="🗺️ Navigate to Destination" 
+                onPress={handleStartFinalJourney}
+                style={[styles.navigationButton, { backgroundColor: '#4CAF50' }]} 
               />
             )}
             {arrivalStatus.isNearMeetingPoint && !arrivalStatus.hasArrivedAtMeetingPoint && (
@@ -1152,6 +1432,19 @@ export default function HomeScreen() {
               }} 
               style={styles.navigationButton} 
             />
+            {tripStatus.tripStarted ? (
+              <ThemedButton 
+                title="🏁 End Trip" 
+                onPress={handleEndTrip}
+                style={[styles.navigationButton, { backgroundColor: '#4CAF50' }]} 
+              />
+            ) : (
+              <ThemedButton 
+                title="❌ Cancel" 
+                onPress={handleCancelTrip}
+                style={[styles.navigationButton, { backgroundColor: '#FF4444' }]} 
+              />
+            )}
             <ThemedButton 
               title="✕" 
               onPress={() => {

@@ -168,6 +168,33 @@ const TripReqSchema = new Schema(
         type: Boolean,
         default: false
     },
+
+    // Trip start coordination
+    startedUsers: [{
+        type: String, // User IDs of users who are ready to start the trip
+    }],
+
+    tripStarted: {
+        type: Boolean,
+        default: false
+    },
+
+    tripStartedAt: {
+        type: Date
+    },
+
+    // Trip cancellation/completion
+    cancelledBy: {
+        type: String
+    },
+
+    cancelledAt: {
+        type: Date
+    },
+
+    completedAt: {
+        type: Date
+    },
 }, {
     timestamps: true // This adds createdAt and updatedAt automatically
 });

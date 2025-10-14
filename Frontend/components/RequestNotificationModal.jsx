@@ -279,6 +279,13 @@ export default function RequestNotificationModal({
         console.log('🔥 [DEBUG] Result data:', JSON.stringify(result.data, null, 2));
         
         if (response === "accepted") {
+          console.log('✅ [REQUEST] Request accepted successfully');
+          Alert.alert(
+            "Request Accepted! 🎉", 
+            "You have successfully accepted the companion request. The sender will be notified and you'll receive a meeting point soon.",
+            [{ text: "OK" }]
+          );
+          
           console.log('🔥 [DEBUG] Processing ACCEPTED response...');
           console.log('🔥 [DEBUG] Has currentLocation:', !!currentLocation);
           console.log('🔥 [DEBUG] Has senderCurrentLocation:', !!result.data.senderCurrentLocation);
@@ -404,8 +411,12 @@ export default function RequestNotificationModal({
               }
             ]
           );
-        } else {
-          Alert.alert("Request Declined", "You've declined this trip request.");
+        } else if (response === "declined") {
+          Alert.alert(
+            "Request Declined ❌", 
+            "You have declined the companion request. The sender will be notified.",
+            [{ text: "OK" }]
+          );
         }
         
         console.log('🔥 [DEBUG] Refreshing requests list...');
