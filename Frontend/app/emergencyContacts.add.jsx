@@ -1,10 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, Switch, TouchableOpacity, Alert, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Switch,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+} from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import { BASE_URL } from '../config';
 
 const join = (base, path) => `${base.replace(/\/+$/, '')}/${String(path).replace(/^\/+/, '')}`;
+
+const palette = {
+  bg: '#FFFFFF',
+  text: '#0D1B2A',
+  sub: '#5A6B7B',
+  primary: '#2C7BE5',
+  border: '#E3E7ED',
+  card: '#F8FAFF',
+};
 
 export default function AddOrEditEmergencyContact() {
   const { mode, id } = useLocalSearchParams();
@@ -12,7 +36,6 @@ export default function AddOrEditEmergencyContact() {
 
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
-
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [relation, setRelation] = useState('');
@@ -25,13 +48,12 @@ export default function AddOrEditEmergencyContact() {
       try {
         setLoading(true);
         const token = await AsyncStorage.getItem('token');
-        const res = await fetch(
-          join(BASE_URL, '/api/v1/user/emergency-contacts'),
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const res = await fetch(join(BASE_URL, '/api/v1/user/emergency-contacts'), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         const json = await res.json();
         if (!res.ok) throw new Error(json.message || 'Failed to load');
-        const contact = (json.data || []).find(c => c._id === id);
+        const contact = (json.data || []).find((c) => c._id === id);
         if (!contact) throw new Error('Contact not found');
         setName(contact.name || '');
         setPhone(contact.phone || '');
@@ -60,7 +82,7 @@ export default function AddOrEditEmergencyContact() {
         phone: phone.trim(),
         relation: relation.trim(),
         email: email.trim(),
-        isPrimary
+        isPrimary,
       };
       const url = isEdit
         ? join(BASE_URL, `/api/v1/user/emergency-contacts/${id}`)
@@ -69,7 +91,7 @@ export default function AddOrEditEmergencyContact() {
       const res = await fetch(url, {
         method: isEdit ? 'PUT' : 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.message || 'Save failed');
@@ -84,50 +106,163 @@ export default function AddOrEditEmergencyContact() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.center}>
         <ActivityIndicator />
-        <Text>Loading…</Text>
-      </View>
+        <Text style={{ color: palette.sub, marginTop: 8 }}>Loading contact…</Text>
+      </SafeAreaView>
     );
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', android: undefined })} style={{ flex: 1 }}>
-      <View style={styles.container}>
-        <Text style={styles.title}>{isEdit ? 'Edit Contact' : 'Add Contact'}</Text>
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}
+        >
+          <View style={styles.header}>
+            <Ionicons
+              name="chevron-back"
+              size={24}
+              color={palette.text}
+              onPress={() => router.back()}
+            />
+            <Text style={styles.title}>{isEdit ? 'Edit Contact' : 'Add Contact'}</Text>
+          </View>
 
-        <Text style={styles.label}>Name *</Text>
-        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Jane Doe" />
+          <View style={styles.container}>
+            <Text style={styles.label}>Name *</Text>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Jane Doe"
+              placeholderTextColor="#9AA2B1"
+            />
 
-        <Text style={styles.label}>Phone *</Text>
-        <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="+61 4xx xxx xxx" keyboardType="phone-pad" />
+            <Text style={styles.label}>Phone *</Text>
+            <TextInput
+              style={styles.input}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="+61 4xx xxx xxx"
+              placeholderTextColor="#9AA2B1"
+              keyboardType="phone-pad"
+            />
 
-        <Text style={styles.label}>Relation</Text>
-        <TextInput style={styles.input} value={relation} onChangeText={setRelation} placeholder="Sister, Friend…" />
+            <Text style={styles.label}>Relation</Text>
+            <TextInput
+              style={styles.input}
+              value={relation}
+              onChangeText={setRelation}
+              placeholder="Sister, Friend…"
+              placeholderTextColor="#9AA2B1"
+            />
 
-        <Text style={styles.label}>Email</Text>
-        <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="jane@example.com" keyboardType="email-address" />
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="jane@example.com"
+              placeholderTextColor="#9AA2B1"
+              keyboardType="email-address"
+            />
 
-        <View style={styles.row}>
-          <Text style={styles.label}>Primary contact</Text>
-          <Switch value={isPrimary} onValueChange={setIsPrimary} />
-        </View>
+            <View style={styles.row}>
+              <Text style={styles.label}>Primary contact</Text>
+              <Switch
+                value={isPrimary}
+                onValueChange={setIsPrimary}
+                trackColor={{ false: '#ccc', true: '#A8D0FF' }}
+                thumbColor={isPrimary ? palette.primary : '#f4f3f4'}
+              />
+            </View>
 
-        <TouchableOpacity style={styles.primary} disabled={saving} onPress={onSave}>
-          {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{isEdit ? 'Save Changes' : 'Add Contact'}</Text>}
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+            <TouchableOpacity
+              style={styles.primary}
+              disabled={saving}
+              onPress={onSave}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryText}>
+                  {isEdit ? 'Save Changes' : 'Add Contact'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+  safe: {
+    flex: 1,
+    backgroundColor: palette.bg,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 10) + 4 : 10,
+  },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 20, fontWeight: '700', marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: '600', marginTop: 10, marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingRight: 6 },
-  primary: { marginTop: 20, backgroundColor: '#2c7be5', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  primaryText: { color: '#fff', fontWeight: '700' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: palette.text,
+    marginLeft: 8,
+  },
+  container: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: palette.sub,
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 12,
+    backgroundColor: palette.card,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: palette.text,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 3 },
+      android: { elevation: 1 },
+    }),
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 18,
+  },
+  primary: {
+    marginTop: 26,
+    backgroundColor: palette.primary,
+    paddingVertical: 15,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  primaryText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 16,
+  },
 });
