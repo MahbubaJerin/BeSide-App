@@ -4,18 +4,8 @@ const UserLocation = require("../models/userLocationModel");
 const User = require("../models/userModel");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
-
-// Helper function to calculate distance between two points
-const calculateDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371000; // Earth's radius in meters
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return Math.round(R * c);
-};
+const { retryDatabaseOperation, withFallback } = require("../utils/retryHandler");
+const { sendEventToUser, broadcastToUsers } = require("./realtimeController");
 
 // Schedule automatic cleanup every 1 minute (to handle 2-minute expiration)
 let cleanupInterval = null;
@@ -91,52 +81,12 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
     // DEBUG: Check what users are in UserLocation collection
     const allActiveUsers = await UserLocation.find({
         isActive: true,
-        lastSeen: { $gte: new Date(Date.now() - 30 * 60 * 1000) } // Last 30 minutes for debugging
+        lastSeen: { $gte: new Date(Date.now() - 10 * 60 * 1000) } // Last 10 minutes for debugging
     }).select("userId userName isActive shareLocation visibleToOthers lastSeen location");
     
-    console.log("🔍 [DEBUG] All active users in last 30 minutes:", allActiveUsers.length);
+    console.log("🔍 [DEBUG] All active users in last 10 minutes:", allActiveUsers.length);
     allActiveUsers.forEach(user => {
-        const distance = user.location ? 
-            calculateDistance(
-                startCoordinates.latitude, startCoordinates.longitude,
-                user.location.coordinates[1], user.location.coordinates[0]
-            ) : 'No location';
-        console.log(`  - ${user.userName}: active=${user.isActive}, share=${user.shareLocation}, visible=${user.visibleToOthers}, lastSeen=${user.lastSeen}, distance=${distance}m`);
-    });
-
-    // DEBUG: Test the exact query used by findNearbyUsers
-    const debugQuery = {
-        location: {
-            $nearSphere: {
-                $geometry: {
-                    type: "Point",
-                    coordinates: [startCoordinates.longitude, startCoordinates.latitude],
-                },
-                $maxDistance: searchRadius,
-            },
-        },
-        isActive: true,
-        shareLocation: true,
-        visibleToOthers: true,
-        lastSeen: {
-            $gte: new Date(Date.now() - 5 * 60 * 1000), // Last 5 minutes
-        },
-        userId: { $ne: senderId }
-    };
-    
-    console.log("🔍 [DEBUG] Testing exact findNearbyUsers query:");
-    console.log("   - Search center:", startCoordinates);
-    console.log("   - Search radius:", searchRadius, "meters");
-    console.log("   - Sender ID to exclude:", senderId);
-    
-    const debugResults = await UserLocation.find(debugQuery).select("userId userName location lastSeen");
-    console.log("🔍 [DEBUG] Direct query results:", debugResults.length);
-    debugResults.forEach(user => {
-        const distance = calculateDistance(
-            startCoordinates.latitude, startCoordinates.longitude,
-            user.location.coordinates[1], user.location.coordinates[0]
-        );
-        console.log(`   - ${user.userName}: distance=${distance}m, lastSeen=${user.lastSeen}`);
+        console.log(`  - ${user.userName}: active=${user.isActive}, share=${user.shareLocation}, visible=${user.visibleToOthers}, lastSeen=${user.lastSeen}`);
     });
     
     const nearbyUsers = await UserLocation.findNearbyUsers(
@@ -198,6 +148,25 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
     await tripRequest.save();
 
     console.log("✅ [BACKEND] Trip request updated successfully");
+
+    // 🚀 SEND REAL-TIME NOTIFICATIONS TO NEW RECIPIENTS
+    console.log("📱 [RECIPIENT NOTIFICATIONS] Sending real-time notifications to new recipients...");
+    
+    const requestEventData = {
+        tripReqId: tripRequest.tripReqId,
+        senderName: tripRequest.user.userName,
+        senderPhoto: tripRequest.photo?.url,
+        destination: tripRequest.destination,
+        destinationType: tripRequest.destinationType,
+        expiresAt: tripRequest.expiresAt,
+        message: `🚶 New companion request from ${tripRequest.user.userName}`,
+        timestamp: new Date().toISOString()
+    };
+    
+    // Send to all new recipients
+    const recipientIds = newRecipients.map(r => r.userId);
+    const deliveryResults = broadcastToUsers(recipientIds, 'new_request', requestEventData);
+    console.log(`📡 [REAL-TIME] Request notifications: ${deliveryResults.delivered.length} delivered, ${deliveryResults.failed.length} failed`);
 
     res.status(200).json({
         status: "success",
@@ -452,6 +421,18 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
                 plannedTime: tripRequest.time,
                 genderPreference: tripRequest.genderPreference
             },
+            // Auto-set meeting point to sender's start location
+            meetingPoint: {
+                name: 'Meeting Point (Sender\'s Start Location)',
+                description: 'Starting location of the trip organizer',
+                location: {
+                    latitude: tripRequest.startLocation?.latitude || tripRequest.startCoordinates?.latitude || 0,
+                    longitude: tripRequest.startLocation?.longitude || tripRequest.startCoordinates?.longitude || 0
+                },
+                type: 'organizer',
+                setBy: tripRequest.user.userName,
+                setAt: new Date()
+            },
             status: "active"
         });
 
@@ -554,9 +535,24 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
         });
     }
 
-    // TODO: Send notification to sender about the response
-    // This would be implemented with push notifications or websockets in production
-    console.log(`📱 [SENDER NOTIFICATION] Sender ${tripRequest.user.userName} should be notified: Request ${response} by ${req.user.userName}`);
+    // 🚀 SEND REAL-TIME NOTIFICATION TO SENDER
+    console.log(`📱 [SENDER NOTIFICATION] Notifying sender ${tripRequest.user.userName} about ${response} from ${req.user.userName}`);
+    
+    const eventData = {
+        tripReqId: tripRequest.tripReqId,
+        responderId: userId,
+        responderName: req.user.userName,
+        response: response,
+        message: response === "accepted" 
+            ? `🎉 ${req.user.userName} accepted your companion request!`
+            : `${req.user.userName} declined your request`,
+        tripMatch: response === "accepted" ? tripRequest.matchedTripId : null,
+        timestamp: new Date().toISOString()
+    };
+    
+    // Send real-time event to sender
+    const notificationSent = sendEventToUser(tripRequest.user.userId, 'request_response', eventData);
+    console.log(`📡 [REAL-TIME] Notification ${notificationSent ? 'sent' : 'failed'} to sender ${tripRequest.user.userId}`);
 
     res.status(200).json({
         status: "success",

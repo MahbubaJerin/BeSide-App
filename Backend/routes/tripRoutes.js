@@ -3,6 +3,7 @@ const router = express.Router();
 
 const tripController = require("../controllers/tripController");
 const notificationController = require("../controllers/notificationController");
+const realtimeController = require("../controllers/realtimeController");
 const { model } = require("mongoose");
 const { uploadSingle } = require("../utils/fileUpload");
 const authController = require("../controllers/authController");
@@ -96,6 +97,19 @@ router.post(
   notificationController.updateUserHeartbeat
 );
 
+// 🚀 REAL-TIME ROUTES
+// Server-Sent Events endpoint for real-time updates
+router.get(
+  "/realtime",
+  realtimeController.connectRealtime
+);
+
+// Debug endpoint to see connected users
+router.get(
+  "/connected-users",
+  realtimeController.getConnectedUsers
+);
+
 // Admin/debug endpoint to manually cleanup expired requests
 router.post(
   "/cleanup-expired",
@@ -168,15 +182,36 @@ router.post(
   notificationController.sendTripNotification
 );
 
-// Navigation and completion routes
+// ===== POST-ACCEPTANCE TRIP MATCH WORKFLOW =====
+
+// Set meeting point
 router.post(
-  "/update-arrival",
-  tripController.updateArrival
+  "/match/:matchId/meeting-point",
+  tripController.setMeetingPoint
 );
 
+// Start live location sharing
 router.post(
-  "/complete-match",
-  tripController.completeMatch
+  "/match/:matchId/start-sharing",
+  tripController.startLocationSharing
+);
+
+// Update live location during trip
+router.post(
+  "/match/:matchId/update-location",
+  tripController.updateLiveLocation
+);
+
+// Get trip match details
+router.get(
+  "/match/:matchId/details",
+  tripController.getTripMatchDetails
+);
+
+// Cancel trip match
+router.post(
+  "/match/:matchId/cancel",
+  tripController.cancelTripMatch
 );
 
 module.exports = router;

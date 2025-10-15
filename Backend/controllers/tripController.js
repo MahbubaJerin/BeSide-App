@@ -1,6 +1,7 @@
 const User = require("../models/userModel");
 const Trip = require("../models/tripModel");
 const TripRequest = require("../models/tripRequestModel");
+const TripMatch = require("../models/tripMatchModel");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../utils/fileUpload");
 
 const AppError = require("../utils/AppError");
@@ -640,6 +641,274 @@ exports.completeMatch = catchAsync(async (req, res, next) => {
     message: "Trip completed successfully",
     data: {
       match: tripMatch
+    }
+  });
+});
+
+// ===== POST-ACCEPTANCE WORKFLOW MANAGEMENT =====
+
+// Set meeting point for a trip match
+exports.setMeetingPoint = catchAsync(async (req, res, next) => {
+  const { matchId } = req.params;
+  const { meetingPoint } = req.body;
+  const userId = req.user._id.toString();
+
+  console.log(`🎯 [MEETING POINT] Setting meeting point for match ${matchId} by user ${req.user.userName}`);
+
+  // Find the trip match
+  const tripMatch = await TripMatch.findOne({ matchId });
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  if (tripMatch.organizer.userId !== userId && tripMatch.companion.userId !== userId) {
+    return next(new AppError("You are not part of this trip match", 403));
+  }
+
+  // Validate meeting point data
+  if (!meetingPoint || !meetingPoint.location || 
+      typeof meetingPoint.location.latitude !== 'number' || 
+      typeof meetingPoint.location.longitude !== 'number') {
+    return next(new AppError("Valid meeting point location is required", 400));
+  }
+
+  // Update meeting point
+  tripMatch.meetingPoint = {
+    name: meetingPoint.name || 'Meeting Point',
+    description: meetingPoint.description || '',
+    location: {
+      latitude: meetingPoint.location.latitude,
+      longitude: meetingPoint.location.longitude
+    },
+    type: meetingPoint.type || 'custom',
+    setBy: req.user.userName,
+    setAt: new Date()
+  };
+
+  await tripMatch.save();
+
+  // Send real-time notification to the other user
+  const { sendEventToUser } = require('./realtimeController');
+  const otherUserId = tripMatch.organizer.userId === userId ? 
+    tripMatch.companion.userId : tripMatch.organizer.userId;
+  
+  const eventData = {
+    matchId: matchId,
+    meetingPoint: tripMatch.meetingPoint,
+    setByName: req.user.userName,
+    message: `${req.user.userName} set the meeting point: ${meetingPoint.name}`,
+    timestamp: new Date().toISOString()
+  };
+
+  sendEventToUser(otherUserId, 'meeting_point_set', eventData);
+
+  console.log(`✅ [MEETING POINT] Meeting point set successfully for match ${matchId}`);
+
+  res.status(200).json({
+    status: "success",
+    message: "Meeting point set successfully",
+    data: {
+      tripMatch,
+      meetingPoint: tripMatch.meetingPoint
+    }
+  });
+});
+
+// Start live location sharing
+exports.startLocationSharing = catchAsync(async (req, res, next) => {
+  const { matchId } = req.params;
+  const userId = req.user._id.toString();
+
+  console.log(`📍 [LOCATION SHARING] Starting location sharing for match ${matchId} by user ${req.user.userName}`);
+
+  // Find the trip match
+  const tripMatch = await TripMatch.findOne({ matchId });
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  if (tripMatch.organizer.userId !== userId && tripMatch.companion.userId !== userId) {
+    return next(new AppError("You are not part of this trip match", 403));
+  }
+
+  // Enable live location sharing
+  tripMatch.liveLocationSharing.enabled = true;
+  tripMatch.status = 'in-progress';
+  
+  if (!tripMatch.progression.started) {
+    tripMatch.progression.started = new Date();
+  }
+
+  await tripMatch.save();
+
+  // Send real-time notification to the other user
+  const { sendEventToUser } = require('./realtimeController');
+  const otherUserId = tripMatch.organizer.userId === userId ? 
+    tripMatch.companion.userId : tripMatch.organizer.userId;
+  
+  const eventData = {
+    matchId: matchId,
+    startedBy: req.user.userName,
+    message: `${req.user.userName} started live location sharing. Trip is now in progress!`,
+    timestamp: new Date().toISOString()
+  };
+
+  sendEventToUser(otherUserId, 'trip_started', eventData);
+
+  console.log(`✅ [LOCATION SHARING] Location sharing enabled for match ${matchId}`);
+
+  res.status(200).json({
+    status: "success",
+    message: "Live location sharing started. Trip is now in progress!",
+    data: {
+      tripMatch,
+      locationSharingEnabled: true
+    }
+  });
+});
+
+// Update live location during trip
+exports.updateLiveLocation = catchAsync(async (req, res, next) => {
+  const { matchId } = req.params;
+  const { latitude, longitude } = req.body;
+  const userId = req.user._id.toString();
+
+  if (!latitude || !longitude) {
+    return next(new AppError("Latitude and longitude are required", 400));
+  }
+
+  // Find the trip match
+  const tripMatch = await TripMatch.findOne({ matchId });
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match and location sharing is enabled
+  if (tripMatch.organizer.userId !== userId && tripMatch.companion.userId !== userId) {
+    return next(new AppError("You are not part of this trip match", 403));
+  }
+
+  if (!tripMatch.liveLocationSharing.enabled) {
+    return next(new AppError("Live location sharing is not enabled for this trip", 400));
+  }
+
+  // Update the appropriate user's location
+  const isOrganizer = tripMatch.organizer.userId === userId;
+  const locationField = isOrganizer ? 'organizerLocation' : 'companionLocation';
+
+  tripMatch.liveLocationSharing[locationField] = {
+    latitude: latitude,
+    longitude: longitude,
+    lastUpdated: new Date()
+  };
+
+  await tripMatch.save();
+
+  // Send real-time location update to the other user
+  const { sendEventToUser } = require('./realtimeController');
+  const otherUserId = isOrganizer ? tripMatch.companion.userId : tripMatch.organizer.userId;
+  
+  const eventData = {
+    matchId: matchId,
+    userId: userId,
+    userName: req.user.userName,
+    location: { latitude, longitude },
+    timestamp: new Date().toISOString()
+  };
+
+  sendEventToUser(otherUserId, 'location_update', eventData);
+
+  res.status(200).json({
+    status: "success",
+    message: "Location updated successfully",
+    data: {
+      location: { latitude, longitude },
+      timestamp: new Date()
+    }
+  });
+});
+
+// Get trip match details for coordination
+exports.getTripMatchDetails = catchAsync(async (req, res, next) => {
+  const { matchId } = req.params;
+  const userId = req.user._id.toString();
+
+  console.log(`📋 [MATCH DETAILS] Getting details for match ${matchId} by user ${req.user.userName}`);
+
+  // Find the trip match
+  const tripMatch = await TripMatch.findOne({ matchId });
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  if (tripMatch.organizer.userId !== userId && tripMatch.companion.userId !== userId) {
+    return next(new AppError("You are not part of this trip match", 403));
+  }
+
+  // Get the original trip request for additional details
+  const tripRequest = await TripRequest.findOne({ tripReqId: tripMatch.originalTripRequest.tripReqId });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      tripMatch,
+      originalTripRequest: tripRequest,
+      userRole: tripMatch.organizer.userId === userId ? 'organizer' : 'companion'
+    }
+  });
+});
+
+// Cancel trip match
+exports.cancelTripMatch = catchAsync(async (req, res, next) => {
+  const { matchId } = req.params;
+  const { reason } = req.body;
+  const userId = req.user._id.toString();
+
+  console.log(`❌ [CANCEL TRIP] Cancelling match ${matchId} by user ${req.user.userName}`);
+
+  // Find the trip match
+  const tripMatch = await TripMatch.findOne({ matchId });
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  if (tripMatch.organizer.userId !== userId && tripMatch.companion.userId !== userId) {
+    return next(new AppError("You are not part of this trip match", 403));
+  }
+
+  // Update trip match status
+  tripMatch.status = 'cancelled';
+  tripMatch.progression.cancelled = new Date();
+
+  await tripMatch.save();
+
+  // Send real-time notification to the other user
+  const { sendEventToUser } = require('./realtimeController');
+  const otherUserId = tripMatch.organizer.userId === userId ? 
+    tripMatch.companion.userId : tripMatch.organizer.userId;
+  
+  const eventData = {
+    matchId: matchId,
+    cancelledBy: req.user.userName,
+    reason: reason || 'No reason provided',
+    message: `${req.user.userName} cancelled the trip match`,
+    timestamp: new Date().toISOString()
+  };
+
+  sendEventToUser(otherUserId, 'trip_cancelled', eventData);
+
+  console.log(`✅ [CANCEL TRIP] Trip match ${matchId} cancelled successfully`);
+
+  res.status(200).json({
+    status: "success",
+    message: "Trip match cancelled successfully",
+    data: {
+      tripMatch,
+      cancelReason: reason
     }
   });
 });

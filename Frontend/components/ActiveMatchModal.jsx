@@ -16,6 +16,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/Colors";
 import LiveTripModal from "./LiveTripModal";
 import NavigationModal from "./NavigationModal";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BASE_URL } from '../config';
 
 export default function ActiveMatchModal({
   visible,
@@ -74,7 +76,7 @@ export default function ActiveMatchModal({
 
   const handleStatusUpdate = async (match, newStatus) => {
     const statusMessages = {
-      'in-progress': 'Start this trip?',
+      'in-progress': 'Start this trip and enable live location sharing?',
       'completed': 'Mark this trip as completed?',
       'cancelled': 'Cancel this trip?'
     };
@@ -88,8 +90,14 @@ export default function ActiveMatchModal({
           text: "Yes",
           onPress: async () => {
             try {
-              await onUpdateStatus(match.matchId, newStatus);
-              Alert.alert("Success", `Trip ${newStatus === 'in-progress' ? 'started' : newStatus} successfully!`);
+              if (newStatus === 'in-progress') {
+                // For starting trip, call the specialized start location sharing endpoint
+                await handleStartTrip(match);
+              } else {
+                // For other status changes, use the regular status update
+                await onUpdateStatus(match.matchId, newStatus);
+                Alert.alert("Success", `Trip ${newStatus} successfully!`);
+              }
             } catch (error) {
               Alert.alert("Error", error.message || "Failed to update trip status");
             }
@@ -97,6 +105,33 @@ export default function ActiveMatchModal({
         }
       ]
     );
+  };
+
+  const handleStartTrip = async (match) => {
+    try {
+      // Call the start location sharing endpoint which also updates status to in-progress
+      const token = await AsyncStorage.getItem('token');
+      if (!token) throw new Error('No authentication token');
+
+      const response = await fetch(`${BASE_URL.replace(/\/+$/, '')}/api/trip/match/${match.matchId}/start-sharing`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        Alert.alert("Trip Started! 🚀", "Live location sharing is now active. You can track each other's real-time location.");
+        // Refresh the matches to show updated status
+        if (onRefresh) onRefresh();
+      } else {
+        throw new Error(result.message || 'Failed to start trip');
+      }
+    } catch (error) {
+      throw error;
+    }
   };
 
   return (
@@ -213,15 +248,13 @@ export default function ActiveMatchModal({
                       </View>
                     </View>
 
-                    {/* Meeting Point Info */}
-                    {match.meetingPoint && (
-                      <View style={styles.meetingInfo}>
-                        <Ionicons name="location" size={16} color={Colors.light.primary} />
-                        <ThemedText style={styles.meetingText}>
-                          Meeting at: {match.meetingPoint.name}
-                        </ThemedText>
-                      </View>
-                    )}
+                    {/* Meeting Point Info - Always shown as sender's start location */}
+                    <View style={styles.meetingInfo}>
+                      <Ionicons name="location" size={16} color={Colors.light.primary} />
+                      <ThemedText style={styles.meetingText}>
+                        Meeting at: {myRole === 'organizer' ? 'Your starting location' : `${match.organizer.userName}'s starting location`}
+                      </ThemedText>
+                    </View>
 
                     <View style={styles.actionButtons}>
                       <ThemedButton

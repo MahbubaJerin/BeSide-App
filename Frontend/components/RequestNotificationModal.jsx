@@ -97,37 +97,57 @@ export default function RequestNotificationModal({
 }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [respondingTo, setRespondingTo] = useState(null);
 
   const fetchPendingRequests = async () => {
+    // Prevent multiple simultaneous requests
+    if (loading) return;
+    
     try {
       const token = await AsyncStorage.getItem("token");
-      if (!token) return;
+      if (!token) {
+        console.log("❌ [NOTIFICATIONS] No token found");
+        return;
+      }
 
       setLoading(true);
       const API_URL = BASE_URL.replace(/\/+$/, "");
+      
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const response = await fetch(`${API_URL}/api/v1/trip/pending-requests`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const result = await response.json();
         if (result.status === "success") {
-          setRequests(result.data.requests || []);
+          const pendingRequests = result.data.requests || [];
+          setRequests(pendingRequests);
+          console.log(`📋 [NOTIFICATIONS] Found ${pendingRequests.length} pending requests`);
+        } else {
+          console.log("❌ [NOTIFICATIONS] API error:", result.message);
+          setRequests([]); // Clear on error
         }
+      } else {
+        console.log("❌ [NOTIFICATIONS] HTTP Error:", response.status);
+        setRequests([]); // Clear on error
       }
     } catch (error) {
-      console.error("Error fetching requests:", error);
+      if (error.name === 'AbortError') {
+        console.log("⏱️ [NOTIFICATIONS] Request timed out");
+      } else {
+        console.error("❌ [NOTIFICATIONS] Network error:", error);
+      }
+      setRequests([]); // Clear on error to prevent freeze
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchPendingRequests();
-    setRefreshing(false);
   };
 
   const handleResponse = async (tripReqId, response) => {
@@ -182,7 +202,23 @@ export default function RequestNotificationModal({
   useEffect(() => {
     if (visible) {
       setRespondingTo(null);
+      setRequests([]); // Clear previous requests
       fetchPendingRequests();
+      
+      // Safety timeout to prevent freezing
+      const safetyTimeout = setTimeout(() => {
+        if (loading) {
+          console.log("⚠️ [NOTIFICATIONS] Safety timeout - closing loading state");
+          setLoading(false);
+        }
+      }, 15000); // 15 second safety timeout
+      
+      return () => clearTimeout(safetyTimeout);
+    } else {
+      // Reset state when modal closes
+      setRequests([]);
+      setLoading(false);
+      setRespondingTo(null);
     }
   }, [visible]);
 
@@ -192,20 +228,24 @@ export default function RequestNotificationModal({
         <View style={styles.container}>
           <View style={styles.header}>
             <ThemedText type="subtitle">🔔 Trip Requests</ThemedText>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <TouchableOpacity 
+              onPress={() => {
+                console.log("🚪 [NOTIFICATIONS] Closing modal");
+                setLoading(false);
+                setRequests([]);
+                setRespondingTo(null);
+                onClose();
+              }} 
+              style={styles.closeButton}
+            >
               <ThemedText style={styles.closeText}>✕</ThemedText>
             </TouchableOpacity>
           </View>
 
-          <ScrollView
-            style={styles.requestsList}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-            }
-          >
-            {loading && requests.length === 0 ? (
+          <View style={styles.contentContainer}>
+            {loading ? (
               <View style={styles.emptyContainer}>
-                <ThemedText>Loading requests...</ThemedText>
+                <ThemedText style={styles.loadingText}>Loading...</ThemedText>
               </View>
             ) : requests.length === 0 ? (
               <View style={styles.emptyContainer}>
@@ -214,22 +254,36 @@ export default function RequestNotificationModal({
                 <ThemedText style={styles.emptySubtext}>
                   New companion requests from nearby users will appear here.
                 </ThemedText>
+                <TouchableOpacity 
+                  style={styles.refreshButton}
+                  onPress={fetchPendingRequests}
+                >
+                  <ThemedText style={styles.refreshButtonText}>🔄 Refresh</ThemedText>
+                </TouchableOpacity>
               </View>
             ) : (
-              requests.map((request) => (
-                <RequestCard 
-                  key={request.tripReqId}
-                  request={request}
-                  onResponse={handleResponse}
-                  respondingTo={respondingTo}
-                />
-              ))
+              <ScrollView style={styles.requestsList}>
+                {requests.map((request) => (
+                  <RequestCard 
+                    key={request.tripReqId}
+                    request={request}
+                    onResponse={handleResponse}
+                    respondingTo={respondingTo}
+                  />
+                ))}
+              </ScrollView>
             )}
-          </ScrollView>
+          </View>
 
           <ThemedButton
             title="Close"
-            onPress={onClose}
+            onPress={() => {
+              console.log("🚪 [NOTIFICATIONS] Force closing modal");
+              setLoading(false);
+              setRequests([]);
+              setRespondingTo(null);
+              onClose();
+            }}
             style={styles.closeButtonBottom}
           />
         </View>
@@ -288,6 +342,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.light.textSecondary,
     textAlign: "center",
+    marginBottom: 20,
+  },
+  refreshButton: {
+    backgroundColor: "#8B5CF6",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignSelf: "center",
+  },
+  refreshButtonText: {
+    color: "white",
+    fontWeight: "600",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.light.textSecondary,
+  },
+  contentContainer: {
+    flex: 1,
   },
   closeButtonBottom: {
     margin: 16,

@@ -69,6 +69,9 @@ app.use(`${baseUrl}/trip`, tripRoutes);
 app.use(`${baseUrl}/location`, locationRoutes);
 app.use(`${baseUrl}/sos`, sosRoutes); // ✅ Add this line
 
+// Additional route mounting for the new API structure
+app.use("/api/trip", tripRoutes);
+
 
 app.all("*", (req, res, next) => {
   next(new AppError(`Cannot find ${req.originalUrl} on this server!`, 404));
