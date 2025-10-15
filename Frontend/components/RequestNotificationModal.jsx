@@ -55,11 +55,53 @@ function RequestCard({ request, onResponse, respondingTo }) {
 
         <View style={styles.messageSection}>
           <Text style={styles.messageLabel}>Trip Details</Text>
-          <Text style={styles.messageText}>
-            Destination: {request.destination}
-            {'\n'}Transport: {request.destinationType}
-            {request.genderPreference !== "any" ? `\nPrefers: ${request.genderPreference} companions` : ''}
-          </Text>
+          <View style={styles.tripDetailsContainer}>
+            <View style={styles.tripDetailRow}>
+              <Text style={styles.tripDetailIcon}>📍</Text>
+              <View style={styles.tripDetailContent}>
+                <Text style={styles.tripDetailLabel}>Destination</Text>
+                <Text style={styles.tripDetailValue}>{request.destination}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.tripDetailRow}>
+              <Text style={styles.tripDetailIcon}>🚌</Text>
+              <View style={styles.tripDetailContent}>
+                <Text style={styles.tripDetailLabel}>Transport</Text>
+                <Text style={styles.tripDetailValue}>{request.destinationType}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.tripDetailRow}>
+              <Text style={styles.tripDetailIcon}>📅</Text>
+              <View style={styles.tripDetailContent}>
+                <Text style={styles.tripDetailLabel}>Date & Time</Text>
+                <Text style={styles.tripDetailValue}>
+                  {new Date(request.date).toLocaleDateString()} at {request.time}
+                </Text>
+              </View>
+            </View>
+            
+            {request.startingLocation?.address && (
+              <View style={styles.tripDetailRow}>
+                <Text style={styles.tripDetailIcon}>🚩</Text>
+                <View style={styles.tripDetailContent}>
+                  <Text style={styles.tripDetailLabel}>Starting From</Text>
+                  <Text style={styles.tripDetailValue}>{request.startingLocation.address}</Text>
+                </View>
+              </View>
+            )}
+            
+            {request.genderPreference !== "any" && (
+              <View style={styles.tripDetailRow}>
+                <Text style={styles.tripDetailIcon}>👥</Text>
+                <View style={styles.tripDetailContent}>
+                  <Text style={styles.tripDetailLabel}>Preference</Text>
+                  <Text style={styles.tripDetailValue}>{request.genderPreference} companions</Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Action buttons */}
@@ -448,6 +490,34 @@ const styles = StyleSheet.create({
   },
   messageSection: {
     marginBottom: 20,
+  },
+  tripDetailsContainer: {
+    marginTop: 8,
+  },
+  tripDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  tripDetailIcon: {
+    fontSize: 16,
+    marginRight: 8,
+    marginTop: 2,
+    width: 20,
+  },
+  tripDetailContent: {
+    flex: 1,
+  },
+  tripDetailLabel: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  tripDetailValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
   },
   messageLabel: {
     fontSize: 14,

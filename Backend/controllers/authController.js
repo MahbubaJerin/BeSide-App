@@ -12,7 +12,7 @@ const asyncHandler = require("express-async-handler");
 
 // Create a dummy verification model for testing
 const tokenUtils = require("../utils/tokenUtils");
-const emailService = require("../services/emailService");
+const { getEmailService } = require("../services/emailService");
 
 const dummyVerification =
   mongoose.models.dummyVerification ||
@@ -368,7 +368,7 @@ exports.sendOTPForReset = catchAsync(async (req, res, next) => {
   await user.save({ validateBeforeSave: false });
 
   try {
-    await emailService.sendGenericEmail(
+    await getEmailService().sendGenericEmail(
       user.email,
       "Your OTP Code",
       `Hi ${user.userName}, your OTP for password reset is ${otp}. It expires in 10 minutes.`
@@ -489,7 +489,7 @@ exports.sendVerificationEmail = catchAsync(async (req, res, next) => {
   user.emailVerificationExpires = tokenExpiry;
   await user.save({ validateBeforeSave: false });
   try {
-    await emailService.sendVerificationEmail(
+    await getEmailService().sendVerificationEmail(
       user.email,
       verificationToken,
       user.userName

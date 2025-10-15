@@ -2,7 +2,8 @@ const app = require("./app");
 const connectDb = require("./config/db");
 const locationService = require("./services/locationService");
 const dotenv = require("dotenv");
-dotenv.config();
+const path = require("path");
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION! 💥 Shutting down...");

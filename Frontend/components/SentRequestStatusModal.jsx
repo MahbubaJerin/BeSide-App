@@ -118,6 +118,11 @@ export default function SentRequestStatusModal({ visible, onClose }) {
       return "⏰ Expired";
     }
     
+    // Use enhanced status info if available
+    if (request.statusInfo) {
+      return request.statusInfo.message;
+    }
+    
     const respondedCount = request.recipients?.filter(r => 
       ["accepted", "declined"].includes(r.responseStatus)
     ).length || 0;
@@ -197,6 +202,41 @@ export default function SentRequestStatusModal({ visible, onClose }) {
                   <ThemedText style={styles.dateTime}>
                     📅 {new Date(request.date).toLocaleDateString()} at {request.time}
                   </ThemedText>
+                  
+                  <ThemedText style={styles.statusMessage}>
+                    {getStatusText(request)}
+                  </ThemedText>
+                  
+                  {/* Enhanced status info display */}
+                  {request.statusInfo && (
+                    <View style={styles.statusDetails}>
+                      <View style={styles.statusRow}>
+                        <ThemedText style={styles.statusLabel}>📤 Sent to:</ThemedText>
+                        <ThemedText style={styles.statusValue}>{request.statusInfo.totalRecipients} users</ThemedText>
+                      </View>
+                      {request.statusInfo.viewedCount > 0 && (
+                        <View style={styles.statusRow}>
+                          <ThemedText style={styles.statusLabel}>👁️ Viewed:</ThemedText>
+                          <ThemedText style={styles.statusValue}>{request.statusInfo.viewedCount} users</ThemedText>
+                        </View>
+                      )}
+                      {request.statusInfo.awaitingCount > 0 && (
+                        <View style={styles.statusRow}>
+                          <ThemedText style={styles.statusLabel}>⏳ Awaiting:</ThemedText>
+                          <ThemedText style={[styles.statusValue, styles.awaitingText]}>
+                            {request.statusInfo.awaitingCount} responses
+                          </ThemedText>
+                        </View>
+                      )}
+                      {request.statusInfo.isExpiringSoon && (
+                        <View style={[styles.statusRow, styles.warningRow]}>
+                          <ThemedText style={styles.warningText}>
+                            ⚠️ Expires in {request.statusInfo.timeRemainingMinutes} minutes
+                          </ThemedText>
+                        </View>
+                      )}
+                    </View>
+                  )}
 
                   <ThemedText style={styles.statusDescription}>
                     {getStatusText(request)}
@@ -335,6 +375,49 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 4,
+  },
+  statusMessage: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+    marginVertical: 6,
+  },
+  statusDetails: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  statusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  statusLabel: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "500",
+  },
+  statusValue: {
+    fontSize: 12,
+    color: "#333",
+    fontWeight: "600",
+  },
+  awaitingText: {
+    color: "#8B5CF6",
+  },
+  warningRow: {
+    backgroundColor: "#fff3cd",
+    borderRadius: 4,
+    padding: 6,
+    marginTop: 4,
+  },
+  warningText: {
+    fontSize: 12,
+    color: "#856404",
+    fontWeight: "600",
+    textAlign: "center",
   },
   dateTime: {
     fontSize: 14,

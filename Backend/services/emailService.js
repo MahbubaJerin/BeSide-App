@@ -95,4 +95,18 @@ class EmailService {
 }
 
 }
-module.exports = new EmailService();
+
+// Export the class instead of an instance to avoid initialization errors
+module.exports = EmailService;
+
+// Create a singleton instance that's lazily loaded
+let emailServiceInstance = null;
+const getEmailService = () => {
+  if (!emailServiceInstance) {
+    emailServiceInstance = new EmailService();
+  }
+  return emailServiceInstance;
+};
+
+module.exports.getEmailService = getEmailService;
+module.exports.EmailService = EmailService;

@@ -448,6 +448,31 @@ export default function HomeScreen() {
                 [{ text: "View Trip", onPress: () => setActiveMatchModalVisible(true) }]
               );
             }, 500);
+          } else if (eventData.response === 'declined') {
+            // Request declined - show brief notification
+            setTimeout(() => {
+              Alert.alert(
+                "Request Update",
+                eventData.detailedMessage,
+                [{ text: "OK" }]
+              );
+            }, 500);
+          }
+          break;
+          
+        case 'request_status_update':
+          // Show status updates to sender (request sent, awaiting responses, etc.)
+          if (eventData.status === 'request_sent') {
+            setTimeout(() => {
+              Alert.alert(
+                "Request Sent 📤",
+                eventData.detailedMessage,
+                [
+                  { text: "View Status", onPress: () => setSentRequestModalVisible(true) },
+                  { text: "OK" }
+                ]
+              );
+            }, 1000);
           }
           break;
           

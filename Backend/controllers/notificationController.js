@@ -155,11 +155,21 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
     const requestEventData = {
         tripReqId: tripRequest.tripReqId,
         senderName: tripRequest.user.userName,
-        senderPhoto: tripRequest.photo?.url,
+        senderPhoto: tripRequest.photo?.url || tripRequest.user.userImage,
         destination: tripRequest.destination,
         destinationType: tripRequest.destinationType,
+        startingLocation: {
+            address: tripRequest.startingLocation?.address || "Starting Location",
+            latitude: tripRequest.startingLocation?.latitude,
+            longitude: tripRequest.startingLocation?.longitude
+        },
+        tripDate: tripRequest.date,
+        tripTime: tripRequest.time,
+        genderPreference: tripRequest.genderPreference,
+        transportMode: tripRequest.transportMode || tripRequest.destinationType,
         expiresAt: tripRequest.expiresAt,
-        message: `🚶 New companion request from ${tripRequest.user.userName}`,
+        message: `🚶 ${tripRequest.user.userName} wants to travel to ${tripRequest.destination}`,
+        detailedMessage: `Trip to ${tripRequest.destination} on ${new Date(tripRequest.date).toLocaleDateString()} at ${tripRequest.time} via ${tripRequest.destinationType}`,
         timestamp: new Date().toISOString()
     };
     
@@ -167,6 +177,24 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
     const recipientIds = newRecipients.map(r => r.userId);
     const deliveryResults = broadcastToUsers(recipientIds, 'new_request', requestEventData);
     console.log(`📡 [REAL-TIME] Request notifications: ${deliveryResults.delivered.length} delivered, ${deliveryResults.failed.length} failed`);
+
+    // 📤 SEND STATUS NOTIFICATION TO SENDER
+    console.log("📱 [SENDER STATUS] Notifying sender about request status...");
+    
+    const senderStatusData = {
+        tripReqId: tripRequest.tripReqId,
+        status: 'request_sent',
+        message: `📤 Request sent to ${newRecipients.length} nearby users`,
+        detailedMessage: `Your companion request for ${tripRequest.destination} has been sent to ${newRecipients.length} nearby users. Awaiting responses...`,
+        recipientCount: newRecipients.length,
+        totalRecipients: tripRequest.recipients.length,
+        destination: tripRequest.destination,
+        expiresAt: tripRequest.expiresAt,
+        timestamp: new Date().toISOString()
+    };
+    
+    const senderNotificationSent = sendEventToUser(senderId.toString(), 'request_status_update', senderStatusData);
+    console.log(`📡 [REAL-TIME] Sender status notification ${senderNotificationSent ? 'sent' : 'failed'} to ${senderId}`);
 
     res.status(200).json({
         status: "success",
@@ -542,11 +570,18 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
         tripReqId: tripRequest.tripReqId,
         responderId: userId,
         responderName: req.user.userName,
+        responderPhoto: req.user.userImage || req.user.profilePhoto,
         response: response,
         message: response === "accepted" 
             ? `🎉 ${req.user.userName} accepted your companion request!`
-            : `${req.user.userName} declined your request`,
+            : `❌ ${req.user.userName} declined your request`,
+        detailedMessage: response === "accepted"
+            ? `Great! ${req.user.userName} will join you on your trip to ${tripRequest.destination}. Check Active Trips for coordination.`
+            : `${req.user.userName} declined to join your trip to ${tripRequest.destination}. Your request is still active for other nearby users.`,
         tripMatch: response === "accepted" ? tripRequest.matchedTripId : null,
+        destination: tripRequest.destination,
+        tripDate: tripRequest.date,
+        tripTime: tripRequest.time,
         timestamp: new Date().toISOString()
     };
     
@@ -573,10 +608,42 @@ exports.getSentRequestsStatus = catchAsync(async (req, res, next) => {
         expiresAt: { $gt: new Date() }
     }).sort({ createdAt: -1 });
 
+    // Enhance requests with detailed status information
+    const enhancedRequests = requests.map(request => {
+        const totalRecipients = request.recipients.length;
+        const viewedCount = request.recipients.filter(r => r.responseStatus === 'viewed').length;
+        const declinedCount = request.recipients.filter(r => r.responseStatus === 'declined').length;
+        const awaitingCount = request.recipients.filter(r => ['notified', 'viewed'].includes(r.responseStatus)).length;
+        
+        const timeRemaining = Math.max(0, Math.ceil((request.expiresAt - new Date()) / (1000 * 60))); // minutes
+        
+        let statusMessage = `📤 Request sent, awaiting responses...`;
+        if (totalRecipients === 0) {
+            statusMessage = `🔍 Searching for nearby users...`;
+        } else if (awaitingCount > 0) {
+            statusMessage = `⏳ Waiting for responses from ${awaitingCount} users`;
+        } else if (declinedCount === totalRecipients) {
+            statusMessage = `❌ All users declined. Searching for more...`;
+        }
+        
+        return {
+            ...request.toObject(),
+            statusInfo: {
+                message: statusMessage,
+                totalRecipients,
+                viewedCount,
+                declinedCount,
+                awaitingCount,
+                timeRemainingMinutes: timeRemaining,
+                isExpiringSoon: timeRemaining <= 5
+            }
+        };
+    });
+
     res.status(200).json({
         status: "success",
-        results: requests.length,
-        data: { requests }
+        results: enhancedRequests.length,
+        data: { requests: enhancedRequests }
     });
 });
 

@@ -138,31 +138,33 @@ export default function ActiveMatchModal({
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
         <View style={styles.container}>
-          <View style={styles.header}>
-            <ThemedText type="subtitle">🚀 Active Trips</ThemedText>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <ThemedText style={styles.closeText}>✕</ThemedText>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <ThemedText style={styles.statNumber}>
-                {matches.length}
-              </ThemedText>
-              <ThemedText style={styles.statLabel}>
-                Active {matches.length === 1 ? 'Trip' : 'Trips'}
-              </ThemedText>
+          {/* Modern Purple Header */}
+          <View style={styles.modernHeader}>
+            <View style={styles.headerContent}>
+              <View style={styles.headerLeft}>
+                <Text style={styles.headerIcon}>🚗</Text>
+                <Text style={styles.headerTitle}>Active Trips</Text>
+              </View>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
             </View>
-          </View>
-
-          <View style={styles.refreshContainer}>
-            <ThemedButton
-              title={isLoading ? "Refreshing..." : "🔄 Refresh"}
-              onPress={onRefresh}
-              disabled={isLoading}
-              style={[styles.refreshButton, isLoading && styles.refreshButtonDisabled]}
-            />
+            
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{matches.length}</Text>
+                <Text style={styles.statLabel}>Active {matches.length === 1 ? 'Trip' : 'Trips'}</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.refreshButton}
+                onPress={onRefresh}
+                disabled={isLoading}
+              >
+                <Text style={styles.refreshButtonText}>
+                  {isLoading ? "🔄 Refreshing..." : "🔄 Refresh"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <ScrollView
@@ -248,12 +250,36 @@ export default function ActiveMatchModal({
                       </View>
                     </View>
 
-                    {/* Meeting Point Info - Always shown as sender's start location */}
-                    <View style={styles.meetingInfo}>
-                      <Ionicons name="location" size={16} color={Colors.light.primary} />
-                      <ThemedText style={styles.meetingText}>
-                        Meeting at: {myRole === 'organizer' ? 'Your starting location' : `${match.organizer.userName}'s starting location`}
-                      </ThemedText>
+                    {/* Modern Meeting Point Section */}
+                    <View style={styles.meetingPointCard}>
+                      <View style={styles.meetingPointHeader}>
+                        <View style={styles.meetingPointIcon}>
+                          <Text style={styles.meetingIconText}>📍</Text>
+                        </View>
+                        <View style={styles.meetingPointContent}>
+                          <Text style={styles.meetingPointTitle}>Meeting Point</Text>
+                          <Text style={styles.meetingPointLocation}>
+                            {myRole === 'Organizer' ? 'Your starting location' : `${match.organizer.userName}'s starting location`}
+                          </Text>
+                          <Text style={styles.meetingPointSubtext}>
+                            {myRole === 'Organizer' 
+                              ? '💼 Wait here for your companion to arrive' 
+                              : '🚶‍♂️ Navigate to this location to meet up'}
+                          </Text>
+                        </View>
+                      </View>
+                      
+                      {myRole === 'Companion' && (
+                        <TouchableOpacity 
+                          style={styles.navigateButton}
+                          onPress={() => {
+                            setSelectedMatch(match);
+                            setNavigationModalVisible(true);
+                          }}
+                        >
+                          <Text style={styles.navigateButtonText}>🧭 Navigate</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
 
                     <View style={styles.actionButtons}>
@@ -364,23 +390,91 @@ export default function ActiveMatchModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
     justifyContent: "center",
     alignItems: "center",
+    padding: 20,
   },
   container: {
-    backgroundColor: Colors.light.background,
+    backgroundColor: "#fff",
     borderRadius: 20,
-    width: "95%",
+    width: "100%",
+    maxWidth: 400,
     maxHeight: "90%",
-    paddingVertical: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  header: {
+  
+  // Modern Purple Header
+  modernHeader: {
+    backgroundColor: "#8B5CF6",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+  },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  headerIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "white",
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  statsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  },
+  statItem: {
+    alignItems: "flex-start",
+  },
+  statNumber: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "white",
+  },
+  statLabel: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.8)",
+  },
+  refreshButton: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  refreshButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
   },
   closeButton: {
     width: 32,
@@ -452,17 +546,17 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   matchCard: {
-    backgroundColor: Colors.light.surface,
+    backgroundColor: 'white',
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    padding: 20,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#E3F2FD",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    borderColor: '#f1f5f9',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 12,
+    elevation: 8,
   },
   matchHeader: {
     flexDirection: "row",
@@ -520,62 +614,126 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 12,
+    marginTop: 16,
   },
   actionButton: {
     flex: 1,
     minWidth: "45%",
-    paddingVertical: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   detailsButton: {
-    backgroundColor: Colors.light.tint,
+    backgroundColor: "#8B5CF6",
   },
   startButton: {
-    backgroundColor: "#4CAF50",
+    backgroundColor: "#10b981",
   },
   meetingButton: {
-    backgroundColor: "#FF9800",
+    backgroundColor: "#f59e0b",
   },
   liveTrackingButton: {
-    backgroundColor: "#9C27B0",
+    backgroundColor: "#8B5CF6",
   },
   navigationButton: {
-    backgroundColor: "#00BCD4",
+    backgroundColor: "#06b6d4",
   },
   completeButton: {
-    backgroundColor: "#2196F3",
+    backgroundColor: "#3b82f6",
   },
   cancelButton: {
     backgroundColor: "#F44336",
   },
-  meetingInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E3F2FD',
+  // Modern Meeting Point Card
+  meetingPointCard: {
+    backgroundColor: "#f8fafc",
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 20,
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
   },
-  meetingText: {
+  meetingPointHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  meetingPointIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#8B5CF6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  meetingIconText: {
+    fontSize: 20,
+  },
+  meetingPointContent: {
+    flex: 1,
+  },
+  meetingPointTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1f2937",
+    marginBottom: 4,
+  },
+  meetingPointLocation: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#8B5CF6",
+    marginBottom: 6,
+  },
+  meetingPointSubtext: {
     fontSize: 12,
-    color: Colors.light.tint,
-    marginLeft: 6,
-    fontWeight: '500',
+    color: "#6b7280",
+    lineHeight: 16,
+  },
+  navigateButton: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    backgroundColor: "#8B5CF6",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  navigateButtonText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "600",
   },
   footer: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 20,
+    paddingBottom: 20,
     borderTopWidth: 1,
-    borderTopColor: "#E3F2FD",
-    marginTop: 16,
+    borderTopColor: "#f1f5f9",
+    marginTop: 20,
+    backgroundColor: "#f8fafc",
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   footerText: {
     fontSize: 12,
-    color: Colors.light.tabIconDefault,
+    color: "#6b7280",
     textAlign: "center",
-    marginBottom: 12,
+    marginBottom: 16,
+    lineHeight: 18,
   },
   closeButtonBottom: {
-    backgroundColor: Colors.light.tabIconDefault,
+    backgroundColor: "#8B5CF6",
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
 });

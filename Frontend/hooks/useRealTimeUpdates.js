@@ -26,6 +26,10 @@ export const useRealTimeUpdates = (enabled = true) => {
       setNewRequests(prev => [data, ...prev.slice(0, 9)]); // Keep last 10
       setLastEvent({ type: 'new_request', data, timestamp: new Date() });
     },
+    request_status_update: (data) => {
+      console.log('📊 [REAL-TIME] Received request status update:', data);
+      setLastEvent({ type: 'request_status_update', data, timestamp: new Date() });
+    },
     connected: (data) => {
       console.log('🔌 [REAL-TIME] Connected to server:', data);
       setIsConnected(true);

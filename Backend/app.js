@@ -7,7 +7,8 @@ const xss = require("xss-clean");
 const cookieParser = require("cookie-parser");
 const mongoSanitize = require("express-mongo-sanitize");
 const dotenv = require("dotenv");
-dotenv.config();
+const path = require("path");
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const AppError = require("./utils/AppError");
 const errorHandler = require("./middlewares/errorHandler");
