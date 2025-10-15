@@ -37,7 +37,6 @@ import EnhancedConsentModal from "@/components/EnhancedConsentModal";
 import TwoStepTripModal from "@/components/TwoStepTripModal";
 import { usePersistentSearch } from "@/hooks/usePersistentSearch";
 import RequestNotificationModal from "@/components/RequestNotificationModal";
-import ActiveMatchModal from "@/components/ActiveMatchModal";
 import BeSideLogo from "../assets/images/BeSide.png";
 import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";
@@ -267,7 +266,6 @@ export default function HomeScreen() {
   // Enhanced persistent search hook
   const persistentSearch = usePersistentSearch();
   const [requestNotificationVisible, setRequestNotificationVisible] = useState(false);
-  const [activeMatchModalVisible, setActiveMatchModalVisible] = useState(false);
 
   const [consent, setConsent] = useState({ noTouch: false, respectful: false, safety: false });
   const [photoUrl, setPhotoUrl] = useState(null);
@@ -315,6 +313,7 @@ export default function HomeScreen() {
   // Safe modal management functions
   const safeCloseModal = useCallback((modalSetter) => {
     try {
+      console.log("🔄 [HOME] Closing modal safely");
       if (isMounted.current) {
         modalSetter(false);
       }
@@ -327,6 +326,7 @@ export default function HomeScreen() {
     try {
       if (!isMounted.current) return;
       
+      console.log("🔄 [HOME] Resetting all modals to closed state");
       setModalVisible(false);
       setPhotoUploadVisible(false);
       setConsentVisible(false);
@@ -336,11 +336,16 @@ export default function HomeScreen() {
       setEnhancedConsentVisible(false);
       setTwoStepTripVisible(false);
       setRequestNotificationVisible(false);
-      setActiveMatchModalVisible(false);
       setAvailabilityModalVisible(false);
     } catch (error) {
       console.error('Error resetting modals:', error);
     }
+  }, []);
+
+  // Force close notification modal function
+  const forceCloseNotificationModal = useCallback(() => {
+    console.log("🔧 [HOME] Force closing notification modal");
+    setRequestNotificationVisible(false);
   }, []);
 
   // Sender request status polling is now handled in useEffect
@@ -382,20 +387,20 @@ export default function HomeScreen() {
   useEffect(() => {
     const currentMatchCount = activeMatches?.matches?.length || 0;
     
-    // If match count increased (new match created), auto-open active trips modal
+    // Just log when new matches are detected (removed auto-redirect to ActiveMatchModal)
     if (currentMatchCount > previousMatchCount && currentMatchCount > 0 && isMounted.current) {
-      console.log("🎉 [AUTO REDIRECT] New match detected! Opening active trips modal");
+      console.log("🎉 [MATCH DETECTED] New match created! Count:", currentMatchCount);
       
-      // Close any open modals and show active trips
+      // Close any open modals
       setRequestNotificationVisible(false);
       setSentRequestStatusVisible(false);
       
-      // Small delay to ensure state updates, then open active trips
-      setTimeout(() => {
-        if (isMounted.current) {
-          setActiveMatchModalVisible(true);
-        }
-      }, 500);
+      // Show simple success alert instead of opening modal
+      Alert.alert(
+        "Match Created! 🎉",
+        "You've successfully matched with a companion! Your trip routes and meeting point are now displayed on the map.",
+        [{ text: "Great!" }]
+      );
     }
     
     if (isMounted.current) {
@@ -1123,48 +1128,7 @@ export default function HomeScreen() {
     }
   };
 
-  // Match management functions
-  const handleViewActiveMatches = () => {
-    setActiveMatchModalVisible(true);
-  };
-
-  const handleUpdateMatchStatus = async (matchId, newStatus) => {
-    try {
-      await activeMatches.updateMatchStatus(matchId, newStatus);
-      
-      // Send notification to other user
-      const statusMessages = {
-        'in-progress': 'Trip has been started!',
-        'completed': 'Trip has been completed!',
-        'cancelled': 'Trip has been cancelled.'
-      };
-      
-      if (statusMessages[newStatus]) {
-        await tripNotifications.sendTripNotification(
-          matchId, 
-          'status_change', 
-          statusMessages[newStatus],
-          { newStatus }
-        );
-      }
-      
-      console.log(`✅ Trip ${matchId} status updated to ${newStatus}`);
-    } catch (error) {
-      console.error("Error updating match status:", error);
-      throw error; // Re-throw to let ActiveMatchModal handle the alert
-    }
-  };
-
-  const handleViewMatchDetails = (match) => {
-    Alert.alert(
-      `Trip Details - ${match.tripDetails?.destination || 'Unknown'}`,
-      `Status: ${match.status || 'Unknown'}\n` +
-      `Companion: ${match.companion?.userName || 'Unknown'}\n` +
-      `Planned: ${match.tripDetails?.plannedDate ? new Date(match.tripDetails.plannedDate).toLocaleDateString() : 'Not set'}\n` +
-      `Transport: ${match.tripDetails?.destinationType || 'Unknown'}`,
-      [{ text: "OK" }]
-    );
-  };
+  // Removed ActiveMatchModal related functions
 
   const handleSOS = async (num = "000") => {
     const url = Platform.OS === "ios" ? `telprompt:${num}` : `tel:${num}`;
@@ -1578,12 +1542,24 @@ export default function HomeScreen() {
               <Ionicons name="time-outline" size={24} color="#fff" />
               <ThemedText style={styles.navLabel}>Trip History</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.navButton} onPress={handleViewActiveMatches}>
+            <TouchableOpacity 
+              style={styles.navButton} 
+              onPress={() => {
+                const matchCount = activeMatches?.matches?.length || 0;
+                Alert.alert(
+                  "Active Trips", 
+                  matchCount > 0 
+                    ? `You have ${matchCount} active trip${matchCount > 1 ? 's' : ''}. Trip details and routes are displayed on the map above.`
+                    : "No active trips at the moment. Accept a companion request to start a trip!",
+                  [{ text: "OK" }]
+                );
+              }}
+            >
               <View style={styles.notificationIconContainer}>
                 <Ionicons name="people" size={24} color="#fff" />
-                {activeMatches.length > 0 && (
+                {(activeMatches?.matches?.length || 0) > 0 && (
                   <View style={styles.notificationBadge}>
-                    <ThemedText style={styles.badgeText}>{activeMatches.length}</ThemedText>
+                    <ThemedText style={styles.badgeText}>{activeMatches?.matches?.length || 0}</ThemedText>
                   </View>
                 )}
               </View>
@@ -1592,8 +1568,14 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={styles.navButton}
               onPress={() => {
-                setRequestNotificationVisible(true);
-                requestPolling.markAsViewed();
+                console.log("📱 [HOME] Opening notification modal");
+                // Reset any stuck states first
+                resetAllModals();
+                // Small delay then open notification modal
+                setTimeout(() => {
+                  setRequestNotificationVisible(true);
+                  requestPolling.markAsViewed();
+                }, 100);
               }}
             >
               <View style={styles.notificationIconContainer}>
@@ -1674,6 +1656,17 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
+      {/* Emergency close button for stuck modals */}
+      {requestNotificationVisible && (
+        <TouchableOpacity 
+          style={styles.emergencyCloseButton}
+          onPress={forceCloseNotificationModal}
+        >
+          <Ionicons name="close-circle" size={32} color="#ff4444" />
+          <ThemedText style={styles.emergencyCloseText}>Close Modal</ThemedText>
+        </TouchableOpacity>
+      )}
+
       {/* Consent → Selfie → Preferences */}
       <ConsentModal
         visible={consentVisible}
@@ -1712,13 +1705,15 @@ export default function HomeScreen() {
           // Refresh active matches to show the new match
           activeMatches.refresh();
           
-          // Close notification modal and open active trip page
+          // Close notification modal
           setRequestNotificationVisible(false);
           
-          // Give a brief moment for the match to be created, then show active trips
-          setTimeout(() => {
-            setActiveMatchModalVisible(true);
-          }, 1000);
+          // Show success message instead of opening modal
+          Alert.alert(
+            "Request Accepted! 🎉",
+            "You've successfully accepted the companion request. Your trip routes are now displayed on the map.",
+            [{ text: "Got it!" }]
+          );
         }}
         onRouteUpdate={(routeData) => {
           console.log("🗺️ [HOME] Updating map with receiver route:", routeData);
@@ -1798,18 +1793,6 @@ export default function HomeScreen() {
           // Show route overlay
           setShowRadius(true);
         }}
-      />
-      <ActiveMatchModal
-        visible={activeMatchModalVisible}
-        onClose={() => safeCloseModal(setActiveMatchModalVisible)}
-        matches={activeMatches?.matches || []}
-        isLoading={activeMatches?.loading || false}
-        onRefresh={activeMatches?.refresh}
-        onUpdateStatus={handleUpdateMatchStatus}
-        onViewDetails={handleViewMatchDetails}
-        onSetMeetingPoint={activeMatches?.setMeetingPoint}
-        currentLocation={currentLocation}
-        currentUserId={user?._id}
       />
 
       {/* Enhanced Consent Modal for Receivers */}
@@ -2108,5 +2091,30 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     minWidth: 40,
+  },
+  
+  // Emergency close button styles
+  emergencyCloseButton: {
+    position: 'absolute',
+    top: 100,
+    right: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 9999,
+  },
+  emergencyCloseText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ff4444',
   },
 });

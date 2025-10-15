@@ -9,6 +9,8 @@ import {
   Alert,
   Image,
   RefreshControl,
+  BackHandler,
+  Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemedButton } from "@/components/ThemedButton";
@@ -160,14 +162,12 @@ export default function RequestNotificationModal({
     getNavigationInstructions 
   } = useRouteCalculation();
 
-  // Safe close function to prevent multiple close calls
+  // Simplified close function
   const safeClose = () => {
-    if (!isClosing) {
-      setIsClosing(true);
-      onClose();
-      // Reset the closing flag after a brief delay
-      setTimeout(() => setIsClosing(false), 500);
-    }
+    console.log("🔄 [MODAL] Closing notification modal");
+    setIsClosing(false); // Reset closing state
+    setRespondingTo(null); // Clear any pending response
+    onClose(); // Call parent close function
   };
 
   useEffect(() => {
@@ -176,6 +176,19 @@ export default function RequestNotificationModal({
       setIsClosing(false);
       setRespondingTo(null);
       fetchPendingRequests();
+    }
+  }, [visible]);
+
+  // Handle Android back button
+  useEffect(() => {
+    if (visible && Platform.OS === 'android') {
+      const backAction = () => {
+        safeClose();
+        return true; // Prevent default back action
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+      return () => backHandler.remove();
     }
   }, [visible]);
 
@@ -538,8 +551,16 @@ export default function RequestNotificationModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.overlay}>
-        <View style={styles.container}>
+      <TouchableOpacity 
+        style={styles.overlay} 
+        activeOpacity={1}
+        onPress={safeClose}
+      >
+        <TouchableOpacity 
+          style={styles.container}
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
+        >
           <View style={styles.header}>
             <ThemedText type="subtitle">🔔 Trip Requests</ThemedText>
             <TouchableOpacity onPress={safeClose} style={styles.closeButton}>
@@ -582,11 +603,11 @@ export default function RequestNotificationModal({
 
           <ThemedButton
             title="Close"
-            onPress={onClose}
+            onPress={safeClose}
             style={styles.closeButtonBottom}
           />
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }
