@@ -116,6 +116,11 @@ router.post(
   notificationController.cancelTripRequest
 );
 
+router.get(
+  "/trip-history",
+  notificationController.getTripHistory
+);
+
 // 🎯 MATCH MANAGEMENT ROUTES
 router.get(
   "/active-matches",

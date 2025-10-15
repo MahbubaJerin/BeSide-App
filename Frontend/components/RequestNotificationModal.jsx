@@ -282,8 +282,14 @@ export default function RequestNotificationModal({
           console.log('✅ [REQUEST] Request accepted successfully');
           Alert.alert(
             "Request Accepted! 🎉", 
-            "You have successfully accepted the companion request. The sender will be notified and you'll receive a meeting point soon.",
-            [{ text: "OK" }]
+            "You have successfully accepted the companion request. You'll be redirected to the active trip page to coordinate with your companion.",
+            [{ 
+              text: "OK",
+              onPress: () => {
+                // Trigger callback to parent to handle redirect
+                onRequestAccepted?.(result.data.tripRequest);
+              }
+            }]
           );
           
           console.log('🔥 [DEBUG] Processing ACCEPTED response...');
@@ -398,19 +404,7 @@ export default function RequestNotificationModal({
             );
           }
 
-          Alert.alert(
-            "🎉 Match Found!", 
-            "You've successfully joined this trip! Your route to the destination has been calculated and displayed on the map.",
-            [
-              { 
-                text: "View Route", 
-                onPress: () => {
-                  onRequestAccepted?.(result.data.tripRequest);
-                  onClose();
-                }
-              }
-            ]
-          );
+
         } else if (response === "declined") {
           Alert.alert(
             "Request Declined ❌", 

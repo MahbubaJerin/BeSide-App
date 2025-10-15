@@ -18,7 +18,7 @@ const catchAsync = require("../utils/catchAsync");
       destinationLocation,
       routeCoordinates,
       transportMode,
-      searchDuration = 30 * 60 * 1000 // Default 30 minutes
+      searchDuration = 2 * 60 * 1000 // Default 2 minutes
     } = req.body;
   
     if (!user || !user.userName) {

@@ -83,6 +83,7 @@ const createSendToken = (user, statusCode, res) => {
  * Login user and send JWT token
  */
 exports.login = catchAsync(async (req, res, next) => {
+
   const { userName, email, password } = req.body;
 
   // Allow login via either username or email
@@ -96,6 +97,10 @@ exports.login = catchAsync(async (req, res, next) => {
   if (!user || !(await bcrypt.compare(password, user.password))) {
     return next(new AppError("Incorrect username/email or password", 401));
   }
+
+  // Cleanup expired/pending trip requests on every login
+  const notificationController = require("./notificationController");
+  await notificationController.cleanupExpiredRequests();
 
   createSendToken(user, 200, res);
 });

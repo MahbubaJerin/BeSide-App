@@ -5,7 +5,7 @@ const User = require("../models/userModel");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
 
-// Schedule automatic cleanup every 10 minutes
+// Schedule automatic cleanup every 1 minute (to handle 2-minute expiration)
 let cleanupInterval = null;
 
 const startCleanupScheduler = () => {
@@ -18,7 +18,7 @@ const startCleanupScheduler = () => {
         } catch (error) {
             console.error("❌ [SCHEDULER] Cleanup error:", error);
         }
-    }, 10 * 60 * 1000); // Every 10 minutes
+    }, 1 * 60 * 1000); // Every 1 minute
 };
 
 const stopCleanupScheduler = () => {
@@ -147,37 +147,33 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
 });
 
 // Get pending requests for current user
-// Cleanup expired requests
+// Cleanup expired requests - DELETE unsuccessful/pending requests older than 5 minutes
 exports.cleanupExpiredRequests = catchAsync(async () => {
     console.log("🧹 [BACKEND] Cleaning up expired requests...");
     
-    const expiredRequests = await TripRequest.find({
-        status: "pending",
-        expiresAt: { $lt: new Date() }
-    });
-
-    if (expiredRequests.length > 0) {
-        const updateResult = await TripRequest.updateMany(
-            { 
-                status: "pending", 
-                expiresAt: { $lt: new Date() } 
+    // Find requests that are expired or unsuccessful (pending/declined) and older than 5 minutes
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    
+    // Delete expired requests (past expiresAt time) OR unsuccessful requests older than 5 minutes
+    const deleteResult = await TripRequest.deleteMany({
+        $or: [
+            // Delete expired requests
+            {
+                status: "pending",
+                expiresAt: { $lt: new Date() }
             },
-            { 
-                status: "expired",
-                $push: {
-                    recipients: { 
-                        $each: [], 
-                        $set: { 
-                            responseStatus: "declined" 
-                        } 
-                    }
-                }
+            // Delete unsuccessful requests older than 5 minutes
+            {
+                status: { $in: ["pending", "declined", "expired"] },
+                createdAt: { $lt: fiveMinutesAgo }
             }
-        );
-        
-        console.log(`✅ [BACKEND] Marked ${updateResult.modifiedCount} requests as expired`);
+        ]
+    });
+    
+    if (deleteResult.deletedCount > 0) {
+        console.log(`✅ [BACKEND] Deleted ${deleteResult.deletedCount} expired/unsuccessful requests`);
     } else {
-        console.log("✅ [BACKEND] No expired requests found");
+        console.log("✅ [BACKEND] No expired/unsuccessful requests found to delete");
     }
 });
 
@@ -471,13 +467,13 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
     });
 });
 
-// Get sent requests status (for sender)
+// Get sent requests status (for sender) - only pending requests, not accepted ones (accepted ones show in Active Trips)
 exports.getSentRequestsStatus = catchAsync(async (req, res, next) => {
     const userId = req.user._id.toString();
 
     const requests = await TripRequest.find({
         "user.userId": userId,
-        status: { $in: ["pending", "accepted"] },
+        status: "pending", // Only pending requests, accepted ones are shown in Active Trips
         expiresAt: { $gt: new Date() }
     }).sort({ createdAt: -1 });
 
@@ -510,6 +506,24 @@ exports.cancelTripRequest = catchAsync(async (req, res, next) => {
         status: "success",
         message: "Trip request cancelled successfully",
         data: { tripRequest }
+    });
+});
+
+// Get trip history (completed/cancelled/expired trips for sender)
+exports.getTripHistory = catchAsync(async (req, res, next) => {
+    const userId = req.user._id.toString();
+
+    console.log("🔍 [BACKEND] Getting trip history for user:", userId);
+
+    const historyRequests = await TripRequest.find({
+        "user.userId": userId,
+        status: { $in: ["completed", "cancelled", "expired", "declined"] }
+    }).sort({ createdAt: -1 }).limit(50); // Limit to last 50 history items
+
+    res.status(200).json({
+        status: "success",
+        results: historyRequests.length,
+        data: { requests: historyRequests }
     });
 });
 

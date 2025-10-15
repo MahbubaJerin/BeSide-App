@@ -32,6 +32,7 @@ import ConsentModal from "./ConsentModal";
 import CompanionPreferencesModal from "./CompanionPreferencesModal";
 import PhotoUploadModal from "./PhotoUploadModal";
 import SentRequestStatusModal from "@/components/SentRequestStatusModal";
+import TripHistoryModal from "@/components/TripHistoryModal";
 import EnhancedConsentModal from "@/components/EnhancedConsentModal";
 import TwoStepTripModal from "@/components/TwoStepTripModal";
 import { usePersistentSearch } from "@/hooks/usePersistentSearch";
@@ -258,6 +259,7 @@ export default function HomeScreen() {
   const [consentVisible, setConsentVisible] = useState(false);
   const [preferencesVisible, setPreferencesVisible] = useState(false);
   const [sentRequestStatusVisible, setSentRequestStatusVisible] = useState(false);
+  const [tripHistoryVisible, setTripHistoryVisible] = useState(false);
   const [enhancedConsentVisible, setEnhancedConsentVisible] = useState(false);
   const [twoStepTripVisible, setTwoStepTripVisible] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
@@ -371,6 +373,29 @@ export default function HomeScreen() {
     const timeoutId = setTimeout(updateActiveRequest, 1000);
     return () => clearTimeout(timeoutId);
   }, [activeMatches?.matches?.length]); // Only trigger when matches count changes
+
+  // Auto-open active match modal when new matches are detected (for sender when request is accepted)
+  const [previousMatchCount, setPreviousMatchCount] = useState(0);
+  
+  useEffect(() => {
+    const currentMatchCount = activeMatches?.matches?.length || 0;
+    
+    // If match count increased (new match created), auto-open active trips modal
+    if (currentMatchCount > previousMatchCount && currentMatchCount > 0) {
+      console.log("🎉 [AUTO REDIRECT] New match detected! Opening active trips modal");
+      
+      // Close any open modals and show active trips
+      setRequestNotificationVisible(false);
+      setSentRequestStatusVisible(false);
+      
+      // Small delay to ensure state updates, then open active trips
+      setTimeout(() => {
+        setActiveMatchModalVisible(true);
+      }, 500);
+    }
+    
+    setPreviousMatchCount(currentMatchCount);
+  }, [activeMatches?.matches?.length, previousMatchCount]);
 
   // Poll sender status when there's an active trip request
   useEffect(() => {
@@ -1471,9 +1496,9 @@ export default function HomeScreen() {
               <Ionicons name="people-outline" size={24} color="#fff" />
               <ThemedText style={styles.navLabel}>Contacts</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.navButton} onPress={() => setSentRequestStatusVisible(true)}>
-              <Ionicons name="paper-plane-outline" size={24} color="#fff" />
-              <ThemedText style={styles.navLabel}>My Requests</ThemedText>
+            <TouchableOpacity style={styles.navButton} onPress={() => setTripHistoryVisible(true)}>
+              <Ionicons name="time-outline" size={24} color="#fff" />
+              <ThemedText style={styles.navLabel}>Trip History</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.navButton} onPress={handleViewActiveMatches}>
               <View style={styles.notificationIconContainer}>
@@ -1596,6 +1621,10 @@ export default function HomeScreen() {
         visible={sentRequestStatusVisible}
         onClose={() => setSentRequestStatusVisible(false)}
       />
+      <TripHistoryModal
+        visible={tripHistoryVisible}
+        onClose={() => setTripHistoryVisible(false)}
+      />
       <RequestNotificationModal
         visible={requestNotificationVisible}
         onClose={() => setRequestNotificationVisible(false)}
@@ -1604,6 +1633,14 @@ export default function HomeScreen() {
           console.log("Request accepted:", tripRequest);
           // Refresh active matches to show the new match
           activeMatches.refresh();
+          
+          // Close notification modal and open active trip page
+          setRequestNotificationVisible(false);
+          
+          // Give a brief moment for the match to be created, then show active trips
+          setTimeout(() => {
+            setActiveMatchModalVisible(true);
+          }, 1000);
         }}
         onRouteUpdate={(routeData) => {
           console.log("🗺️ [HOME] Updating map with receiver route:", routeData);
