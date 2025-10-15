@@ -75,6 +75,18 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
 
     // Find nearby active users
     console.log("🔍 [BACKEND] Searching for nearby users...");
+    
+    // DEBUG: Check what users are in UserLocation collection
+    const allActiveUsers = await UserLocation.find({
+        isActive: true,
+        lastSeen: { $gte: new Date(Date.now() - 10 * 60 * 1000) } // Last 10 minutes for debugging
+    }).select("userId userName isActive shareLocation visibleToOthers lastSeen location");
+    
+    console.log("🔍 [DEBUG] All active users in last 10 minutes:", allActiveUsers.length);
+    allActiveUsers.forEach(user => {
+        console.log(`  - ${user.userName}: active=${user.isActive}, share=${user.shareLocation}, visible=${user.visibleToOthers}, lastSeen=${user.lastSeen}`);
+    });
+    
     const nearbyUsers = await UserLocation.findNearbyUsers(
         startCoordinates.longitude,
         startCoordinates.latitude,

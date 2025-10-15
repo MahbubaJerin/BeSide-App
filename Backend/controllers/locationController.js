@@ -130,14 +130,21 @@ const findNearbyCompanions = catchAsync(async (req, res, next) => {
     await UserLocation.findOneAndUpdate(
       { userId },
       {
-        location: {
-          type: "Point",
-          coordinates: [lng, lat],
+        $set: {
+          location: {
+            type: "Point",
+            coordinates: [lng, lat],
+          },
+          isActive: true,
+          isSearching: true,
+          searchRadius,
+          lastSeen: new Date(),
         },
-        isActive: true,
-        isSearching: true,
-        searchRadius,
-        lastSeen: new Date(),
+        $setOnInsert: {
+          userName: req.user.userName,
+          shareLocation: true,
+          visibleToOthers: true,
+        }
       },
       { upsert: true, new: true }
     );
