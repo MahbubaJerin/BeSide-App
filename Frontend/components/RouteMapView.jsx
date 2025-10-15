@@ -138,48 +138,113 @@ const RouteMapView = ({
     return R * c;
   };
 
-  // Generate route coordinates (simplified - in real app, use Google Directions API)
+  // Generate route coordinates based on user role and workflow
   const generateRouteCoordinates = () => {
     if (!currentLocation) {
       console.log('🗺️ [ROUTE MAP] No current location for route generation');
       return [];
     }
     
-    if (!tripMatch?.meetingPoint?.location) {
-      console.log('🗺️ [ROUTE MAP] No meeting point location for route generation', {
-        hasTripMatch: !!tripMatch,
-        hasMeetingPoint: !!tripMatch?.meetingPoint,
-        meetingPointLocation: tripMatch?.meetingPoint?.location
-      });
+    // Get meeting point (sender's starting location) and destination
+    const meetingPoint = tripMatch?.meetingPoint;
+    const destination = tripMatch?.destinationLocation;
+    
+    if (!meetingPoint?.latitude || !meetingPoint?.longitude) {
+      console.log('🗺️ [ROUTE MAP] No meeting point coordinates available');
       return [];
     }
 
-    // Simple straight line route for demo
-    // In production, use Google Directions API for real routes
-    const route = [
-      currentLocation,
-      tripMatch.meetingPoint.location
-    ];
+    console.log('🗺️ [ROUTE MAP] Generating route for:', {
+      userRole,
+      hasMeetingPoint: !!meetingPoint,
+      hasDestination: !!destination,
+      meetingPoint: {lat: meetingPoint.latitude, lng: meetingPoint.longitude},
+      destination: destination ? {lat: destination.latitude, lng: destination.longitude} : 'not available'
+    });
+
+    // SENDER (organizer): Route from Meeting Point (starting location) → Destination
+    if (userRole === 'organizer') {
+      if (!destination?.latitude || !destination?.longitude) {
+        console.log('🗺️ [ROUTE MAP] No destination for sender route');
+        return [];
+      }
+      
+      const senderRoute = [
+        {latitude: meetingPoint.latitude, longitude: meetingPoint.longitude}, // Meeting point (sender's start)
+        {latitude: destination.latitude, longitude: destination.longitude}    // Destination
+      ];
+      
+      console.log('🗺️ [ROUTE MAP] Sender route: Meeting Point → Destination', senderRoute);
+      return senderRoute;
+    }
     
-    console.log('🗺️ [ROUTE MAP] Generated route coordinates:', route);
-    return route;
+    // RECEIVER (companion): Route from Current Location → Meeting Point → Destination  
+    else if (userRole === 'companion') {
+      const receiverRoute = [currentLocation]; // Start from current location
+      
+      // Add meeting point
+      receiverRoute.push({
+        latitude: meetingPoint.latitude, 
+        longitude: meetingPoint.longitude
+      });
+      
+      // Add destination if available
+      if (destination?.latitude && destination?.longitude) {
+        receiverRoute.push({
+          latitude: destination.latitude, 
+          longitude: destination.longitude
+        });
+      }
+      
+      console.log('🗺️ [ROUTE MAP] Receiver route: Current → Meeting Point → Destination', receiverRoute);
+      return receiverRoute;
+    }
+    
+    return [];
   };
 
-  // Open Google Maps for turn-by-turn navigation
+  // Open Google Maps for turn-by-turn navigation based on user role
   const startExternalNavigation = () => {
-    if (!tripMatch?.meetingPoint?.location) {
+    const meetingPoint = tripMatch?.meetingPoint;
+    const destination = tripMatch?.destinationLocation;
+    
+    if (!meetingPoint?.latitude || !meetingPoint?.longitude) {
       Alert.alert('Error', 'Meeting point not available');
       return;
     }
 
-    const { latitude, longitude } = tripMatch.meetingPoint.location;
-    const label = encodeURIComponent(tripMatch.meetingPoint.name || 'Meeting Point');
+    let destinationLat, destinationLng, label, navType;
+
+    // SENDER: Navigate from Meeting Point to Final Destination
+    if (userRole === 'organizer') {
+      if (!destination?.latitude || !destination?.longitude) {
+        Alert.alert('Error', 'Destination not available');
+        return;
+      }
+      destinationLat = destination.latitude;
+      destinationLng = destination.longitude;
+      label = encodeURIComponent('Final Destination');
+      navType = 'Meeting Point → Destination';
+    }
+    // RECEIVER: Navigate from Current Location to Meeting Point
+    else if (userRole === 'companion') {
+      destinationLat = meetingPoint.latitude;
+      destinationLng = meetingPoint.longitude;
+      label = encodeURIComponent('Meeting Point');
+      navType = 'Current Location → Meeting Point';
+    }
+    
+    console.log('🧭 [NAVIGATION] Starting navigation:', {
+      userRole,
+      navType,
+      destination: {lat: destinationLat, lng: destinationLng}
+    });
     
     let url;
     if (Platform.OS === 'ios') {
-      url = `maps://0,0?q=${label}@${latitude},${longitude}`;
+      url = `maps://0,0?q=${label}@${destinationLat},${destinationLng}`;
     } else {
-      url = `geo:0,0?q=${latitude},${longitude}(${label})`;
+      url = `geo:0,0?q=${destinationLat},${destinationLng}(${label})`;
     }
 
     Linking.canOpenURL(url)
@@ -190,7 +255,7 @@ const RouteMapView = ({
           return Linking.openURL(url);
         } else {
           // Fallback to Google Maps web
-          const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
+          const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${destinationLat},${destinationLng}`;
           return Linking.openURL(webUrl);
         }
       })
@@ -200,12 +265,12 @@ const RouteMapView = ({
       });
   };
 
-  // Get markers for map
+  // Get markers for map based on new workflow
   const getMapMarkers = () => {
     const markers = [];
 
-    // Current location marker
-    if (currentLocation) {
+    // Current location marker (only for receiver)
+    if (currentLocation && userRole === 'companion') {
       markers.push(
         <Marker
           key="current"
@@ -220,18 +285,51 @@ const RouteMapView = ({
       );
     }
 
-    // Meeting point marker
-    if (tripMatch?.meetingPoint?.location) {
+    // Meeting Point marker (sender's starting location)
+    const meetingPoint = tripMatch?.meetingPoint;
+    if (meetingPoint?.latitude && meetingPoint?.longitude) {
+      const meetingCoord = {
+        latitude: meetingPoint.latitude,
+        longitude: meetingPoint.longitude
+      };
+      
       markers.push(
         <Marker
           key="meeting"
-          coordinate={tripMatch.meetingPoint.location}
-          title="Meeting Point"
-          description={tripMatch.meetingPoint.name || 'Meet your companion here'}
+          coordinate={meetingCoord}
+          title={userRole === 'organizer' ? "Your Starting Point" : "Meeting Point"}
+          description={
+            userRole === 'organizer' 
+              ? "Your journey starts here" 
+              : "Meet your companion here"
+          }
           pinColor="green"
         >
           <View style={styles.meetingPointMarker}>
-            <Ionicons name="flag" size={16} color="white" />
+            <Ionicons name={userRole === 'organizer' ? "play" : "flag"} size={16} color="white" />
+          </View>
+        </Marker>
+      );
+    }
+
+    // Destination marker
+    const destination = tripMatch?.destinationLocation;
+    if (destination?.latitude && destination?.longitude) {
+      const destCoord = {
+        latitude: destination.latitude,
+        longitude: destination.longitude
+      };
+      
+      markers.push(
+        <Marker
+          key="destination"
+          coordinate={destCoord}
+          title="Destination"
+          description={destination.address || "Your final destination"}
+          pinColor="red"
+        >
+          <View style={styles.destinationMarker}>
+            <Ionicons name="location" size={16} color="white" />
           </View>
         </Marker>
       );
@@ -318,8 +416,20 @@ const RouteMapView = ({
 
       {/* Route info overlay */}
       <View style={styles.routeInfo}>
-        <Text style={styles.distanceText}>
-          📍 {Math.round(distance)}m to meeting point
+        <Text style={styles.routeTitle}>
+          {userRole === 'organizer' ? '📍 Your Route (Sender)' : '🚶 Your Journey (Receiver)'}
+        </Text>
+        <Text style={styles.routeDescription}>
+          {userRole === 'organizer' 
+            ? 'From Starting Point → Final Destination'
+            : 'Current Location → Meeting Point → Destination'
+          }
+        </Text>
+        {userRole === 'companion' && distance > 0 && (
+          <Text style={styles.distanceText}>
+            📍 {Math.round(distance)}m to meeting point
+          </Text>
+        )}
         </Text>
         <Text style={styles.meetingPointText}>
           📍 {tripMatch?.meetingPoint?.name || 'Meeting Point'}
@@ -387,6 +497,16 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: 'white',
   },
+  destinationMarker: {
+    backgroundColor: '#F44336',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'white',
+  },
   companionMarker: {
     backgroundColor: '#FF9800',
     borderRadius: 20,
@@ -410,6 +530,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  routeTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  routeDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
   },
   distanceText: {
     fontSize: 16,
