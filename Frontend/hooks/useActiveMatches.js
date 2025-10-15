@@ -54,10 +54,25 @@ export function useActiveMatches(pollingInterval = 15000) { // Reduced to 15s fo
         return;
       }
 
-      const result = await response.json();
+      // Check content type and parse response
+      const contentType = response.headers.get('content-type');
+      const responseText = await response.text();
+      
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('❌ [MATCH POLLING] Non-JSON response:', responseText.substring(0, 200));
+        throw new Error('Server returned non-JSON response: ' + responseText.substring(0, 100));
+      }
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ [MATCH POLLING] JSON parse error. Response text:', responseText.substring(0, 200));
+        throw new Error('Invalid JSON response from server: ' + responseText.substring(0, 100));
+      }
 
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to fetch active matches');
+        throw new Error(result?.message || 'Failed to fetch active matches');
       }
 
       if (result.status === 'success') {

@@ -9,56 +9,32 @@ import {
   Alert,
   Image,
   RefreshControl,
-  BackHandler,
-  Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemedButton } from "@/components/ThemedButton";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { BASE_URL } from "../config";
-import { useRouteCalculation } from "@/hooks/useRouteCalculation";
 
-// Separate component for each request card to properly handle hooks
-function RequestCard({ request, onMarkViewed, onResponse, respondingTo, formatDate, formatTimeRemaining }) {
-  // Mark as viewed when component mounts
-  useEffect(() => {
-    onMarkViewed(request.tripReqId);
-  }, [request.tripReqId, onMarkViewed]);
-
+// Simple request card component with sender photo
+function RequestCard({ request, onResponse, respondingTo }) {
   return (
     <View style={styles.requestCard}>
-      {/* Header with curved background similar to appointment card */}
+      {/* Header with curved background */}
       <View style={styles.curvedHeader}>
         <View style={styles.headerContent}>
-          <View style={styles.headerTopRow}>
-            <Text style={styles.headerTitle}>🚶 Companion Request</Text>
-            <View style={styles.urgencyBadgeHeader}>
-              <Text style={styles.urgencyTextHeader}>•</Text>
-            </View>
-          </View>
-          
-          <View style={styles.dateTimeHeader}>
-            <Text style={styles.dateTextHeader}>
-              {new Date(request.date).toLocaleDateString('en-US', { 
-                day: '2-digit', 
-                month: 'short', 
-                year: 'numeric' 
-              })}
-            </Text>
-            <Text style={styles.timeTextHeader}>
-              {formatTimeRemaining(request.expiresAt)}
-            </Text>
-          </View>
+          <Text style={styles.headerTitle}>🚶 Companion Request</Text>
+          <Text style={styles.dateTextHeader}>
+            {new Date(request.date).toLocaleDateString()}
+          </Text>
         </View>
         
-        {/* Sender photo positioned like in appointment card */}
+        {/* Sender photo */}
         <View style={styles.photoContainer}>
           {request.photo?.url ? (
             <Image 
               source={{ uri: request.photo.url }}
               style={styles.senderPhotoCard}
-              onError={() => console.log('Error loading sender photo')}
             />
           ) : (
             <View style={styles.senderPhotoPlaceholderCard}>
@@ -68,16 +44,9 @@ function RequestCard({ request, onMarkViewed, onResponse, respondingTo, formatDa
             </View>
           )}
         </View>
-        
-        {/* Phone icon like in appointment card */}
-        <View style={styles.phoneIconContainer}>
-          <View style={styles.phoneIcon}>
-            <Text style={styles.phoneIconText}>📱</Text>
-          </View>
-        </View>
       </View>
 
-      {/* White content section */}
+      {/* Content section */}
       <View style={styles.whiteSection}>
         <View style={styles.senderInfo}>
           <Text style={styles.senderName}>{request.user.userName}</Text>
@@ -85,57 +54,36 @@ function RequestCard({ request, onMarkViewed, onResponse, respondingTo, formatDa
         </View>
 
         <View style={styles.messageSection}>
-          <Text style={styles.messageLabel}>Message</Text>
+          <Text style={styles.messageLabel}>Trip Details</Text>
           <Text style={styles.messageText}>
-            Hi! I'm looking for a travel companion to {request.destination}. 
-            {request.destinationType !== "By Walk" ? ` We'll be going ${request.destinationType.toLowerCase()}.` : ' Let\'s walk together!'}
-            {request.genderPreference !== "any" ? ` I prefer traveling with ${request.genderPreference} companions.` : ''}
+            Destination: {request.destination}
+            {'\n'}Transport: {request.destinationType}
+            {request.genderPreference !== "any" ? `\nPrefers: ${request.genderPreference} companions` : ''}
           </Text>
         </View>
 
-        <View style={styles.tripSummary}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryIcon}>📍</Text>
-            <View style={styles.summaryContent}>
-              <Text style={styles.summaryLabel}>Destination</Text>
-              <Text style={styles.summaryValue}>{request.destination}</Text>
-            </View>
-          </View>
+        {/* Action buttons */}
+        <View style={styles.actionButtonsCard}>
+          <TouchableOpacity
+            style={[styles.actionButtonCard, styles.acceptButtonCard, respondingTo === request.tripReqId && styles.disabledButton]}
+            onPress={() => onResponse(request.tripReqId, "accepted")}
+            disabled={respondingTo === request.tripReqId}
+          >
+            <Text style={styles.acceptButtonText}>
+              {respondingTo === request.tripReqId ? "..." : "ACCEPT"}
+            </Text>
+          </TouchableOpacity>
           
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryIcon}>�</Text>
-            <View style={styles.summaryContent}>
-              <Text style={styles.summaryLabel}>Transport</Text>
-              <Text style={styles.summaryValue}>{request.destinationType}</Text>
-            </View>
-          </View>
+          <TouchableOpacity
+            style={[styles.actionButtonCard, styles.declineButtonCard, respondingTo === request.tripReqId && styles.disabledButton]}
+            onPress={() => onResponse(request.tripReqId, "declined")}
+            disabled={respondingTo === request.tripReqId}
+          >
+            <Text style={styles.declineButtonText}>
+              {respondingTo === request.tripReqId ? "..." : "DECLINE"}
+            </Text>
+          </TouchableOpacity>
         </View>
-      </View>
-
-      <View style={styles.actionButtonsCard}>
-        <TouchableOpacity
-          style={[styles.actionButtonCard, styles.acceptButtonCard, respondingTo === request.tripReqId && styles.disabledButton]}
-          onPress={() => {
-            console.log('🚨 [DEBUG] Accept button pressed for request:', request.tripReqId);
-            console.log('🚨 [DEBUG] Button is disabled?', respondingTo === request.tripReqId);
-            onResponse(request.tripReqId, "accepted");
-          }}
-          disabled={respondingTo === request.tripReqId}
-        >
-          <Text style={styles.acceptButtonText}>
-            {respondingTo === request.tripReqId ? "..." : "ACCEPT"}
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.actionButtonCard, styles.declineButtonCard, respondingTo === request.tripReqId && styles.disabledButton]}
-          onPress={() => onResponse(request.tripReqId, "declined")}
-          disabled={respondingTo === request.tripReqId}
-        >
-          <Text style={styles.declineButtonText}>
-            {respondingTo === request.tripReqId ? "..." : "DECLINE"}
-          </Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -145,70 +93,29 @@ export default function RequestNotificationModal({
   visible, 
   onClose, 
   onRequestAccepted,
-  onRouteUpdate, // New prop to update parent map with receiver's route
-  currentLocation // Receiver's current location
+  currentLocation
 }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [respondingTo, setRespondingTo] = useState(null);
-  const [isClosing, setIsClosing] = useState(false);
-
-  const { 
-    calculateReceiverRoute, 
-    getMapRegion, 
-    calculating, 
-    openGoogleMapsNavigation, 
-    getNavigationInstructions 
-  } = useRouteCalculation();
-
-  // Simplified close function
-  const safeClose = () => {
-    console.log("🔄 [MODAL] Closing notification modal");
-    setIsClosing(false); // Reset closing state
-    setRespondingTo(null); // Clear any pending response
-    onClose(); // Call parent close function
-  };
-
-  useEffect(() => {
-    if (visible) {
-      // Reset state when modal opens
-      setIsClosing(false);
-      setRespondingTo(null);
-      fetchPendingRequests();
-    }
-  }, [visible]);
-
-  // Handle Android back button
-  useEffect(() => {
-    if (visible && Platform.OS === 'android') {
-      const backAction = () => {
-        safeClose();
-        return true; // Prevent default back action
-      };
-
-      const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
-      return () => backHandler.remove();
-    }
-  }, [visible]);
 
   const fetchPendingRequests = async () => {
     try {
-      setLoading(true);
       const token = await AsyncStorage.getItem("token");
       if (!token) return;
 
+      setLoading(true);
       const API_URL = BASE_URL.replace(/\/+$/, "");
       const response = await fetch(`${API_URL}/api/v1/trip/pending-requests`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      const result = await response.json();
-      if (result.status === "success") {
-        setRequests(result.data.requests);
-      } else {
-        console.log("No pending requests or error:", result.message);
-        setRequests([]);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.status === "success") {
+          setRequests(result.data.requests || []);
+        }
       }
     } catch (error) {
       console.error("Error fetching requests:", error);
@@ -224,34 +131,14 @@ export default function RequestNotificationModal({
   };
 
   const handleResponse = async (tripReqId, response) => {
-    console.log('🔥 [DEBUG] === ACCEPT BUTTON CLICKED ===');
-    console.log('🔥 [DEBUG] Trip Request ID:', tripReqId);
-    console.log('🔥 [DEBUG] Response Type:', response);
-    console.log('🔥 [DEBUG] Current respondingTo:', respondingTo);
-    console.log('🔥 [DEBUG] Current Location:', currentLocation);
-    
-    if (respondingTo === tripReqId) {
-      console.log('🚫 [DEBUG] Already responding to this request, preventing double-tap');
-      return; // Prevent double-tap
-    }
+    if (respondingTo === tripReqId) return;
     
     try {
-      console.log('🔥 [DEBUG] Setting respondingTo state...');
       setRespondingTo(tripReqId);
-      
-      console.log('🔥 [DEBUG] Getting token from AsyncStorage...');
       const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        console.log('❌ [DEBUG] No token found in AsyncStorage!');
-        return;
-      }
-      console.log('✅ [DEBUG] Token retrieved successfully');
+      if (!token) return;
 
-      console.log('🔥 [DEBUG] Preparing API request...');
       const API_URL = BASE_URL.replace(/\/+$/, "");
-      console.log('🔥 [DEBUG] API URL:', `${API_URL}/api/v1/trip/respond-request`);
-      console.log('🔥 [DEBUG] Request body:', { tripReqId, response });
-      
       const apiResponse = await fetch(`${API_URL}/api/v1/trip/respond-request`, {
         method: "POST",
         headers: {
@@ -261,309 +148,51 @@ export default function RequestNotificationModal({
         body: JSON.stringify({ tripReqId, response }),
       });
 
-      console.log('🔥 [DEBUG] API Response Status:', apiResponse.status);
-      console.log('🔥 [DEBUG] API Response OK:', apiResponse.ok);
-      
-      // Handle non-JSON error responses (like 429 Too Many Requests)
-      let result;
-      try {
-        const responseText = await apiResponse.text();
-        console.log('🔥 [DEBUG] Raw response text:', responseText);
-        
-        // Try to parse as JSON
-        result = JSON.parse(responseText);
-        console.log('🔥 [DEBUG] Parsed JSON result:', JSON.stringify(result, null, 2));
-      } catch (parseError) {
-        console.error('💥 [DEBUG] Failed to parse response as JSON:', parseError.message);
-        
-        // Handle specific HTTP status codes without JSON
-        if (apiResponse.status === 429) {
-          console.error("❌ Too many requests - rate limited");
-          Alert.alert("Too Many Requests", "Please wait a moment before trying again. The server is busy.");
-          return;
-        } else if (apiResponse.status === 500) {
-          console.error("❌ Server error");
-          Alert.alert("Server Error", "There was an issue with the server. Please try again later.");
-          return;
-        } else {
-          console.error("❌ Non-JSON error response");
-          Alert.alert("Connection Error", "Unable to process your request. Please check your connection and try again.");
-          return;
-        }
-      }
-      
-      if (!apiResponse.ok) {
-        // Handle specific error cases with JSON responses
-        if (apiResponse.status === 404) {
-          console.error("❌ Trip request not found - may have been cancelled or expired");
-          Alert.alert("Request Expired", "This trip request is no longer available.");
-          setRequests(prev => prev.filter(req => req.tripReqId !== tripReqId));
-          return;
-        } else if (apiResponse.status === 409) {
-          console.error("❌ Trip request already processed");
-          Alert.alert("Request Unavailable", "This request has already been accepted by someone else.");
-          setRequests(prev => prev.filter(req => req.tripReqId !== tripReqId));
-          return;
-        } else if (apiResponse.status === 410) {
-          console.error("❌ Trip request has expired");
-          Alert.alert("Request Expired", "This trip request has expired.");
-          setRequests(prev => prev.filter(req => req.tripReqId !== tripReqId));
-          return;
-        }
-        throw new Error(result?.message || "Failed to respond to request");
-      }
+      const result = await apiResponse.json();
 
       if (result.status === "success") {
-        console.log('✅ [DEBUG] API Response successful!');
-        console.log('🔥 [DEBUG] Result data:', JSON.stringify(result.data, null, 2));
-        
         if (response === "accepted") {
-          console.log('✅ [REQUEST] Request accepted successfully');
-          
-          // Close modal immediately for better UX
-          safeClose();
-          
+          onClose();
           Alert.alert(
             "Request Accepted! 🎉", 
-            "You have successfully accepted the companion request. You'll be redirected to the active trip page to coordinate with your companion.",
+            "You have successfully accepted the companion request.",
             [{ 
               text: "OK",
               onPress: () => {
-                // Trigger callback to parent to handle redirect
                 onRequestAccepted?.(result.data.tripRequest);
               }
             }]
           );
-          
-          console.log('🔥 [DEBUG] Processing ACCEPTED response...');
-          console.log('🔥 [DEBUG] Has currentLocation:', !!currentLocation);
-          console.log('🔥 [DEBUG] Has senderCurrentLocation:', !!result.data.senderCurrentLocation);
-          console.log('🔥 [DEBUG] Has onRouteUpdate callback:', !!onRouteUpdate);
-          
-          // CORRECTED FLOW: Route to meeting point (sender's start location)
-          if (currentLocation && result.data.routeData && onRouteUpdate) {
-            // Start route calculation asynchronously (don't block modal closing)
-            setTimeout(async () => {
-            try {
-              console.log('🚀 [MEETING POINT ROUTE] Starting meeting point route calculation...');
-              console.log('📍 [MEETING POINT ROUTE] Receiver location:', currentLocation);
-              console.log('📍 [MEETING POINT ROUTE] Route data:', result.data.routeData);
-              
-              // Meeting point is automatically set from sender's starting location
-              const tripRequest = result.data.tripRequest;
-              let meetingPoint = tripRequest.meetingPoint;
-              const finalDestination = tripRequest.destinationLocation;
-              
-              console.log('🔍 [DEBUG] Trip request data:', JSON.stringify(tripRequest, null, 2));
-              console.log('🔍 [DEBUG] Meeting point from trip:', meetingPoint);
-              
-              if (!meetingPoint || !meetingPoint.latitude || !meetingPoint.longitude) {
-                console.log('❌ [DEBUG] Meeting point validation failed:', {
-                  hasMeetingPoint: !!meetingPoint,
-                  hasLat: meetingPoint?.latitude,
-                  hasLng: meetingPoint?.longitude,
-                  fullTripRequest: tripRequest
-                });
-                
-                // Try fallback to startingLocation if meetingPoint is not set
-                const startingLocation = tripRequest.startingLocation;
-                if (startingLocation && startingLocation.latitude && startingLocation.longitude) {
-                  console.log('🔄 [DEBUG] Using startingLocation as fallback:', startingLocation);
-                  meetingPoint = startingLocation;
-                } else {
-                  console.log('❌ [DEBUG] No valid starting location either:', startingLocation);
-                  throw new Error('Meeting point (sender start location) not available');
-                }
-              }
-              
-              console.log('🎯 [MEETING POINT ROUTE] Meeting point:', meetingPoint);
-              console.log('🏁 [MEETING POINT ROUTE] Final destination:', finalDestination);
-              
-              // Calculate route from receiver to meeting point
-              const routeToMeetingPoint = await calculateReceiverRoute(
-                currentLocation,
-                meetingPoint,
-                'walking'
-              );
-              
-              console.log('✅ [MEETING POINT ROUTE] Route to meeting point calculated successfully');
-              
-              // Update parent map with receiver's route to meeting point
-              onRouteUpdate({
-                receiverRoute: routeToMeetingPoint,
-                routeType: 'to-meeting-point',
-                meetingPoint: {
-                  coordinates: meetingPoint,
-                  address: meetingPoint.address || 'Meeting Point',
-                },
-                finalDestination: {
-                  coordinates: finalDestination,
-                  address: finalDestination?.address || 'Final Destination',
-                },
-                companion: result.data.routeData?.senderName || 'Companion',
-                mapRegion: getMapRegion([
-                  currentLocation,
-                  meetingPoint
-                ])
-              });
-              
-              // Show success message with navigation options
-              const companionName = result.data.routeData?.senderName || 'your companion';
-              const meetingAddress = meetingPoint.address || 'the meeting point';
-              
-              Alert.alert(
-                "🎉 Match Found!", 
-                `Route calculated! Distance: ${routeToMeetingPoint.distance}, Duration: ${routeToMeetingPoint.duration}\n\nNavigate to ${meetingAddress} to meet ${companionName}.`,
-                [
-                  { 
-                    text: "View Route", 
-                    style: "default",
-                    onPress: () => {
-                      console.log('📱 [NAVIGATION] User chose to view route in-app');
-                      // Route is already displayed on map via onRouteUpdate
-                    }
-                  },
-                  { 
-                    text: "Open Maps", 
-                    style: "default",
-                    onPress: () => {
-                      try {
-                        console.log('🗺️ [NAVIGATION] Opening Google Maps navigation');
-                        openGoogleMapsNavigation(meetingPoint, currentLocation, 'walking');
-                      } catch (error) {
-                        Alert.alert('Navigation Error', 'Could not open navigation app. Please ensure Google Maps is installed.');
-                      }
-                    }
-                  },
-                  { 
-                    text: "Got it!", 
-                    style: "default"
-                  }
-                ]
-              );
-              
-            } catch (routeError) {
-              console.error('❌ [DEBUG] Route calculation failed with error:', routeError);
-              console.error('❌ [DEBUG] Route error message:', routeError.message);
-              console.error('❌ [DEBUG] Route error stack:', routeError.stack);
-              
-              Alert.alert(
-                "✅ Match Successful!", 
-                "Your match was successful! Please coordinate with your companion to meet up.",
-                [{ text: "OK" }]
-              );
-            }
-            }, 100); // End setTimeout - run route calculation async
-          } else {
-            console.warn('⚠️ [SIMPLE ROUTE] Missing data for route calculation:', {
-              hasCurrentLocation: !!currentLocation,
-              hasSenderLocation: !!result.data.senderCurrentLocation,
-              hasOnRouteUpdate: !!onRouteUpdate
-            });
-            
-            // Still show success even without route calculation
-            Alert.alert(
-              "✅ Match Successful!", 
-              "You've been matched with a companion! Please coordinate to meet up.",
-              [{ 
-                text: "Great!"
-              }]
-            );
-          }
-
-
-        } else if (response === "declined") {
-          // Close modal immediately for better UX
-          safeClose();
-          
-          Alert.alert(
-            "Request Declined ❌", 
-            "You have declined the companion request. The sender will be notified.",
-            [{ text: "OK" }]
-          );
+        } else {
+          Alert.alert("Success", "Request declined successfully");
         }
         
-        console.log('🔥 [DEBUG] Refreshing requests list...');
-        // Refresh the list to remove the responded request
-        await fetchPendingRequests();
-        console.log('✅ [DEBUG] Requests refreshed successfully');
+        // Remove the request from the list
+        setRequests(prev => prev.filter(req => req.tripReqId !== tripReqId));
       } else {
-        console.error('❌ [DEBUG] API returned error status:', result.status);
-        console.error('❌ [DEBUG] Error message:', result.message);
         throw new Error(result.message || "Failed to respond to request");
       }
     } catch (error) {
-      console.error('💥 [DEBUG] === CRITICAL ERROR IN HANDLE RESPONSE ===');
-      console.error('💥 [DEBUG] Error type:', error.constructor.name);
-      console.error('💥 [DEBUG] Error message:', error.message);
-      console.error('💥 [DEBUG] Error stack:', error.stack);
-      console.error('💥 [DEBUG] Full error object:', error);
-      
-      // Close modal even on error to prevent freeze
-      safeClose();
-      
       Alert.alert("Error", error.message || "Failed to respond to request");
     } finally {
-      console.log('🔥 [DEBUG] Cleaning up - setting respondingTo to null');
       setRespondingTo(null);
     }
   };
 
-  const markAsViewed = async (tripReqId) => {
-    try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) return;
-
-      const API_URL = BASE_URL.replace(/\/+$/, "");
-      await fetch(`${API_URL}/api/v1/trip/mark-viewed`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ tripReqId }),
-      });
-    } catch (error) {
-      console.error("Error marking as viewed:", error);
+  useEffect(() => {
+    if (visible) {
+      setRespondingTo(null);
+      fetchPendingRequests();
     }
-  };
-
-  const formatTimeRemaining = (expiresAt) => {
-    const now = new Date();
-    const expiry = new Date(expiresAt);
-    const diff = expiry - now;
-    
-    if (diff <= 0) return "Expired";
-    
-    const minutes = Math.floor(diff / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-    
-    if (minutes > 0) {
-      return `${minutes}m ${seconds}s left`;
-    }
-    return `${seconds}s left`;
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + " at " + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-  };
+  }, [visible]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <TouchableOpacity 
-        style={styles.overlay} 
-        activeOpacity={1}
-        onPress={safeClose}
-      >
-        <TouchableOpacity 
-          style={styles.container}
-          activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
-        >
+      <View style={styles.overlay}>
+        <View style={styles.container}>
           <View style={styles.header}>
             <ThemedText type="subtitle">🔔 Trip Requests</ThemedText>
-            <TouchableOpacity onPress={safeClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <ThemedText style={styles.closeText}>✕</ThemedText>
             </TouchableOpacity>
           </View>
@@ -575,7 +204,7 @@ export default function RequestNotificationModal({
             }
           >
             {loading && requests.length === 0 ? (
-              <View style={styles.loadingContainer}>
+              <View style={styles.emptyContainer}>
                 <ThemedText>Loading requests...</ThemedText>
               </View>
             ) : requests.length === 0 ? (
@@ -583,7 +212,7 @@ export default function RequestNotificationModal({
                 <ThemedText style={styles.emptyIcon}>📭</ThemedText>
                 <ThemedText style={styles.emptyText}>No trip requests</ThemedText>
                 <ThemedText style={styles.emptySubtext}>
-                  New companion requests from nearby users will appear here
+                  New companion requests from nearby users will appear here.
                 </ThemedText>
               </View>
             ) : (
@@ -591,11 +220,8 @@ export default function RequestNotificationModal({
                 <RequestCard 
                   key={request.tripReqId}
                   request={request}
-                  onMarkViewed={markAsViewed}
                   onResponse={handleResponse}
                   respondingTo={respondingTo}
-                  formatDate={formatDate}
-                  formatTimeRemaining={formatTimeRemaining}
                 />
               ))
             )}
@@ -603,11 +229,11 @@ export default function RequestNotificationModal({
 
           <ThemedButton
             title="Close"
-            onPress={safeClose}
+            onPress={onClose}
             style={styles.closeButtonBottom}
           />
-        </TouchableOpacity>
-      </TouchableOpacity>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -620,39 +246,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   container: {
-    backgroundColor: "#F8F9FA",
-    borderRadius: 20,
-    width: "95%",
-    maxHeight: "85%",
-    paddingVertical: 20,
+    backgroundColor: Colors.light.surface,
+    borderRadius: 16,
+    width: "90%",
+    maxHeight: "80%",
+    overflow: "hidden",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.border,
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.light.tabIconDefault,
-    justifyContent: "center",
-    alignItems: "center",
+    padding: 8,
   },
   closeText: {
     fontSize: 18,
-    color: Colors.light.background,
-    fontWeight: "bold",
+    color: Colors.light.text,
   },
   requestsList: {
-    paddingHorizontal: 20,
-    maxHeight: "75%",
-  },
-  loadingContainer: {
-    alignItems: "center",
-    padding: 40,
+    maxHeight: 400,
   },
   emptyContainer: {
     alignItems: "center",
@@ -665,364 +281,140 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: "600",
+    color: Colors.light.text,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: Colors.light.tabIconDefault,
+    color: Colors.light.textSecondary,
     textAlign: "center",
-    lineHeight: 20,
   },
+  closeButtonBottom: {
+    margin: 16,
+  },
+  
+  // Request card styles
   requestCard: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 8,
-    overflow: 'hidden',
+    margin: 16,
+    borderRadius: 16,
+    backgroundColor: Colors.light.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  userInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.light.tint,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  avatarText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  // Appointment card style design
   curvedHeader: {
-    backgroundColor: "#6C5CE7",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    paddingBottom: 60,
-    position: "relative",
+    backgroundColor: '#4A90E2',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    position: 'relative',
   },
   headerContent: {
-    paddingHorizontal: 20,
-  },
-  headerTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
-    color: "#fff",
     fontSize: 16,
-    fontWeight: "600",
-  },
-  urgencyBadgeHeader: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#FF6B6B",
-  },
-  urgencyTextHeader: {
-    color: "#FF6B6B",
-    fontSize: 20,
-    textAlign: "center",
-  },
-  dateTimeHeader: {
-    alignItems: "center",
+    fontWeight: '600',
+    color: 'white',
   },
   dateTextHeader: {
-    color: "#fff",
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 4,
-  },
-  timeTextHeader: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 12,
+    color: 'white',
+    opacity: 0.9,
   },
   photoContainer: {
-    position: "absolute",
-    bottom: -35,
-    left: 20,
-    zIndex: 10,
-    elevation: 10,
+    position: 'absolute',
+    right: 20,
+    top: -10,
+    bottom: -10,
+    justifyContent: 'center',
   },
   senderPhotoCard: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    borderWidth: 4,
-    borderColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 8,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
+    borderColor: 'white',
   },
   senderPhotoPlaceholderCard: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: "#4CAF50",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 4,
-    borderColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 8,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'white',
   },
   senderPhotoTextCard: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 20,
-  },
-  phoneIconContainer: {
-    position: "absolute",
-    bottom: -25,
-    right: 20,
-    zIndex: 10,
-    elevation: 10,
-  },
-  phoneIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#00BCD4",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  phoneIconText: {
-    fontSize: 20,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#4A90E2',
   },
   whiteSection: {
-    backgroundColor: "#fff",
-    paddingTop: 45,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    backgroundColor: 'white',
+    padding: 20,
   },
   senderInfo: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   senderName: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#2C3E50",
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
   },
   senderLabel: {
-    fontSize: 14,
-    color: "#7F8C8D",
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   messageSection: {
     marginBottom: 20,
   },
   messageLabel: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#2C3E50",
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 8,
   },
   messageText: {
     fontSize: 14,
-    color: "#7F8C8D",
+    color: '#666',
     lineHeight: 20,
   },
-  tripSummary: {
-    marginBottom: 20,
-  },
-  summaryItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  summaryIcon: {
-    fontSize: 16,
-    marginRight: 12,
-    width: 20,
-  },
-  summaryContent: {
-    flex: 1,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: "#7F8C8D",
-    marginBottom: 2,
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#2C3E50",
-  },
   actionButtonsCard: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: 12,
   },
   actionButtonCard: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 25,
-    alignItems: "center",
+    borderRadius: 8,
+    alignItems: 'center',
   },
   acceptButtonCard: {
-    backgroundColor: "#6C5CE7",
+    backgroundColor: '#28A745',
   },
   declineButtonCard: {
-    backgroundColor: "#E8E8E8",
+    backgroundColor: '#DC3545',
   },
   disabledButton: {
     opacity: 0.6,
   },
   acceptButtonText: {
-    color: "#fff",
+    color: 'white',
     fontSize: 14,
-    fontWeight: "600",
-    letterSpacing: 0.5,
+    fontWeight: '600',
   },
   declineButtonText: {
-    color: "#7F8C8D",
+    color: 'white',
     fontSize: 14,
-    fontWeight: "600",
-    letterSpacing: 0.5,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  timeAgo: {
-    fontSize: 12,
-    color: "#FF6B6B",
-    fontWeight: "500",
-  },
-  urgencyBadge: {
-    backgroundColor: "#FF6B6B",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  urgencyBadgeTop: {
-    backgroundColor: "#FF6B6B",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    position: "absolute",
-    top: 0,
-    right: 16,
-  },
-  urgencyText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "bold",
-  },
-  requestDetails: {
-    backgroundColor: "#F8F9FA",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  detailIcon: {
-    fontSize: 16,
-    marginRight: 8,
-    width: 20,
-  },
-  detailText: {
-    fontSize: 14,
-    color: Colors.light.text,
-    flex: 1,
-  },
-  routeInfo: {
-    backgroundColor: Colors.light.tint + "10",
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.light.tint,
-  },
-  routeTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.light.tint,
-    marginBottom: 6,
-  },
-  routeDetail: {
-    fontSize: 12,
-    color: Colors.light.text,
-    marginBottom: 2,
-    opacity: 0.8,
-  },
-  routeHelp: {
-    fontSize: 11,
-    color: Colors.light.tabIconDefault,
-    fontStyle: 'italic',
-    marginTop: 6,
-    opacity: 0.7,
-  },
-  meetingInfo: {
-    backgroundColor: "#28a745" + "10",
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: "#28a745",
-  },
-  meetingTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#28a745",
-    marginBottom: 4,
-  },
-  meetingDetail: {
-    fontSize: 12,
-    color: Colors.light.text,
-    opacity: 0.8,
-  },
-  actionButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-  },
-  acceptButton: {
-    backgroundColor: "#4CAF50",
-  },
-  declineButton: {
-    backgroundColor: "#FF6B6B",
-  },
-  closeButtonBottom: {
-    marginTop: 16,
-    marginHorizontal: 20,
+    fontWeight: '600',
   },
 });

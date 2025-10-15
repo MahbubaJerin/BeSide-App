@@ -57,7 +57,23 @@ export const useRequestPolling = (intervalMs = 30000, enabled = true) => { // In
         return;
       }
       
-      const result = await response.json();
+      // Check content type and parse response
+      const contentType = response.headers.get('content-type');
+      const responseText = await response.text();
+      
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('❌ Non-JSON response:', responseText.substring(0, 200));
+        throw new Error('Server returned non-JSON response: ' + responseText.substring(0, 100));
+      }
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON parse error. Response text:', responseText.substring(0, 200));
+        throw new Error('Invalid JSON response from server: ' + responseText.substring(0, 100));
+      }
+      
       console.log("📥 Polling result:", JSON.stringify(result, null, 2));
       
       if (result.status === "success") {

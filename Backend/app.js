@@ -27,13 +27,14 @@ if (process.env.NODE_ENV === "development") {
 }
 
 const limiter = rateLimit({
-  max: process.env.RATE_LIMIT_MAX || 1000, // Increased further for development 
+  max: process.env.RATE_LIMIT_MAX || 10000, // Dramatically increased for development 
   windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes for development
-  message: "Too many requests from this IP, please try again later!",
+  message: JSON.stringify({ status: "error", message: "Too many requests from this IP, please try again later!" }),
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
-app.use("/api", limiter);
+// Temporarily disable rate limiting for development
+// app.use("/api", limiter);
 
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));

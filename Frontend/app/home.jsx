@@ -297,8 +297,8 @@ export default function HomeScreen() {
   // hooks
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
-  const requestPolling = useRequestPolling(90000, true); // Poll every 90 seconds (reduced for rate limiting)
-  const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds for better responsiveness
+  const requestPolling = useRequestPolling(120000, true); // Poll every 2 minutes to avoid rate limiting
+  const activeMatches = useActiveMatches(30000); // Poll for matches every 30 seconds to avoid rate limiting
   const tripNotifications = useTripNotifications();
   const { 
     openGoogleMapsNavigation, 
@@ -313,7 +313,6 @@ export default function HomeScreen() {
   // Safe modal management functions
   const safeCloseModal = useCallback((modalSetter) => {
     try {
-      console.log("🔄 [HOME] Closing modal safely");
       if (isMounted.current) {
         modalSetter(false);
       }
@@ -326,7 +325,6 @@ export default function HomeScreen() {
     try {
       if (!isMounted.current) return;
       
-      console.log("🔄 [HOME] Resetting all modals to closed state");
       setModalVisible(false);
       setPhotoUploadVisible(false);
       setConsentVisible(false);
@@ -344,7 +342,6 @@ export default function HomeScreen() {
 
   // Force close notification modal function
   const forceCloseNotificationModal = useCallback(() => {
-    console.log("🔧 [HOME] Force closing notification modal");
     setRequestNotificationVisible(false);
   }, []);
 
@@ -387,15 +384,11 @@ export default function HomeScreen() {
   useEffect(() => {
     const currentMatchCount = activeMatches?.matches?.length || 0;
     
-    // Just log when new matches are detected (removed auto-redirect to ActiveMatchModal)
+    // Show success when new matches are detected
     if (currentMatchCount > previousMatchCount && currentMatchCount > 0 && isMounted.current) {
-      console.log("🎉 [MATCH DETECTED] New match created! Count:", currentMatchCount);
-      
-      // Close any open modals
       setRequestNotificationVisible(false);
       setSentRequestStatusVisible(false);
       
-      // Show simple success alert instead of opening modal
       Alert.alert(
         "Match Created! 🎉",
         "You've successfully matched with a companion! Your trip routes and meeting point are now displayed on the map.",
@@ -1160,8 +1153,8 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // Add debugging to track rendering issues
-  console.log("🏠 [HOME RENDER] Rendering home screen...");
+  // Remove excessive rendering logs to reduce noise
+  // console.log("🏠 [HOME RENDER] Rendering home screen...");
   
   // Safety check to prevent crashes
   if (!user) {
@@ -1568,14 +1561,8 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={styles.navButton}
               onPress={() => {
-                console.log("📱 [HOME] Opening notification modal");
-                // Reset any stuck states first
-                resetAllModals();
-                // Small delay then open notification modal
-                setTimeout(() => {
-                  setRequestNotificationVisible(true);
-                  requestPolling.markAsViewed();
-                }, 100);
+                setRequestNotificationVisible(true);
+                requestPolling.markAsViewed();
               }}
             >
               <View style={styles.notificationIconContainer}>
