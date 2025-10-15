@@ -300,7 +300,7 @@ export default function HomeScreen() {
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
   const requestPolling = useRequestPolling(90000, true); // Poll every 90 seconds (reduced for rate limiting)
-  const activeMatches = useActiveMatches(60000); // Poll for matches every 60 seconds (reduced for rate limiting)
+  const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds for better responsiveness
   const tripNotifications = useTripNotifications();
   const { 
     openGoogleMapsNavigation, 

@@ -5,6 +5,18 @@ const User = require("../models/userModel");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
 
+// Helper function to calculate distance between two points
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return Math.round(R * c);
+};
+
 // Schedule automatic cleanup every 1 minute (to handle 2-minute expiration)
 let cleanupInterval = null;
 
@@ -79,12 +91,52 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
     // DEBUG: Check what users are in UserLocation collection
     const allActiveUsers = await UserLocation.find({
         isActive: true,
-        lastSeen: { $gte: new Date(Date.now() - 10 * 60 * 1000) } // Last 10 minutes for debugging
+        lastSeen: { $gte: new Date(Date.now() - 30 * 60 * 1000) } // Last 30 minutes for debugging
     }).select("userId userName isActive shareLocation visibleToOthers lastSeen location");
     
-    console.log("🔍 [DEBUG] All active users in last 10 minutes:", allActiveUsers.length);
+    console.log("🔍 [DEBUG] All active users in last 30 minutes:", allActiveUsers.length);
     allActiveUsers.forEach(user => {
-        console.log(`  - ${user.userName}: active=${user.isActive}, share=${user.shareLocation}, visible=${user.visibleToOthers}, lastSeen=${user.lastSeen}`);
+        const distance = user.location ? 
+            calculateDistance(
+                startCoordinates.latitude, startCoordinates.longitude,
+                user.location.coordinates[1], user.location.coordinates[0]
+            ) : 'No location';
+        console.log(`  - ${user.userName}: active=${user.isActive}, share=${user.shareLocation}, visible=${user.visibleToOthers}, lastSeen=${user.lastSeen}, distance=${distance}m`);
+    });
+
+    // DEBUG: Test the exact query used by findNearbyUsers
+    const debugQuery = {
+        location: {
+            $nearSphere: {
+                $geometry: {
+                    type: "Point",
+                    coordinates: [startCoordinates.longitude, startCoordinates.latitude],
+                },
+                $maxDistance: searchRadius,
+            },
+        },
+        isActive: true,
+        shareLocation: true,
+        visibleToOthers: true,
+        lastSeen: {
+            $gte: new Date(Date.now() - 5 * 60 * 1000), // Last 5 minutes
+        },
+        userId: { $ne: senderId }
+    };
+    
+    console.log("🔍 [DEBUG] Testing exact findNearbyUsers query:");
+    console.log("   - Search center:", startCoordinates);
+    console.log("   - Search radius:", searchRadius, "meters");
+    console.log("   - Sender ID to exclude:", senderId);
+    
+    const debugResults = await UserLocation.find(debugQuery).select("userId userName location lastSeen");
+    console.log("🔍 [DEBUG] Direct query results:", debugResults.length);
+    debugResults.forEach(user => {
+        const distance = calculateDistance(
+            startCoordinates.latitude, startCoordinates.longitude,
+            user.location.coordinates[1], user.location.coordinates[0]
+        );
+        console.log(`   - ${user.userName}: distance=${distance}m, lastSeen=${user.lastSeen}`);
     });
     
     const nearbyUsers = await UserLocation.findNearbyUsers(
@@ -248,6 +300,42 @@ exports.markRequestAsViewed = catchAsync(async (req, res, next) => {
         status: "success",
         message: "Request marked as viewed"
     });
+});
+
+// Heartbeat endpoint to keep user visible for notifications
+exports.updateUserHeartbeat = catchAsync(async (req, res, next) => {
+    const userId = req.user._id;
+    const userName = req.user.userName;
+
+    console.log(`💓 [HEARTBEAT] Updating heartbeat for user: ${userName} (${userId})`);
+
+    try {
+        // Check if user location record exists
+        let userLocation = await UserLocation.findOne({ userId });
+        
+        if (userLocation) {
+            // If exists, just update the timestamp
+            userLocation.isActive = true;
+            userLocation.lastSeen = new Date();
+            await userLocation.save();
+        } else {
+            // Only create a new record if none exists - let them set location later
+            console.log(`ℹ️ [HEARTBEAT] No location record found for ${userName} - they need to update location first`);
+        }
+
+        console.log(`✅ [HEARTBEAT] Heartbeat updated for user: ${userName}`);
+
+        res.status(200).json({
+            status: "success",
+            message: "Heartbeat updated successfully",
+            data: {
+                timestamp: new Date()
+            }
+        });
+    } catch (error) {
+        console.error(`❌ [HEARTBEAT] Error updating heartbeat for user ${userName}:`, error);
+        return next(new AppError("Failed to update heartbeat", 500));
+    }
 });
 
 // Respond to trip request (accept/decline)

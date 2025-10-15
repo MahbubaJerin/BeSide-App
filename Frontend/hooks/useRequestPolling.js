@@ -76,6 +76,23 @@ export const useRequestPolling = (intervalMs = 30000, enabled = true) => { // In
         
         lastCountRef.current = newRequests.length;
         setPendingRequests(newRequests);
+
+        // Send heartbeat to keep user visible for notifications
+        try {
+          console.log("💓 Sending heartbeat to stay visible...");
+          const heartbeatUrl = `${API_URL}/api/v1/trip/heartbeat`;
+          await fetch(heartbeatUrl, {
+            method: "POST",
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json"
+            },
+          });
+          console.log("✅ Heartbeat sent successfully");
+        } catch (heartbeatError) {
+          console.log("⚠️ Heartbeat failed:", heartbeatError.message);
+          // Don't let heartbeat failure affect main polling
+        }
       } else {
         console.log("❌ Polling API error:", result.message);
         setNetworkError(result.message);

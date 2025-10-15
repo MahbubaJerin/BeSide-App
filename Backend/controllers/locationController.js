@@ -127,7 +127,7 @@ const findNearbyCompanions = catchAsync(async (req, res, next) => {
     console.log(`🔄 [COMPANION SEARCH] Updating user location and setting search mode for: ${userId}`);
     
     // Update current user's location and set searching mode
-    await UserLocation.findOneAndUpdate(
+    const locationUpdate = await UserLocation.findOneAndUpdate(
       { userId },
       {
         $set: {
@@ -139,15 +139,22 @@ const findNearbyCompanions = catchAsync(async (req, res, next) => {
           isSearching: true,
           searchRadius,
           lastSeen: new Date(),
+          shareLocation: true, // Force enable to ensure discoverability
+          visibleToOthers: true, // Force enable to ensure discoverability
         },
         $setOnInsert: {
           userName: req.user.userName,
-          shareLocation: true,
-          visibleToOthers: true,
         }
       },
       { upsert: true, new: true }
     );
+
+    console.log(`✅ [COMPANION SEARCH] Updated location for ${req.user.userName}:`);
+    console.log(`   - Coordinates: [${lng}, ${lat}]`);
+    console.log(`   - Active: ${locationUpdate.isActive}`);
+    console.log(`   - Share Location: ${locationUpdate.shareLocation}`);
+    console.log(`   - Visible to Others: ${locationUpdate.visibleToOthers}`);
+    console.log(`   - Last Seen: ${locationUpdate.lastSeen}`);
     
     console.log(`✅ [COMPANION SEARCH] User location updated and search mode enabled for: ${userId}`);
 

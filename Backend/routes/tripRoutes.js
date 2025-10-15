@@ -90,6 +90,12 @@ router.get(
   notificationController.getPendingRequests
 );
 
+// Heartbeat endpoint to keep users visible
+router.post(
+  "/heartbeat",
+  notificationController.updateUserHeartbeat
+);
+
 // Admin/debug endpoint to manually cleanup expired requests
 router.post(
   "/cleanup-expired",

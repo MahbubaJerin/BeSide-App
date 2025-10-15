@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../config';
 
-export function useActiveMatches(pollingInterval = 45000) { // Increased from 30s to 45s
+export function useActiveMatches(pollingInterval = 15000) { // Reduced to 15s for better responsiveness
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

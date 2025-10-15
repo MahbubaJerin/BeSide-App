@@ -137,7 +137,7 @@ UserLocationSchema.statics.findNearbyUsers = function (
     shareLocation: true,
     visibleToOthers: true,
     lastSeen: {
-      $gte: new Date(Date.now() - 5 * 60 * 1000), // Last 5 minutes
+      $gte: new Date(Date.now() - 15 * 60 * 1000), // Last 15 minutes
     },
   };
 
