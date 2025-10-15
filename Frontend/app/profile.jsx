@@ -24,7 +24,9 @@ import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { BASE_URL } from "../config";
 
-const API_BASE_URL = `${BASE_URL}api/v1/user`; 
+import ProfileHeader from "@/components/profile/ProfileHeader";
+
+const API_BASE_URL = `${BASE_URL}api/v1/user`;
 const { width, height } = Dimensions.get("window");
 
 export default function ProfileScreen() {
@@ -477,30 +479,14 @@ export default function ProfileScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-      <View style={[styles.header]}>
-  <TouchableOpacity
-    style={styles.goBackButton}
-    onPress={() => router.back()}
-    accessibilityLabel="Go back"
-    accessibilityRole="button"
-  >
-    <MaterialIcons name="arrow-back" size={28} color={text} />
-  </TouchableOpacity>
+      {/* Fixed header */}
+      <ProfileHeader onSettingsPress={handleSettingsPress} />
 
-  {/* Center Title */}
-  <Text style={[styles.headerTitle, { color: text }]}>Profile</Text>
-
-  <TouchableOpacity
-    style={styles.settingsButton}
-    onPress={handleSettingsPress}
-    accessibilityLabel="Open Settings"
-    accessibilityRole="button"
-  >
-    <MaterialIcons name="more-vert" size={28} color={text} />
-  </TouchableOpacity>
-</View>
-
+      {/* Scrollable content below */}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         <Animated.View style={[styles.profileSection, { opacity: fadeAnim }]}>
           <TouchableOpacity
             onPress={() => setPhotoModalVisible(true)}
@@ -971,38 +957,10 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  header: {
-  flexDirection: "row",
-  alignItems: "center",
-    justifyContent: "space-between",
-  width: "100%",
-    paddingVertical: 12,
-    marginTop: 30,
-padding: 10,
-  },
-  goBackButton: {
-    padding: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#000",
-  },
-  settingsButton: {
-    padding: 5,  
-},
 
-headerTitle: {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  textAlign: "center",
-  fontSize: 20,
-  fontWeight: "bold",
-  fontFamily: "SpaceMono",
-  letterSpacing: 1,
-},
-  
   profileSection: {
-    flexDirection: "row", alignItems: "center",
+    flexDirection: "row",
+    alignItems: "center",
     padding: 15,
     marginTop: 10,
     marginBottom: 10,
@@ -1026,7 +984,7 @@ headerTitle: {
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
-     padding: 15,
+    padding: 15,
   },
   editPhotoButton: {
     padding: 3,
@@ -1071,7 +1029,8 @@ headerTitle: {
     alignItems: "center",
     padding: 15,
     marginTop: 20,
-    marginRight: 10, marginBottom: 20,
+    marginRight: 10,
+    marginBottom: 20,
   },
   fieldContainer: { width: "100%", marginBottom: 20 },
   label: {
@@ -1094,7 +1053,6 @@ headerTitle: {
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 14,
-    
   },
   topBarTitle: {
     fontSize: 20,
@@ -1134,9 +1092,15 @@ headerTitle: {
       : { elevation: 4 }),
   },
   buttonText: {
-    fontSize: 16, fontWeight: "bold", fontFamily: "SpaceMono", borderWidth: 2, padding: 10, borderRadius: 12, marginBottom: 50
+    fontSize: 16,
+    fontWeight: "bold",
+    fontFamily: "SpaceMono",
+    borderWidth: 2,
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 50,
   },
-  
+
   modalView: {
     width: "100%",
     borderTopLeftRadius: 20,

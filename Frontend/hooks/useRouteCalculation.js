@@ -117,7 +117,7 @@ export function useRouteCalculation() {
       }
       
       // Simple geocoding test with a well-known address
-      const testUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=Melbourne&key=${GOOGLE_MAPS_KEY}`;
+      const testUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=Melbourne&key=${GOOGLE_MAPS_KEY}`; 
       const response = await fetch(testUrl);
       const data = await response.json();
       
