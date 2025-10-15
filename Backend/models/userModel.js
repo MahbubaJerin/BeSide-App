@@ -45,6 +45,23 @@ const UserSchema = new Schema(
       type: String,
       enum: ["male", "female", "non-binary", "prefer-not-to-say", "other"],
     },
+  dob: {
+  type: Date,
+  required: [true, "Date of birth is required"],
+  validate: {
+    validator(value) {
+      const today = new Date();
+      // Compare birthdays by shifting today's year back 18
+      const eighteenth = new Date(today);
+      eighteenth.setFullYear(today.getFullYear() - 18);
+      // If dob is on or before the “18th birthday date”, user is >= 18
+      return value <= eighteenth;
+    },
+    message: "You must be at least 18 years old.",
+  },
+},
+
+
     mobileNo: {
       type: String,
       required: [true, "Mobile number is required"],
@@ -86,6 +103,7 @@ const UserSchema = new Schema(
         type: String,
         default: "",
       },
+      
     },
     isVerified: {
       type: Boolean,
@@ -138,10 +156,6 @@ const UserSchema = new Schema(
       type: String,
       enum: ["active", "suspended", "deactivated"],
       default: "active",
-    },
-    bio: {
-      type: String,
-      maxlength: 500,
     },
 
     // Emergency Contacts (NEW) 

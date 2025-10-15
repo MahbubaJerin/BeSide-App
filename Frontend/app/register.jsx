@@ -134,7 +134,7 @@ export default function RegisterScreen() {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         gender,
-        dateOfBirth: dob ? formatDateYMD(dob) : undefined,
+        dob: dob ? formatDateYMD(dob) : undefined,
         address: {
           street: street.trim(),
           city: city.trim(),

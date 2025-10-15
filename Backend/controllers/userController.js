@@ -6,11 +6,12 @@ const generateUserId = require("../utils/generateUserId");
 
 // Update user profile and generate userId if missing
 exports.updateUserProfile = catchAsync(async (req, res, next) => {
-  const { userName, email, mobileNo, firstName, lastName, bio, address } = req.body;
+const { userName, email, mobileNo, firstName, lastName, bio, address, dob } = req.body;
 
   const updateData = {};
   if (userName) updateData.userName = userName;
   if (email) updateData.email = email;
+  if (dob) updateData.dob = dob;
   if (mobileNo) updateData.mobileNo = mobileNo;
   if (firstName) updateData.firstName = firstName;
   if (lastName) updateData.lastName = lastName;
@@ -117,12 +118,31 @@ exports.updateAvailability = catchAsync(async (req, res, next) => {
 });
 
 // View current user profile
+// Backend/controllers/userController.js
+
 exports.getUserProfile = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.user._id).select("-password -__v");
   if (!user) return next(new AppError("User not found", 404));
 
+  // 👇 Add this ONE line:
+  console.log("[GET /api/v1/user/profile][RESPONSE]", JSON.stringify({
+    userId: user.userId,
+    userName: user.userName,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    mobileNo: user.mobileNo,
+    gender: user.gender,
+    dob: user.dob,
+    address: user.address,
+    availability: user.availability,
+    profileSettings: user.profileSettings,
+    isVerified: user.isVerified,
+  }, null, 2));
+
   res.status(200).json({ status: "success", data: { user } });
 });
+
 
 // Delete user profile and remove image from Cloudinary
 exports.deleteUserProfile = catchAsync(async (req, res, next) => {

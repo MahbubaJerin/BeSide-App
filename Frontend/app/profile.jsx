@@ -2,9 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
-  Image,
   Alert,
   ActivityIndicator,
   ScrollView,
@@ -12,22 +10,25 @@ import {
   KeyboardAvoidingView,
   TouchableOpacity,
   Dimensions,
-  Modal,
   Animated,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
-import { Colors } from "@/constants/Colors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
+
 import { BASE_URL } from "../config";
 
 import ProfileHeader from "@/components/profile/ProfileHeader";
+import ProfileSettingsModal from "@/components/profile/ProfileSettingsSidebar";
+import ProfileVisibilityModal from "@/components/profile/ProfileVisibilityModal";
+import ProfilePreviewModal from "@/components/profile/ProfilePreviewModal";
+import ProfileCard from "@/components/profile/ProfileCard";
 
 const API_BASE_URL = `${BASE_URL}api/v1/user`;
 const { width, height } = Dimensions.get("window");
+
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState(null);
@@ -37,7 +38,9 @@ export default function ProfileScreen() {
   const [mobileNo, setMobileNo] = useState("");
   const [gender, setGender] = useState("");
   const [photo, setPhoto] = useState(null);
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [address, setAddress] = useState({});
+  const [consentGiven, setConsentGiven] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
@@ -54,7 +57,6 @@ export default function ProfileScreen() {
   });
 
   const [originalVisibility, setOriginalVisibility] = useState({});
-  const [consentGiven, setConsentGiven] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
 
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -62,11 +64,9 @@ export default function ProfileScreen() {
   const [availability, setAvailability] = useState(true);
 
   const border = useThemeColor({}, "primary");
-  const secondary = useThemeColor({}, "secondary");
   const text = useThemeColor({}, "text");
   const surface = useThemeColor({}, "surface");
-  const muted = useThemeColor({}, "muted");
-
+  
   useEffect(() => {
     fetchProfile();
     Animated.timing(fadeAnim, {
@@ -78,7 +78,10 @@ export default function ProfileScreen() {
 
   const fetchProfile = async () => {
     const token = await AsyncStorage.getItem("token");
-    if (!token) return router.replace("/login");
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/profile`, {
@@ -89,12 +92,33 @@ export default function ProfileScreen() {
         throw new Error(`HTTP error ${res.status}: ${errorText}`);
       }
       const data = await res.json();
+      console.log("[PROFILE][RAW_RESPONSE] /api/v1/user/profile →");
+try {
+  console.log(JSON.stringify(data, null, 2));
+} catch (e) {
+  console.log(data);
+}
       if (data.status === "success") {
         const user = data.data.user;
+        console.log("[PROFILE][USER_MAPPED_FIELDS]", {
+  userName: user?.userName,
+  email: user?.email,
+  mobileNo: user?.mobileNo,
+  firstName: user?.firstName,
+  lastName: user?.lastName,
+  gender: user?.gender,
+  dob: user?.dob,                // if backend uses `dob`
+  dateOfBirth: user?.dateOfBirth, // if backend uses `dateOfBirth`
+  address: user?.address,
+  availability: user?.availability,
+  profileSettings: user?.profileSettings,
+  isVerified: user?.isVerified,
+});
         setProfile(user);
         setFirstName(user.firstName || "");
         setLastName(user.lastName || "");
         setEmail(user.email || "");
+setDateOfBirth(user.dob || user.dateOfBirth || "");
         setMobileNo(user.mobileNo || "");
         setGender(user.gender || "");
         setPhoto(user.profilePhoto?.url || null);
@@ -202,62 +226,62 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSave = async () => {
-    if (!email || !mobileNo) {
-      Alert.alert("Validation Error", "Email and Mobile Number are required.");
-      return;
-    }
+const handleSave = async () => {
+  if (!email || !mobileNo) {
+    Alert.alert("Validation Error", "Email and Mobile Number are required.");
+    return;
+  }
 
-    const payload = {
-      userName,
-      firstName,
-      lastName,
-      email,
-      mobileNo,
-      gender,
-      address,
-      availability,
-    };
-
-    setSaving(true);
-    const token = await AsyncStorage.getItem("token");
-    try {
-      console.log("Sending payload:", payload);
-      const res = await fetch(`${API_BASE_URL}/profile`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          email,
-          mobileNo,
-          gender,
-          availability,
-          userName,
-          address,
-        }),
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      console.log("Backend response:", data);
-      if (res.ok) {
-        Alert.alert("Success", "Profile Updated");
-        setEditMode(false);
-        fetchProfile();
-      } else {
-        Alert.alert("Error", data.message || "Failed to update profile.");
-      }
-    } catch (e) {
-      console.log("Error during save:", e.message);
-      Alert.alert("Error", "Failed to update profile: " + e.message);
-    } finally {
-      setSaving(false);
-    }
+  // 🧠 Map addressString → street so backend accepts it
+  const payload = {
+    userName,
+    email,
+    dob: dateOfBirth,
+    mobileNo,
+    gender,
+    address: {
+      street: address?.addressString || "", // send the entire string here
+      city: "",
+      state: "",
+      postalCode: "",
+      country: "Australia",
+      countryCode: "AU",
+    },
+    availability,
   };
+
+  setSaving(true);
+  const token = await AsyncStorage.getItem("token");
+
+  try {
+    console.log("📤 Sending payload:", payload);
+    const res = await fetch(`${API_BASE_URL}/profile`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    console.log("✅ Backend response:", data);
+
+    if (res.ok) {
+      Alert.alert("Success", "Profile updated successfully");
+      setEditMode(false);
+      fetchProfile(); // refresh view
+    } else {
+      Alert.alert("Error", data.message || "Failed to update profile.");
+    }
+  } catch (e) {
+    console.log("❌ Error during save:", e.message);
+    Alert.alert("Error", "Failed to update profile: " + e.message);
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   const handleVisibilitySave = async () => {
     const token = await AsyncStorage.getItem("token");
@@ -360,7 +384,7 @@ export default function ProfileScreen() {
             <Picker
               selectedValue={value}
               onValueChange={(itemValue) => onChangeText(itemValue)}
-              style={{ color: text, fontFamily: "SpaceMono" }}
+              style={{ color: text, fontFamily: "Arial" }}
               enabled={editable}
               accessibilityLabel={`Select ${label}`}
               accessibilityRole="combobox"
@@ -481,143 +505,34 @@ export default function ProfileScreen() {
     >
       {/* Fixed header */}
       <ProfileHeader onSettingsPress={handleSettingsPress} />
-
+<ProfileCard
+  profile={profile}
+  fields={{
+    photo,
+    userName,
+    email,
+    gender,
+    firstName,
+    lastName,
+    mobileNo,
+    availability,
+    dateOfBirth,
+    address,
+  }}
+  setters={{
+    setEmail,
+    setGender,
+    setDateOfBirth,
+    setAddress,
+  }}
+  editMode={editMode}
+  colors={{ text }}
+/>
       {/* Scrollable content below */}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <Animated.View style={[styles.profileSection, { opacity: fadeAnim }]}>
-          <TouchableOpacity
-            onPress={() => setPhotoModalVisible(true)}
-            accessibilityLabel="View or change profile photo"
-            accessibilityRole="button"
-          >
-            <Image
-              source={{ uri: photo || "https://via.placeholder.com/150" }}
-              style={[
-                styles.profileImage,
-                editMode && { borderColor: border, borderWidth: 2 },
-              ]}
-              accessibilityLabel="User's profile photo"
-            />
-          </TouchableOpacity>
-          <Modal
-            animationType="fade"
-            transparent={true}
-            visible={photoModalVisible}
-            onRequestClose={() => setPhotoModalVisible(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View
-                style={[styles.photoModalView, { backgroundColor: surface }]}
-              >
-                <Image
-                  source={{ uri: photo || "https://via.placeholder.com/150" }}
-                  style={styles.fullScreenImage}
-                  accessibilityLabel="Full-screen profile photo"
-                />
-                <TouchableOpacity
-                  style={styles.floatingCloseButton}
-                  onPress={() => setPhotoModalVisible(false)}
-                  accessibilityLabel="Close Profile Picture Modal"
-                  accessibilityRole="button"
-                >
-                  <MaterialIcons name="close" size={28} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
-          {editMode && (
-            <TouchableOpacity
-              style={styles.editPhotoButton}
-              onPress={pickImage}
-              accessibilityLabel="Change Profile Photo"
-              accessibilityRole="button"
-            >
-              <MaterialIcons name="edit" size={24} color={text} />
-            </TouchableOpacity>
-          )}
-          <View style={styles.nameSection}>
-            {editMode ? (
-              <TextInput
-                style={{
-                  borderBottomWidth: 1,
-                  borderBottomColor: border,
-                  fontSize: 22,
-                  fontWeight: "600",
-                  color: text,
-                }}
-                value={userName}
-                onChangeText={setUserName}
-                placeholder="Enter Username"
-              />
-            ) : (
-              <Text
-                style={[styles.name, { color: text }]}
-                accessibilityLabel={`User's username: ${userName}`}
-                accessibilityRole="text"
-              >
-                {userName || "No username set"}
-              </Text>
-            )}
-
-            <Text style={[styles.subtext, { color: text }]}>
-              User ID: {profile.userId || "Not generated"}
-            </Text>
-
-            <Text style={[styles.subtext, { color: text }]}>
-              {profile?.tripCount || "0"} Trips Completed
-            </Text>
-
-            {profile.isVerified && (
-              <Text style={[styles.subtext, { color: "green" }]}>Verified</Text>
-            )}
-
-            {profile.dateOfBirth && (
-              <Text style={[styles.label, { color: text, fontSize: 14 }]}>
-                DOB:{" "}
-                {new Date(profile.dateOfBirth).toLocaleDateString(undefined, {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </Text>
-            )}
-            <Text style={[styles.label, { color: text, fontSize: 14 }]}>
-              Gender: {gender || "Not specified"}
-            </Text>
-
-            <Text style={[styles.subtext, { color: text }]}>
-              Availability: {availability ? "Available" : "Unavailable"}
-            </Text>
-          </View>
-        </Animated.View>
-
-        <View style={styles.infoContainer}>
-          {renderField("First Name", firstName, editMode, setFirstName)}
-          {renderField("Last Name", lastName, editMode, setLastName)}
-          {renderField("Email", email, editMode, setEmail)}
-          {renderField("Mobile Number", mobileNo, editMode, setMobileNo)}
-          {renderField("Street", address.street || "", editMode, (text) =>
-            setAddress((prev) => ({ ...prev, street: text }))
-          )}
-          {renderField("City", address.city || "", editMode, (text) =>
-            setAddress((prev) => ({ ...prev, city: text }))
-          )}
-          {renderField("State", address.state || "", editMode, (text) =>
-            setAddress((prev) => ({ ...prev, state: text }))
-          )}
-          {renderField("Country", address.country || "", editMode, (text) =>
-            setAddress((prev) => ({ ...prev, country: text }))
-          )}
-          {renderField(
-            "Postal Code",
-            address.postalCode || "",
-            editMode,
-            (text) => setAddress((prev) => ({ ...prev, postalCode: text }))
-          )}
-        </View>
 
         {editMode && (
           <View style={styles.buttonContainer}>
@@ -646,306 +561,48 @@ export default function ProfileScreen() {
           </View>
         )}
       </ScrollView>
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={previewVisible}
-        onRequestClose={() => setPreviewVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalView, { backgroundColor: surface }]}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setPreviewVisible(false)}
-              accessibilityLabel="Close Preview"
-              accessibilityRole="button"
-            >
-              <MaterialIcons name="close" size={24} color={text} />
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: text }]}>
-              Profile Preview
-            </Text>
-            <ScrollView>
-              <View style={styles.profileSection}>
-                <Image
-                  source={{ uri: photo || "https://via.placeholder.com/150" }}
-                  style={styles.profileImage}
-                />
-                <View style={styles.nameSection}>
-                  <Text style={[styles.name, { color: text }]}>
-                    {firstName} {lastName}
-                  </Text>
-                  <Text style={[styles.subtext, { color: text }]}>
-                    User ID: {profile.userId || "Not generated"}
-                  </Text>
-                  <Text style={[styles.subtext, { color: text }]}>
-                    {profile?.tripCount || "0"} Trips Completed
-                  </Text>
-                  {profile.isVerified && (
-                    <Text style={[styles.subtext, { color: "green" }]}>
-                      Verified
-                    </Text>
-                  )}
-                  <Text style={[styles.subtext, { color: text }]}>
-                    Status: {profile.accountStatus}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.infoContainer}>
-                {visibility.email && email ? (
-                  <Text style={[styles.label, { color: text }]}>
-                    Email: {email}
-                  </Text>
-                ) : null}
-                {visibility.mobileNo && mobileNo ? (
-                  <Text style={[styles.label, { color: text }]}>
-                    Mobile: {mobileNo}
-                  </Text>
-                ) : null}
-                {visibility.gender && gender ? (
-                  <Text style={[styles.label, { color: text }]}>
-                    Gender: {gender}
-                  </Text>
-                ) : null}
-                {visibility.address && address ? (
-                  <Text style={[styles.label, { color: text }]}>
-                    Address:{" "}
-                    {[
-                      address.street,
-                      address.city,
-                      address.state,
-                      address.country,
-                      address.postalCode,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </Text>
-                ) : null}
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-      <Modal
-        animationType="fade"
-        transparent={true}
+
+      <ProfileSettingsModal
         visible={settingsModalVisible}
-        onRequestClose={() => setSettingsModalVisible(false)}
-      >
-        <View style={styles.sidebarOverlay}>
-          {/* Overlay background */}
-          <TouchableOpacity
-            style={styles.overlayTouchable}
-            onPress={() => setSettingsModalVisible(false)}
-            activeOpacity={1}
-          />
+        onClose={() => setSettingsModalVisible(false)}
+        onEdit={() => setEditMode(true)}
+        onVisibility={() => setVisibilityModal(true)}
+        onDelete={handleDeleteProfile}
+        onLogout={handleLogout}
+        text={text}
+        surface={surface}
+      />
 
-          {/* Sidebar content */}
-          <View style={[styles.sidebarContainer, { backgroundColor: surface }]}>
-            {/* Topbar inside sidebar */}
-            <View style={styles.topBar}>
-              <Text style={[styles.topBarTitle, { color: text }]}>
-                Settings
-              </Text>
-              <TouchableOpacity onPress={() => setSettingsModalVisible(false)}>
-                <MaterialIcons name="close" size={28} color={text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.settingsContent}>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => {
-                  setEditMode(true);
-                  setSettingsModalVisible(false);
-                }}
-              >
-                <View style={styles.modalOptionRow}>
-                  <MaterialIcons name="edit" size={24} color={text} />
-                  <Text style={[styles.modalText, { color: text }]}>Edit</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => {
-                  setVisibilityModal(true);
-                  setSettingsModalVisible(false);
-                }}
-              >
-                <View style={styles.modalOptionRow}>
-                  <MaterialIcons name="visibility" size={24} color={text} />
-                  <Text style={[styles.modalText, { color: text }]}>
-                    Visibility
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={handleDeleteProfile}
-              >
-                <View style={styles.modalOptionRow}>
-                  <MaterialIcons name="delete" size={24} color={text} />
-                  <Text style={[styles.modalText, { color: text }]}>
-                    Delete
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => {
-                  setSettingsModalVisible(false);
-                  handleLogout();
-                }}
-              >
-                <View style={styles.modalOptionRow}>
-                  <MaterialIcons name="logout" size={24} color={text} />
-                  <Text style={[styles.modalText, { color: text }]}>
-                    Logout
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        animationType="fade"
-        transparent={true}
+      <ProfileVisibilityModal
         visible={visibilityModal}
-        onRequestClose={() => setVisibilityModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalView, { backgroundColor: surface }]}>
-            <Text style={[styles.modalTitle, { color: text }]}>
-              Profile Visibility
-            </Text>
-            <ScrollView>
-              <TouchableOpacity
-                style={styles.previewButton}
-                onPress={() => setPreviewVisible(true)}
-                accessibilityLabel="Preview Profile"
-                accessibilityRole="button"
-              >
-                <MaterialIcons name="visibility" size={24} color={text} />
-                <Text style={[styles.previewText, { color: text }]}>
-                  Preview
-                </Text>
-              </TouchableOpacity>
-              {renderVisibilityField("Email", "email")}
-              {renderVisibilityField("Mobile Number", "mobileNo")}
-              {renderVisibilityField("Address", "address")}
+        onClose={() => setVisibilityModal(false)}
+        onSave={handleVisibilitySave}
+        onPreview={() => setPreviewVisible(true)}
+        onCancel={() => {
+          setVisibility(originalVisibility);
+          setVisibilityModal(false);
+        }}
+        renderVisibilityField={renderVisibilityField}
+        text={text}
+        surface={surface}
+      />
 
-              {renderVisibilityField("Gender", "gender")}
-              <View style={styles.visibilityField}></View>
-            </ScrollView>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                onPress={handleVisibilitySave}
-                accessibilityLabel="Save Visibility Changes"
-                accessibilityRole="button"
-              >
-                <Text style={styles.buttonText}>Save Changes</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setVisibility(originalVisibility);
-                  setVisibilityModal(false);
-                }}
-                accessibilityLabel="Cancel Visibility Changes"
-                accessibilityRole="button"
-              >
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        animationType="fade"
-        transparent={true}
+      <ProfilePreviewModal
         visible={previewVisible}
-        onRequestClose={() => setPreviewVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalView, { backgroundColor: surface }]}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setPreviewVisible(false)}
-              accessibilityLabel="Close Preview"
-              accessibilityRole="button"
-            >
-              <MaterialIcons name="close" size={24} color={text} />
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: text }]}>
-              Profile Preview
-            </Text>
-            <ScrollView>
-              <View style={styles.profileSection}>
-                <Image
-                  source={{ uri: photo || "https://via.placeholder.com/150" }}
-                  style={styles.profileImage}
-                />
-                <View style={styles.nameSection}>
-                  <Text style={[styles.name, { color: text }]}>
-                    {userName || "No username set"}
-                  </Text>
-
-                  <Text style={[styles.subtext, { color: text }]}>
-                    User ID: {profile.userId || "Not generated"}
-                  </Text>
-                  <Text style={[styles.subtext, { color: text }]}>
-                    {profile?.tripCount || "0"} Trips Completed
-                  </Text>
-                  {profile.isVerified && (
-                    <Text style={[styles.subtext, { color: "green" }]}>
-                      Verified
-                    </Text>
-                  )}
-                  <Text style={[styles.subtext, { color: text }]}>
-                    Status: {profile.accountStatus}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.infoContainer}>
-                {visibility.email && email ? (
-                  <Text style={[styles.label, { color: text }]}>
-                    Email: {email}
-                  </Text>
-                ) : null}
-                {visibility.mobileNo && mobileNo ? (
-                  <Text style={[styles.label, { color: text }]}>
-                    Mobile: {mobileNo}
-                  </Text>
-                ) : null}
-                {visibility.gender && gender ? (
-                  <Text style={[styles.label, { color: text }]}>
-                    Gender: {gender}
-                  </Text>
-                ) : null}
-                {visibility.address && address ? (
-                  <Text style={[styles.label, { color: text }]}>
-                    Address:{" "}
-                    {[
-                      address.street,
-                      address.city,
-                      address.state,
-                      address.country,
-                      address.postalCode,
-                    ]
-                      .filter(Boolean)
-                      .join(", ")}
-                  </Text>
-                ) : null}
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setPreviewVisible(false)}
+        profile={profile}
+        photo={photo}
+        text={text}
+        surface={surface}
+        visibility={visibility}
+        email={email}
+        mobileNo={mobileNo}
+        gender={gender}
+        address={address}
+        firstName={firstName}
+        lastName={lastName}
+        userName={userName}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -958,124 +615,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
 
-  profileSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 15,
-    marginTop: 10,
-    marginBottom: 10,
-    marginLeft: 10,
-    marginRight: 10,
-    backgroundColor: "#f9f9f9",
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  profileImage: {
-    width: width * 0.2,
-    height: width * 0.2,
-    borderRadius: (width * 0.2) / 2,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-    padding: 15,
-  },
-  editPhotoButton: {
-    padding: 3,
-    borderRadius: 13,
-    position: "flex-end",
-    backgroundColor: "#76b6ff",
-    top: 10,
-    right: 10,
-  },
-  modalCloseButton: {
-    backgroundColor: "#f0f0f0",
-    padding: 4,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "absolute",
-    top: 10,
-    right: 10,
-  },
-  nameSection: {
-    marginLeft: 15,
-    marginRight: 15,
-    flex: 1,
-    flexDirection: "column",
-  },
-  subtext: {
-    fontSize: 15,
-    fontFamily: "SpaceMono",
-    marginBottom: 4,
-  },
-  name: {
-    fontSize: 28,
-    fontWeight: "bold",
-    fontFamily: "SpaceMono",
-    letterSpacing: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  infoContainer: {
-    alignItems: "center",
-    padding: 15,
-    marginTop: 20,
-    marginRight: 10,
-    marginBottom: 20,
-  },
-  fieldContainer: { width: "100%", marginBottom: 20 },
-  label: {
-    fontSize: 16,
-    fontWeight: "500",
-    fontFamily: "SpaceMono",
-    marginBottom: 5,
-  },
-  input: {
-    height: 50,
-    borderWidth: 1.5,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    fontFamily: "SpaceMono",
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  topBarTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    fontFamily: "SpaceMono",
-  },
-  settingsContent: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#ccc",
-  },
-  settingsCard: {
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 5,
-  },
-
-  inputText: {
-    fontSize: 16,
-    fontFamily: "SpaceMono",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
   button: {
     flex: 1,
     padding: 12,
@@ -1094,175 +633,17 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 16,
     fontWeight: "bold",
-    fontFamily: "SpaceMono",
+    fontFamily: "Arial",
     borderWidth: 2,
     padding: 10,
     borderRadius: 12,
     marginBottom: 50,
-  },
-
-  modalView: {
-    width: "100%",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: height * 0.8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  floatingCloseButton: {
-    position: "absolute",
-    top: 15,
-    right: 15,
-    backgroundColor: "#00000080", // semi-transparent black
-    borderRadius: 20,
-    padding: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 6, // Android shadow
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    zIndex: 10,
-  },
-
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
-  },
-  photoModalView: {
-    width: width * 0.9,
-    borderRadius: 12,
-    padding: 20,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  closeButton: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "#ffffff90",
-    borderRadius: 20,
-    shadowColor: "black",
-    borderWidth: 3,
-    padding: 8,
-    zIndex: 1,
-  },
-
-  sidebarOverlay: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "rgba(0,0,0,0.5)", // dim background
-  },
-  overlayTouchable: {
-    flex: 1, // covers right side, closes on tap
-  },
-  sidebarContainer: {
-    width: "70%", // sidebar width
-    height: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-
-  fullScreenImage: {
-    width: width * 0.8,
-    height: width * 0.8,
-    borderRadius: 12,
-    resizeMode: "cover",
-  },
-  largePhoto: {
-    width: width * 0.8,
-    height: width * 0.8,
-    borderRadius: 12,
-    marginBottom: 20,
-  },
-  modalChangeButton: {
-    position: "absolute",
-    top: 10,
-    left: 10,
-    padding: 10,
-    borderRadius: 20,
-    backgroundColor: "border" + 20,
-  },
-  modalCloseButton: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    padding: 10,
-    borderRadius: 20,
-    backgroundColor: "text" + 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    fontFamily: "SpaceMono",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  modalOption: {
-    paddingVertical: 15,
-    justifyContent: "center",
-    marginBottom: 10,
-    paddingVertical: 18,
-    width: "100%",
-    justifyContent: "flex-start",
-    paddingHorizontal: 20,
-  },
-  modalOptionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  modalText: {
-    fontSize: 18,
-    textAlign: "center",
-    fontFamily: "SpaceMono",
-    marginLeft: 10,
-    fontSize: 18,
-    fontFamily: "SpaceMono",
-    marginLeft: 12,
-  },
-  dragHandle: {
-    width: 40,
-    height: 5,
-    backgroundColor: "#ccc",
-    borderRadius: 2.5,
-    alignSelf: "center",
-    marginBottom: 10,
   },
   visibilityField: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 10,
-  },
-  previewButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  previewText: { marginLeft: 5, fontSize: 16, fontFamily: "SpaceMono" },
-  closeButton: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    borderWidth: 2,
-    borderRadius: 8,
   },
   buttonContainer: {
     flexDirection: "row",

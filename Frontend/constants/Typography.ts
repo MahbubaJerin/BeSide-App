@@ -4,14 +4,14 @@ export const Typography: Record<string, TextStyle> = {
   title: {
     fontSize: 32,
     fontWeight: "700",
-    fontFamily: "SpaceMono",
+    fontFamily: "Arial",
     lineHeight: 38,
     letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: 13,
     fontWeight: "500",
-    fontFamily: "SpaceMono",
+    fontFamily: "Arial",
     lineHeight: 24,
     letterSpacing: 0.5,
   },
@@ -24,13 +24,13 @@ export const Typography: Record<string, TextStyle> = {
   defaultSemiBold: {
     fontSize: 16,
     fontWeight: "600",
-    fontFamily: "SpaceMono",
+    fontFamily: "Arial",
     lineHeight: 22,
   },
   caption: {
     fontSize: 13,
     fontWeight: "400",
-    fontFamily: "SpaceMono",
+    fontFamily: "Arial",
     lineHeight: 18,
     letterSpacing: 0.2,
     opacity: 0.7,

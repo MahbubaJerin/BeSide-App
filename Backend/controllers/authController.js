@@ -137,6 +137,7 @@ exports.logout = catchAsync(async (req, res, next) => {
  * Verify user ID
  */
 exports.verifyUser = catchAsync(async (req, res, next) => {
+  
   const {
     userName,
     verificationIdType,
@@ -259,6 +260,7 @@ exports.registerUser = catchAsync(async (req, res, next) => {
     firstName,
     lastName,
     gender,
+     dob: dob || null,
     address: {
       street: address.street || "",
       city: address.city || "",

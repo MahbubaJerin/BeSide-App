@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 20,
     fontWeight: "bold",
-    fontFamily: "SpaceMono",
+    fontFamily: "Arial",
     letterSpacing: 1,
     zIndex: 0, 
   },
