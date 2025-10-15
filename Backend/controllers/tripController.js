@@ -541,3 +541,92 @@ exports.expireRequest = catchAsync(async (req, res, next) => {
     });
   }
 });
+
+// Update arrival status for navigation
+exports.updateArrival = catchAsync(async (req, res, next) => {
+  const { matchId, userRole, arrivedAt } = req.body;
+  const userId = req.user._id.toString();
+
+  console.log(`🚶‍♀️ [ARRIVAL] User ${userId} (${userRole}) arrived at meeting point for match ${matchId}`);
+
+  const TripMatch = require("../models/tripMatchModel");
+  const tripMatch = await TripMatch.findOne({ matchId });
+  
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  const isAuthorized = tripMatch.organizer.userId === userId || tripMatch.companion.userId === userId;
+  if (!isAuthorized) {
+    return next(new AppError("Not authorized for this trip match", 403));
+  }
+
+  // Update arrival status
+  if (userRole === 'organizer') {
+    tripMatch.progression.organizerArrived = new Date(arrivedAt);
+  } else {
+    tripMatch.progression.companionArrived = new Date(arrivedAt);
+  }
+
+  // If both arrived, mark as meeting
+  if (tripMatch.progression.organizerArrived && tripMatch.progression.companionArrived) {
+    tripMatch.status = 'meeting';
+    console.log(`👥 [MEETING] Both users arrived for match ${matchId}`);
+  }
+
+  await tripMatch.save();
+
+  res.status(200).json({
+    status: "success",
+    message: "Arrival updated successfully",
+    data: {
+      match: tripMatch
+    }
+  });
+});
+
+// Complete trip match
+exports.completeMatch = catchAsync(async (req, res, next) => {
+  const { matchId, completedBy } = req.body;
+  const userId = req.user._id.toString();
+
+  console.log(`✅ [COMPLETE] User ${userId} (${completedBy}) completing match ${matchId}`);
+
+  const TripMatch = require("../models/tripMatchModel");
+  const tripMatch = await TripMatch.findOne({ matchId });
+  
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  const isAuthorized = tripMatch.organizer.userId === userId || tripMatch.companion.userId === userId;
+  if (!isAuthorized) {
+    return next(new AppError("Not authorized for this trip match", 403));
+  }
+
+  // Mark as completed
+  tripMatch.status = 'completed';
+  tripMatch.progression.completed = new Date();
+  
+  await tripMatch.save();
+
+  // Also update the original trip request
+  const tripRequest = await TripRequest.findOne({ tripReqId: tripMatch.originalTripRequest.tripReqId });
+  if (tripRequest) {
+    tripRequest.status = 'completed';
+    tripRequest.completedAt = new Date();
+    await tripRequest.save();
+  }
+
+  console.log(`🎉 [COMPLETED] Match ${matchId} successfully completed`);
+
+  res.status(200).json({
+    status: "success",
+    message: "Trip completed successfully",
+    data: {
+      match: tripMatch
+    }
+  });
+});

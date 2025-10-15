@@ -168,4 +168,15 @@ router.post(
   notificationController.sendTripNotification
 );
 
+// Navigation and completion routes
+router.post(
+  "/update-arrival",
+  tripController.updateArrival
+);
+
+router.post(
+  "/complete-match",
+  tripController.completeMatch
+);
+
 module.exports = router;

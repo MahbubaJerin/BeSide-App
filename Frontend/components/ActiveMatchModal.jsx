@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/Colors";
 import MeetingPointModal from "./MeetingPointModal";
 import LiveTripModal from "./LiveTripModal";
+import NavigationModal from "./NavigationModal";
 
 export default function ActiveMatchModal({
   visible,
@@ -31,6 +32,7 @@ export default function ActiveMatchModal({
 }) {
   const [meetingPointModalVisible, setMeetingPointModalVisible] = useState(false);
   const [liveTripModalVisible, setLiveTripModalVisible] = useState(false);
+  const [navigationModalVisible, setNavigationModalVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -248,6 +250,17 @@ export default function ActiveMatchModal({
                         </>
                       )}
                       
+                      {match.status === 'active' && (
+                        <ThemedButton
+                          title={match.meetingPoint ? "🧭 Navigate to Meeting" : "🗺️ View Route Map"}
+                          onPress={() => {
+                            setSelectedMatch(match);
+                            setNavigationModalVisible(true);
+                          }}
+                          style={[styles.actionButton, styles.navigationButton]}
+                        />
+                      )}
+
                       {match.status === 'in-progress' && (
                         <>
                           <ThemedButton
@@ -257,6 +270,14 @@ export default function ActiveMatchModal({
                               setLiveTripModalVisible(true);
                             }}
                             style={[styles.actionButton, styles.liveTrackingButton]}
+                          />
+                          <ThemedButton
+                            title="🧭 Navigation"
+                            onPress={() => {
+                              setSelectedMatch(match);
+                              setNavigationModalVisible(true);
+                            }}
+                            style={[styles.actionButton, styles.navigationButton]}
                           />
                           <ThemedButton
                             title="✅ Complete"
@@ -315,6 +336,17 @@ export default function ActiveMatchModal({
         match={selectedMatch}
         currentUserId={currentUserId}
         onUpdateTripStatus={onUpdateStatus}
+      />
+
+      {/* Navigation Modal */}
+      <NavigationModal
+        visible={navigationModalVisible}
+        onClose={() => {
+          setNavigationModalVisible(false);
+          setSelectedMatch(null);
+        }}
+        tripMatch={selectedMatch}
+        userRole={selectedMatch?.organizer?.userId === currentUserId ? 'organizer' : 'companion'}
       />
     </Modal>
   );
@@ -497,6 +529,9 @@ const styles = StyleSheet.create({
   },
   liveTrackingButton: {
     backgroundColor: "#9C27B0",
+  },
+  navigationButton: {
+    backgroundColor: "#00BCD4",
   },
   completeButton: {
     backgroundColor: "#2196F3",

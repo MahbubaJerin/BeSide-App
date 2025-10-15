@@ -143,7 +143,10 @@ const TripReqSchema = new Schema(
     meetingPoint: {
         latitude: { type: Number },
         longitude: { type: Number },
-        address: { type: String },
+        name: { type: String },
+        description: { type: String },
+        type: { type: String },
+        address: { type: String }, // Keep for backward compatibility
         isSelected: { type: Boolean, default: false }
     },
 

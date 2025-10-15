@@ -70,16 +70,19 @@ export default function MeetingPointModal({
     if (midpoint) {
       suggestions.push({
         ...midpoint,
-        type: "Midpoint between current locations",
+        title: "Midpoint Location",
+        type: "midpoint", 
         description: "Equal distance from both users",
       });
     }
 
     // 2. Points along the planned route
     const routePoints = findRoutePoints();
-    routePoints.forEach(point => {
+    routePoints.forEach((point, index) => {
       suggestions.push({
         ...point,
+        title: `Route Point ${index + 1}`,
+        type: "route",
         description: "Meeting point on planned route",
       });
     });
@@ -91,7 +94,8 @@ export default function MeetingPointModal({
         suggestions.push({
           latitude: closerToCompanion.latitude + (companionLocation.latitude - startLocation.latitude) * 0.3,
           longitude: closerToCompanion.longitude + (companionLocation.longitude - startLocation.longitude) * 0.3,
-          type: "Closer to companion",
+          title: "Companion's Location",
+          type: "companion",
           description: "More convenient for your companion",
         });
       }
@@ -103,7 +107,9 @@ export default function MeetingPointModal({
     if (midpoint) {
       setSelectedPoint({
         ...midpoint,
-        type: "Midpoint between current locations",
+        title: "Midpoint Location",
+        type: "midpoint",
+        description: "Equal distance from both users",
       });
     }
   }, [startLocation, companionLocation, routeCoordinates]);
@@ -124,9 +130,11 @@ export default function MeetingPointModal({
     }
 
     onSelectMeetingPoint({
+      name: selectedPoint.title || selectedPoint.description || "Selected Meeting Point",
+      description: selectedPoint.description || "User selected meeting location",
       latitude: selectedPoint.latitude,
       longitude: selectedPoint.longitude,
-      address: selectedPoint.description || "Selected meeting point",
+      type: selectedPoint.type || "custom"
     });
     
     onClose();
