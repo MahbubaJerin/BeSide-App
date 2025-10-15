@@ -31,10 +31,23 @@ function RequestCard({ request, onResponse, respondingTo }) {
         
         {/* Sender photo */}
         <View style={styles.photoContainer}>
-          {request.photo?.url ? (
+          {request.user?.displayPhoto ? (
             <Image 
-              source={{ uri: request.photo.url }}
+              source={{ uri: request.user.displayPhoto }}
               style={styles.senderPhotoCard}
+              onError={(error) => {
+                console.log("Image load error for:", request.user.displayPhoto, error);
+              }}
+            />
+          ) : (request.user?.requestPhoto || request.user?.profilePhoto || request.photo?.url) ? (
+            <Image 
+              source={{ 
+                uri: request.user?.requestPhoto || request.user?.profilePhoto || request.photo?.url 
+              }}
+              style={styles.senderPhotoCard}
+              onError={(error) => {
+                console.log("Fallback image load error:", error);
+              }}
             />
           ) : (
             <View style={styles.senderPhotoPlaceholderCard}>
@@ -168,16 +181,36 @@ export default function RequestNotificationModal({
 
       if (response.ok) {
         const result = await response.json();
+        console.log("📋 [NOTIFICATIONS] API Response:", result);
+        
         if (result.status === "success") {
           const pendingRequests = result.data.requests || [];
           setRequests(pendingRequests);
           console.log(`📋 [NOTIFICATIONS] Found ${pendingRequests.length} pending requests`);
+          
+          // Log request details for debugging
+          pendingRequests.forEach((req, index) => {
+            console.log(`📋 [REQUEST ${index + 1}]`, {
+              tripReqId: req.tripReqId,
+              senderName: req.user?.userName,
+              destination: req.destination,
+              hasPhoto: !!(req.user?.requestPhoto || req.user?.profilePhoto || req.photo?.url),
+              photoUrl: req.user?.requestPhoto || req.user?.profilePhoto || req.photo?.url
+            });
+          });
         } else {
           console.log("❌ [NOTIFICATIONS] API error:", result.message);
           setRequests([]); // Clear on error
         }
       } else {
-        console.log("❌ [NOTIFICATIONS] HTTP Error:", response.status);
+        const errorText = await response.text();
+        console.log("❌ [NOTIFICATIONS] HTTP Error:", response.status, errorText);
+        
+        if (response.status === 401) {
+          console.log("❌ [NOTIFICATIONS] Authentication error - token might be invalid");
+          // Could add token refresh logic here
+        }
+        
         setRequests([]); // Clear on error
       }
     } catch (error) {

@@ -251,17 +251,64 @@ exports.getPendingRequests = catchAsync(async (req, res, next) => {
         "recipients.responseStatus": { $in: ["notified", "viewed"] },
         status: "pending",
         expiresAt: { $gt: new Date() }
-    }).populate('user.userId', 'firstName lastName profilePhoto');
+    });
 
     console.log("📋 [BACKEND] Raw requests found:", requests.length);
 
-    // Filter requests where the current user hasn't responded
-    const pendingRequests = requests.filter(request => {
+    // Filter requests where the current user hasn't responded and enrich with user data
+    const pendingRequests = [];
+    
+    for (const request of requests) {
         const userRecipient = request.recipients.find(r => r.userId === userId);
         const isEligible = userRecipient && ["notified", "viewed"].includes(userRecipient.responseStatus);
-        console.log(`- Request ${request.tripReqId}: userRecipient=${!!userRecipient}, isEligible=${isEligible}`);
-        return isEligible;
-    });
+        
+        if (isEligible) {
+            try {
+                // Get the sender's full user data including profile photo
+                const User = require("../models/userModel");
+                const senderUser = await User.findById(request.user.userId);
+                
+                console.log(`🔍 [USER DATA] For request ${request.tripReqId}:`);
+                console.log(`  - Sender User ID: ${request.user.userId}`);
+                console.log(`  - Found sender: ${!!senderUser}`);
+                console.log(`  - Request photo: ${request.photo?.url || "None"}`);
+                console.log(`  - User profile photo: ${senderUser?.profilePhoto || "None"}`);
+                console.log(`  - User image: ${senderUser?.userImage || "None"}`);
+                
+                // Determine the best photo to use
+                const photoToUse = request.photo?.url || // Request selfie first
+                                 senderUser?.profilePhoto || // User profile photo
+                                 senderUser?.userImage || // User image fallback
+                                 request.user.userImage || // Request user image
+                                 null; // No photo available
+                
+                // Enrich the request with sender's complete information
+                const enrichedRequest = {
+                    ...request.toObject(),
+                    user: {
+                        ...request.user,
+                        firstName: senderUser?.firstName || request.user.userName,
+                        lastName: senderUser?.lastName || "",
+                        profilePhoto: senderUser?.profilePhoto || senderUser?.userImage || request.user.userImage,
+                        // Include the photo from the request as well
+                        requestPhoto: request.photo?.url,
+                        // Best photo to display
+                        displayPhoto: photoToUse
+                    }
+                };
+                
+                pendingRequests.push(enrichedRequest);
+                
+                console.log(`✅ [Request ${request.tripReqId}] Added with photo: ${photoToUse || "No photo"}`);
+            } catch (error) {
+                console.error(`❌ [Request ${request.tripReqId}] Error enriching user data:`, error);
+                // Add request without enrichment as fallback
+                pendingRequests.push(request.toObject());
+            }
+        } else {
+            console.log(`- Request ${request.tripReqId}: userRecipient=${!!userRecipient}, isEligible=${isEligible}`);
+        }
+    }
 
     console.log("✅ [BACKEND] Filtered pending requests:", pendingRequests.length);
 
