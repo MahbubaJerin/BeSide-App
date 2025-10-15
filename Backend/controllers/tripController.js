@@ -33,7 +33,10 @@ const catchAsync = require("../utils/catchAsync");
   
     // Generate trip request ID
     const tripReqId = existingUser.userName.slice(0, 3).toUpperCase() + Date.now();
-  
+
+    // Debug logging
+    console.log('🔍 [CREATE TRIP] Start location received:', JSON.stringify(startLocation, null, 2));
+
     // Create new TripRequest using full user data
     const newTripRequest = await TripRequest.create({
       tripReqId,

@@ -430,7 +430,6 @@ const RouteMapView = ({
             📍 {Math.round(distance)}m to meeting point
           </Text>
         )}
-        </Text>
         <Text style={styles.meetingPointText}>
           📍 {tripMatch?.meetingPoint?.name || 'Meeting Point'}
         </Text>

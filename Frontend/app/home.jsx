@@ -312,40 +312,38 @@ export default function HomeScreen() {
   // State for sender notifications
   const [senderRequestStatus, setSenderRequestStatus] = useState(null);
 
-  // Poll for sender request status
-  const pollSenderStatus = useCallback(async () => {
-    if (!currentTripRequestId) return;
-    
+  // Safe modal management functions
+  const safeCloseModal = useCallback((modalSetter) => {
     try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) return;
-
-      const API_URL = BASE_URL.replace(/\/+$/, "");
-      const response = await fetch(`${API_URL}/api/v1/trip/sent-requests-status`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        const myRequest = result.data.requests.find(req => req.tripReqId === currentTripRequestId);
-        
-        if (myRequest && myRequest.status !== senderRequestStatus?.status) {
-          setSenderRequestStatus(myRequest);
-          
-          // Show notification if status changed
-          if (myRequest.status === 'accepted') {
-            Alert.alert(
-              "Request Accepted! 🎉",
-              `${myRequest.acceptedBy?.userName || 'Someone'} has accepted your companion request! You can now set a meeting point.`,
-              [{ text: "OK" }]
-            );
-          }
-        }
+      if (isMounted.current) {
+        modalSetter(false);
       }
     } catch (error) {
-      console.error('Error polling sender status:', error);
+      console.error('Error closing modal:', error);
     }
-  }, [currentTripRequestId, senderRequestStatus?.status]);
+  }, []);
+
+  const resetAllModals = useCallback(() => {
+    try {
+      if (!isMounted.current) return;
+      
+      setModalVisible(false);
+      setPhotoUploadVisible(false);
+      setConsentVisible(false);
+      setPreferencesVisible(false);
+      setSentRequestStatusVisible(false);
+      setTripHistoryVisible(false);
+      setEnhancedConsentVisible(false);
+      setTwoStepTripVisible(false);
+      setRequestNotificationVisible(false);
+      setActiveMatchModalVisible(false);
+      setAvailabilityModalVisible(false);
+    } catch (error) {
+      console.error('Error resetting modals:', error);
+    }
+  }, []);
+
+  // Sender request status polling is now handled in useEffect
 
   const currentLocation = locationTracking.currentLocation;
   const isSearching = companionSearch.isSearching;
@@ -358,13 +356,17 @@ export default function HomeScreen() {
   // Update active request when matches change - with debouncing to avoid excessive calls
   useEffect(() => {
     const updateActiveRequest = async () => {
-      if (activeMatches?.getActiveRequest) {
+      if (activeMatches?.getActiveRequest && isMounted.current) {
         try {
           const request = await activeMatches.getActiveRequest();
-          setActiveRequest(request);
+          if (isMounted.current) {
+            setActiveRequest(request);
+          }
         } catch (error) {
           console.error('Error getting active request:', error);
-          setActiveRequest(null);
+          if (isMounted.current) {
+            setActiveRequest(null);
+          }
         }
       }
     };
@@ -381,7 +383,7 @@ export default function HomeScreen() {
     const currentMatchCount = activeMatches?.matches?.length || 0;
     
     // If match count increased (new match created), auto-open active trips modal
-    if (currentMatchCount > previousMatchCount && currentMatchCount > 0) {
+    if (currentMatchCount > previousMatchCount && currentMatchCount > 0 && isMounted.current) {
       console.log("🎉 [AUTO REDIRECT] New match detected! Opening active trips modal");
       
       // Close any open modals and show active trips
@@ -390,44 +392,94 @@ export default function HomeScreen() {
       
       // Small delay to ensure state updates, then open active trips
       setTimeout(() => {
-        setActiveMatchModalVisible(true);
+        if (isMounted.current) {
+          setActiveMatchModalVisible(true);
+        }
       }, 500);
     }
     
-    setPreviousMatchCount(currentMatchCount);
-  }, [activeMatches?.matches?.length, previousMatchCount]);
+    if (isMounted.current) {
+      setPreviousMatchCount(currentMatchCount);
+    }
+  }, [activeMatches?.matches?.length]); // Removed previousMatchCount dependency to prevent loops
 
   // Poll sender status when there's an active trip request
   useEffect(() => {
     if (!currentTripRequestId) return;
 
+    // Define polling function inside useEffect to avoid stale closure issues
+    const pollStatus = async () => {
+      try {
+        const token = await AsyncStorage.getItem("token");
+        if (!token) return;
+
+        const API_URL = BASE_URL.replace(/\/+$/, "");
+        const response = await fetch(`${API_URL}/api/v1/trip/sent-requests-status`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const myRequest = result.data.requests.find(req => req.tripReqId === currentTripRequestId);
+          
+          if (myRequest && myRequest.status !== senderRequestStatus?.status) {
+            // Only update state if component is still mounted
+            if (isMounted.current) {
+              setSenderRequestStatus(myRequest);
+              
+              // Show notification if status changed
+              if (myRequest.status === 'accepted') {
+                Alert.alert(
+                  "Request Accepted! 🎉",
+                  `${myRequest.acceptedBy?.userName || 'Someone'} has accepted your companion request! You can now set a meeting point.`,
+                  [{ text: "OK" }]
+                );
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error polling sender status:', error);
+      }
+    };
+
     // Poll immediately
-    pollSenderStatus();
+    pollStatus();
 
     // Then poll every 15 seconds while request is active
-    const pollInterval = setInterval(pollSenderStatus, 15000);
+    const pollInterval = setInterval(pollStatus, 15000);
     
     return () => clearInterval(pollInterval);
-  }, [currentTripRequestId, pollSenderStatus]);
+  }, [currentTripRequestId]); // Removed pollSenderStatus dependency
 
   useFocusEffect(
     useCallback(() => {
       const load = async () => {
-        const stored = await AsyncStorage.getItem("user");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          setUser(parsed);
-          await locationTracking.startTracking(true);
-        } else {
+        try {
+          const stored = await AsyncStorage.getItem("user");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            setUser(parsed);
+            await locationTracking.startTracking(true);
+          } else {
+            router.replace("/login");
+          }
+        } catch (error) {
+          console.error('Error loading user data:', error);
           router.replace("/login");
         }
       };
       load();
       return () => {
-        locationTracking.stopTracking();
-        companionSearch.cleanup();
+        try {
+          locationTracking.stopTracking();
+          companionSearch.cleanup();
+          resetAllModals(); // Ensure all modals are closed when leaving
+        } catch (error) {
+          console.error('Error during cleanup:', error);
+        }
       };
-    }, [])
+    }, [resetAllModals])
   );
 
   useEffect(() => {
@@ -1135,6 +1187,28 @@ export default function HomeScreen() {
   const [availability, setAvailability] = useState(true);
   const [availabilityModalVisible, setAvailabilityModalVisible] = useState(false);
 
+  // Component mount tracking to prevent state updates after unmount
+  const isMounted = useRef(true);
+  
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // Add debugging to track rendering issues
+  console.log("🏠 [HOME RENDER] Rendering home screen...");
+  
+  // Safety check to prevent crashes
+  if (!user) {
+    console.log("⚠️ [HOME] No user found, showing loading state...");
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ThemedText type="default">Loading user data...</ThemedText>
+      </View>
+    );
+  }
+
   // UI
   return (
     <View style={styles.container}>
@@ -1169,7 +1243,7 @@ export default function HomeScreen() {
 
       {/* Map */}
       <View style={styles.mapContainer}>
-        {currentLocation ? (
+        {currentLocation && currentLocation.latitude && currentLocation.longitude ? (
           <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
@@ -1631,7 +1705,7 @@ export default function HomeScreen() {
       />
       <RequestNotificationModal
         visible={requestNotificationVisible}
-        onClose={() => setRequestNotificationVisible(false)}
+        onClose={() => safeCloseModal(setRequestNotificationVisible)}
         currentLocation={currentLocation}
         onRequestAccepted={(tripRequest) => {
           console.log("Request accepted:", tripRequest);
@@ -1727,7 +1801,7 @@ export default function HomeScreen() {
       />
       <ActiveMatchModal
         visible={activeMatchModalVisible}
-        onClose={() => setActiveMatchModalVisible(false)}
+        onClose={() => safeCloseModal(setActiveMatchModalVisible)}
         matches={activeMatches?.matches || []}
         isLoading={activeMatches?.loading || false}
         onRefresh={activeMatches?.refresh}
