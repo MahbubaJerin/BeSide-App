@@ -14,7 +14,6 @@ import { ThemedButton } from "@/components/ThemedButton";
 import { ThemedText } from "@/components/ThemedText";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "@/constants/Colors";
-import MeetingPointModal from "./MeetingPointModal";
 import LiveTripModal from "./LiveTripModal";
 import NavigationModal from "./NavigationModal";
 
@@ -30,7 +29,6 @@ export default function ActiveMatchModal({
   currentLocation,
   currentUserId,
 }) {
-  const [meetingPointModalVisible, setMeetingPointModalVisible] = useState(false);
   const [liveTripModalVisible, setLiveTripModalVisible] = useState(false);
   const [navigationModalVisible, setNavigationModalVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
@@ -233,26 +231,16 @@ export default function ActiveMatchModal({
                       />
 
                       {match.status === 'active' && (
-                        <>
-                          <ThemedButton
-                            title="📍 Set Meeting Point"
-                            onPress={() => {
-                              setSelectedMatch(match);
-                              setMeetingPointModalVisible(true);
-                            }}
-                            style={[styles.actionButton, styles.meetingButton]}
-                          />
-                          <ThemedButton
-                            title="▶️ Start Trip"
-                            onPress={() => handleStatusUpdate(match, 'in-progress')}
-                            style={[styles.actionButton, styles.startButton]}
-                          />
-                        </>
+                        <ThemedButton
+                          title="▶️ Start Trip"
+                          onPress={() => handleStatusUpdate(match, 'in-progress')}
+                          style={[styles.actionButton, styles.startButton]}
+                        />
                       )}
                       
                       {match.status === 'active' && (
                         <ThemedButton
-                          title={match.meetingPoint ? "🧭 Navigate to Meeting" : "🗺️ View Route Map"}
+                          title="🗺️ View Route & Navigate"
                           onPress={() => {
                             setSelectedMatch(match);
                             setNavigationModalVisible(true);
@@ -313,18 +301,6 @@ export default function ActiveMatchModal({
           </View>
         </View>
       </View>
-
-      {/* Meeting Point Modal */}
-      <MeetingPointModal
-        visible={meetingPointModalVisible}
-        onClose={() => {
-          setMeetingPointModalVisible(false);
-          setSelectedMatch(null);
-        }}
-        match={selectedMatch}
-        onSetMeetingPoint={onSetMeetingPoint}
-        currentLocation={currentLocation}
-      />
 
       {/* Live Trip Modal */}
       <LiveTripModal

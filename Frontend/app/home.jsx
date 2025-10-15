@@ -739,7 +739,11 @@ export default function HomeScreen() {
           date: new Date(),
           time: "12:00",
           genderPreference: "any", // Will be updated with actual preferences
-          startLocation: null, // Will be updated when preferences are submitted
+          startLocation: {
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            address: "Current location"
+          },
           destinationLocation: null, // Will be updated when preferences are submitted
           routeCoordinates: [], // Will be updated when route is calculated
           transportMode: "walking" // Will be updated when preferences are submitted
