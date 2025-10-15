@@ -26,102 +26,114 @@ function RequestCard({ request, onMarkViewed, onResponse, respondingTo, formatDa
 
   return (
     <View style={styles.requestCard}>
-      <View style={styles.cardHeader}>
-        <View style={styles.userInfo}>
-          <View style={styles.avatar}>
-            <ThemedText style={styles.avatarText}>
-              {request.user.userName.charAt(0).toUpperCase()}
-            </ThemedText>
+      {/* Header with curved background similar to appointment card */}
+      <View style={styles.curvedHeader}>
+        <View style={styles.headerContent}>
+          <View style={styles.headerTopRow}>
+            <Text style={styles.headerTitle}>🚶 Companion Request</Text>
+            <View style={styles.urgencyBadgeHeader}>
+              <Text style={styles.urgencyTextHeader}>•</Text>
+            </View>
           </View>
-          <View>
-            <ThemedText style={styles.userName}>
-              {request.user.userName}
-            </ThemedText>
-            <ThemedText style={styles.timeAgo}>
+          
+          <View style={styles.dateTimeHeader}>
+            <Text style={styles.dateTextHeader}>
+              {new Date(request.date).toLocaleDateString('en-US', { 
+                day: '2-digit', 
+                month: 'short', 
+                year: 'numeric' 
+              })}
+            </Text>
+            <Text style={styles.timeTextHeader}>
               {formatTimeRemaining(request.expiresAt)}
-            </ThemedText>
+            </Text>
           </View>
         </View>
-        <View style={styles.urgencyBadge}>
-          <ThemedText style={styles.urgencyText}>NEW</ThemedText>
-        </View>
-      </View>
-
-      <View style={styles.requestDetails}>
-        <View style={styles.detailRow}>
-          <ThemedText style={styles.detailIcon}>📍</ThemedText>
-          <ThemedText style={styles.detailText}>
-            Going to: {request.destination}
-          </ThemedText>
-        </View>
         
-        <View style={styles.detailRow}>
-          <ThemedText style={styles.detailIcon}>🚶</ThemedText>
-          <ThemedText style={styles.detailText}>
-            Transport: {request.destinationType}
-          </ThemedText>
-        </View>
-
-        <View style={styles.detailRow}>
-          <ThemedText style={styles.detailIcon}>⏰</ThemedText>
-          <ThemedText style={styles.detailText}>
-            {formatDate(request.date)} 
-          </ThemedText>
-        </View>
-
-        <View style={styles.detailRow}>
-          <ThemedText style={styles.detailIcon}>👥</ThemedText>
-          <ThemedText style={styles.detailText}>
-            Prefers: {request.genderPreference === "any" ? "Anyone" : request.genderPreference}
-          </ThemedText>
-        </View>
-
-        {/* Route Information */}
-        <View style={styles.routeInfo}>
-          <ThemedText style={styles.routeTitle}>📍 Trip Information</ThemedText>
-          <ThemedText style={styles.routeDetail}>
-            Destination: {request.destination || 'Not specified'}
-          </ThemedText>
-          <ThemedText style={styles.routeDetail}>
-            Transport: {request.destinationType || 'Walking'}
-          </ThemedText>
-          {request.transportMode && (
-            <ThemedText style={styles.routeDetail}>
-              Mode: {request.transportMode.charAt(0).toUpperCase() + request.transportMode.slice(1)}
-            </ThemedText>
+        {/* Sender photo positioned like in appointment card */}
+        <View style={styles.photoContainer}>
+          {request.photo?.url ? (
+            <Image 
+              source={{ uri: request.photo.url }}
+              style={styles.senderPhotoCard}
+              onError={() => console.log('Error loading sender photo')}
+            />
+          ) : (
+            <View style={styles.senderPhotoPlaceholderCard}>
+              <Text style={styles.senderPhotoTextCard}>
+                {request.user.userName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
           )}
-          <ThemedText style={styles.routeHelp}>
-            💡 Route will be calculated when you accept
-          </ThemedText>
         </View>
         
-        {request.meetingPoint && request.meetingPoint.isSelected && (
-          <View style={styles.meetingInfo}>
-            <ThemedText style={styles.meetingTitle}>🤝 Meeting Point Set</ThemedText>
-            <ThemedText style={styles.meetingDetail}>
-              {request.meetingPoint.address || 'Meeting location selected'}
-            </ThemedText>
+        {/* Phone icon like in appointment card */}
+        <View style={styles.phoneIconContainer}>
+          <View style={styles.phoneIcon}>
+            <Text style={styles.phoneIconText}>📱</Text>
           </View>
-        )}
+        </View>
       </View>
 
-      <View style={styles.actionButtons}>
-        <ThemedButton
-          title={respondingTo === request.tripReqId ? "..." : "✅ Accept"}
+      {/* White content section */}
+      <View style={styles.whiteSection}>
+        <View style={styles.senderInfo}>
+          <Text style={styles.senderName}>{request.user.userName}</Text>
+          <Text style={styles.senderLabel}>Sender</Text>
+        </View>
+
+        <View style={styles.messageSection}>
+          <Text style={styles.messageLabel}>Message</Text>
+          <Text style={styles.messageText}>
+            Hi! I'm looking for a travel companion to {request.destination}. 
+            {request.destinationType !== "By Walk" ? ` We'll be going ${request.destinationType.toLowerCase()}.` : ' Let\'s walk together!'}
+            {request.genderPreference !== "any" ? ` I prefer traveling with ${request.genderPreference} companions.` : ''}
+          </Text>
+        </View>
+
+        <View style={styles.tripSummary}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryIcon}>📍</Text>
+            <View style={styles.summaryContent}>
+              <Text style={styles.summaryLabel}>Destination</Text>
+              <Text style={styles.summaryValue}>{request.destination}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryIcon}>�</Text>
+            <View style={styles.summaryContent}>
+              <Text style={styles.summaryLabel}>Transport</Text>
+              <Text style={styles.summaryValue}>{request.destinationType}</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.actionButtonsCard}>
+        <TouchableOpacity
+          style={[styles.actionButtonCard, styles.acceptButtonCard, respondingTo === request.tripReqId && styles.disabledButton]}
           onPress={() => {
             console.log('🚨 [DEBUG] Accept button pressed for request:', request.tripReqId);
             console.log('🚨 [DEBUG] Button is disabled?', respondingTo === request.tripReqId);
             onResponse(request.tripReqId, "accepted");
           }}
-          style={[styles.button, styles.acceptButton]}
           disabled={respondingTo === request.tripReqId}
-        />
-        <ThemedButton
-          title={respondingTo === request.tripReqId ? "..." : "❌ Decline"}
+        >
+          <Text style={styles.acceptButtonText}>
+            {respondingTo === request.tripReqId ? "..." : "ACCEPT"}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.actionButtonCard, styles.declineButtonCard, respondingTo === request.tripReqId && styles.disabledButton]}
           onPress={() => onResponse(request.tripReqId, "declined")}
-          style={[styles.button, styles.declineButton]}
           disabled={respondingTo === request.tripReqId}
-        />
+        >
+          <Text style={styles.declineButtonText}>
+            {respondingTo === request.tripReqId ? "..." : "DECLINE"}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -138,6 +150,7 @@ export default function RequestNotificationModal({
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [respondingTo, setRespondingTo] = useState(null);
+  const [isClosing, setIsClosing] = useState(false);
 
   const { 
     calculateReceiverRoute, 
@@ -147,8 +160,21 @@ export default function RequestNotificationModal({
     getNavigationInstructions 
   } = useRouteCalculation();
 
+  // Safe close function to prevent multiple close calls
+  const safeClose = () => {
+    if (!isClosing) {
+      setIsClosing(true);
+      onClose();
+      // Reset the closing flag after a brief delay
+      setTimeout(() => setIsClosing(false), 500);
+    }
+  };
+
   useEffect(() => {
     if (visible) {
+      // Reset state when modal opens
+      setIsClosing(false);
+      setRespondingTo(null);
       fetchPendingRequests();
     }
   }, [visible]);
@@ -280,6 +306,10 @@ export default function RequestNotificationModal({
         
         if (response === "accepted") {
           console.log('✅ [REQUEST] Request accepted successfully');
+          
+          // Close modal immediately for better UX
+          safeClose();
+          
           Alert.alert(
             "Request Accepted! 🎉", 
             "You have successfully accepted the companion request. You'll be redirected to the active trip page to coordinate with your companion.",
@@ -299,17 +329,38 @@ export default function RequestNotificationModal({
           
           // CORRECTED FLOW: Route to meeting point (sender's start location)
           if (currentLocation && result.data.routeData && onRouteUpdate) {
+            // Start route calculation asynchronously (don't block modal closing)
+            setTimeout(async () => {
             try {
               console.log('🚀 [MEETING POINT ROUTE] Starting meeting point route calculation...');
               console.log('📍 [MEETING POINT ROUTE] Receiver location:', currentLocation);
               console.log('📍 [MEETING POINT ROUTE] Route data:', result.data.routeData);
               
-              // Meeting point is the sender's starting location
-              const meetingPoint = result.data.routeData.startLocation;
-              const finalDestination = result.data.routeData.destinationLocation;
+              // Meeting point is automatically set from sender's starting location
+              const tripRequest = result.data.tripRequest;
+              let meetingPoint = tripRequest.meetingPoint;
+              const finalDestination = tripRequest.destinationLocation;
+              
+              console.log('🔍 [DEBUG] Trip request data:', JSON.stringify(tripRequest, null, 2));
+              console.log('🔍 [DEBUG] Meeting point from trip:', meetingPoint);
               
               if (!meetingPoint || !meetingPoint.latitude || !meetingPoint.longitude) {
-                throw new Error('Meeting point (sender start location) not available');
+                console.log('❌ [DEBUG] Meeting point validation failed:', {
+                  hasMeetingPoint: !!meetingPoint,
+                  hasLat: meetingPoint?.latitude,
+                  hasLng: meetingPoint?.longitude,
+                  fullTripRequest: tripRequest
+                });
+                
+                // Try fallback to startingLocation if meetingPoint is not set
+                const startingLocation = tripRequest.startingLocation;
+                if (startingLocation && startingLocation.latitude && startingLocation.longitude) {
+                  console.log('🔄 [DEBUG] Using startingLocation as fallback:', startingLocation);
+                  meetingPoint = startingLocation;
+                } else {
+                  console.log('❌ [DEBUG] No valid starting location either:', startingLocation);
+                  throw new Error('Meeting point (sender start location) not available');
+                }
               }
               
               console.log('🎯 [MEETING POINT ROUTE] Meeting point:', meetingPoint);
@@ -373,7 +424,7 @@ export default function RequestNotificationModal({
                   },
                   { 
                     text: "Got it!", 
-                    style: "default" 
+                    style: "default"
                   }
                 ]
               );
@@ -389,6 +440,7 @@ export default function RequestNotificationModal({
                 [{ text: "OK" }]
               );
             }
+            }, 100); // End setTimeout - run route calculation async
           } else {
             console.warn('⚠️ [SIMPLE ROUTE] Missing data for route calculation:', {
               hasCurrentLocation: !!currentLocation,
@@ -400,12 +452,17 @@ export default function RequestNotificationModal({
             Alert.alert(
               "✅ Match Successful!", 
               "You've been matched with a companion! Please coordinate to meet up.",
-              [{ text: "Great!" }]
+              [{ 
+                text: "Great!"
+              }]
             );
           }
 
 
         } else if (response === "declined") {
+          // Close modal immediately for better UX
+          safeClose();
+          
           Alert.alert(
             "Request Declined ❌", 
             "You have declined the companion request. The sender will be notified.",
@@ -428,6 +485,9 @@ export default function RequestNotificationModal({
       console.error('💥 [DEBUG] Error message:', error.message);
       console.error('💥 [DEBUG] Error stack:', error.stack);
       console.error('💥 [DEBUG] Full error object:', error);
+      
+      // Close modal even on error to prevent freeze
+      safeClose();
       
       Alert.alert("Error", error.message || "Failed to respond to request");
     } finally {
@@ -482,7 +542,7 @@ export default function RequestNotificationModal({
         <View style={styles.container}>
           <View style={styles.header}>
             <ThemedText type="subtitle">🔔 Trip Requests</ThemedText>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={safeClose} style={styles.closeButton}>
               <ThemedText style={styles.closeText}>✕</ThemedText>
             </TouchableOpacity>
           </View>
@@ -539,7 +599,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   container: {
-    backgroundColor: Colors.light.background,
+    backgroundColor: "#F8F9FA",
     borderRadius: 20,
     width: "95%",
     maxHeight: "85%",
@@ -566,7 +626,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   requestsList: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     maxHeight: "75%",
   },
   loadingContainer: {
@@ -593,17 +653,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   requestCard: {
-    backgroundColor: Colors.light.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#E3F2FD",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    marginBottom: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 20,
+    elevation: 8,
+    overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: "row",
@@ -629,6 +687,208 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
+  // Appointment card style design
+  curvedHeader: {
+    backgroundColor: "#6C5CE7",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 60,
+    position: "relative",
+  },
+  headerContent: {
+    paddingHorizontal: 20,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  headerTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  urgencyBadgeHeader: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#FF6B6B",
+  },
+  urgencyTextHeader: {
+    color: "#FF6B6B",
+    fontSize: 20,
+    textAlign: "center",
+  },
+  dateTimeHeader: {
+    alignItems: "center",
+  },
+  dateTextHeader: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 4,
+  },
+  timeTextHeader: {
+    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  photoContainer: {
+    position: "absolute",
+    bottom: -35,
+    left: 20,
+    zIndex: 10,
+    elevation: 10,
+  },
+  senderPhotoCard: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 4,
+    borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  senderPhotoPlaceholderCard: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "#4CAF50",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 4,
+    borderColor: "#fff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  senderPhotoTextCard: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 20,
+  },
+  phoneIconContainer: {
+    position: "absolute",
+    bottom: -25,
+    right: 20,
+    zIndex: 10,
+    elevation: 10,
+  },
+  phoneIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#00BCD4",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  phoneIconText: {
+    fontSize: 20,
+  },
+  whiteSection: {
+    backgroundColor: "#fff",
+    paddingTop: 45,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  senderInfo: {
+    marginBottom: 20,
+  },
+  senderName: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#2C3E50",
+    marginBottom: 4,
+  },
+  senderLabel: {
+    fontSize: 14,
+    color: "#7F8C8D",
+  },
+  messageSection: {
+    marginBottom: 20,
+  },
+  messageLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 8,
+  },
+  messageText: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    lineHeight: 20,
+  },
+  tripSummary: {
+    marginBottom: 20,
+  },
+  summaryItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  summaryIcon: {
+    fontSize: 16,
+    marginRight: 12,
+    width: 20,
+  },
+  summaryContent: {
+    flex: 1,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    marginBottom: 2,
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#2C3E50",
+  },
+  actionButtonsCard: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  actionButtonCard: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 25,
+    alignItems: "center",
+  },
+  acceptButtonCard: {
+    backgroundColor: "#6C5CE7",
+  },
+  declineButtonCard: {
+    backgroundColor: "#E8E8E8",
+  },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  acceptButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  declineButtonText: {
+    color: "#7F8C8D",
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
   userName: {
     fontSize: 16,
     fontWeight: "600",
@@ -643,6 +903,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+  },
+  urgencyBadgeTop: {
+    backgroundColor: "#FF6B6B",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    position: "absolute",
+    top: 0,
+    right: 16,
   },
   urgencyText: {
     color: "#fff",
