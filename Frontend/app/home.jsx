@@ -37,14 +37,12 @@ import EnhancedConsentModal from "@/components/EnhancedConsentModal";
 import TwoStepTripModal from "@/components/TwoStepTripModal";
 import { usePersistentSearch } from "@/hooks/usePersistentSearch";
 import RequestNotificationModal from "@/components/RequestNotificationModal";
-import ActiveMatchModal from "@/components/ActiveMatchModal";
 import BeSideLogo from "../assets/images/BeSide.png";
 import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";
 import { useActiveMatches } from "../hooks/useActiveMatches";
 import { useTripNotifications } from "../hooks/useTripNotifications";
 import { useRouteCalculation } from "../hooks/useRouteCalculation";
-import { useRealTimeUpdates } from "../hooks/useRealTimeUpdates";
 
 // Enhanced Google Maps functionality
 import { useLocationStore } from "../store/locationStore";
@@ -275,7 +273,6 @@ export default function HomeScreen() {
   // Enhanced persistent search hook
   const persistentSearch = usePersistentSearch();
   const [requestNotificationVisible, setRequestNotificationVisible] = useState(false);
-  const [activeMatchModalVisible, setActiveMatchModalVisible] = useState(false);
 
   const [consent, setConsent] = useState({ noTouch: false, respectful: false, safety: false });
   const [photoUrl, setPhotoUrl] = useState(null);
@@ -308,9 +305,8 @@ export default function HomeScreen() {
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
   const requestPolling = useRequestPolling(120000, true); // Poll every 2 minutes to avoid rate limiting
-  const activeMatches = useActiveMatches(60000); // Poll for matches every minute
+  const activeMatches = useActiveMatches(30000); // Poll for matches every 30 seconds to avoid rate limiting
   const tripNotifications = useTripNotifications();
-  const realTimeUpdates = useRealTimeUpdates();
   const { 
     openGoogleMapsNavigation, 
     getNavigationInstructions,
@@ -345,7 +341,6 @@ export default function HomeScreen() {
       setEnhancedConsentVisible(false);
       setTwoStepTripVisible(false);
       setRequestNotificationVisible(false);
-      setActiveMatchModalVisible(false);
       setAvailabilityModalVisible(false);
     } catch (error) {
       console.error('Error resetting modals:', error);
@@ -424,104 +419,6 @@ export default function HomeScreen() {
       setPreviousMatchCount(currentMatchCount);
     }
   }, [activeMatches?.matches?.length]); // Removed previousMatchCount dependency to prevent loops
-
-  // Handle real-time events for active matches
-  useEffect(() => {
-    if (!activeMatches?.handleTripEvent) return;
-
-    // Listen to real-time events
-    const handleRealtimeEvent = (eventType, eventData) => {
-      console.log('🏠 [HOME] Real-time event received:', eventType, eventData);
-      
-      // Pass events to active matches handler
-      activeMatches.handleTripEvent(eventType, eventData);
-      
-      // Handle specific events for UI updates
-      switch (eventType) {
-        case 'request_response':
-          if (eventData.response === 'accepted') {
-            // New match created
-            setTimeout(() => {
-              Alert.alert(
-                "Request Accepted! 🎉",
-                `${eventData.responderName} accepted your companion request!`,
-                [{ text: "View Trip", onPress: () => setActiveMatchModalVisible(true) }]
-              );
-            }, 500);
-          } else if (eventData.response === 'declined') {
-            // Request declined - show brief notification
-            setTimeout(() => {
-              Alert.alert(
-                "Request Update",
-                eventData.detailedMessage,
-                [{ text: "OK" }]
-              );
-            }, 500);
-          }
-          break;
-          
-        case 'request_status_update':
-          // Show status updates to sender (request sent, awaiting responses, etc.)
-          if (eventData.status === 'request_sent') {
-            setTimeout(() => {
-              Alert.alert(
-                "Request Sent 📤",
-                eventData.detailedMessage,
-                [
-                  { text: "View Status", onPress: () => setSentRequestModalVisible(true) },
-                  { text: "OK" }
-                ]
-              );
-            }, 1000);
-          }
-          break;
-          
-        case 'meeting_point_set':
-          Alert.alert(
-            "Meeting Point Set 📍",
-            `${eventData.setByName} set the meeting point: ${eventData.meetingPoint?.name}`,
-            [{ text: "OK" }]
-          );
-          break;
-          
-        case 'trip_started':
-          Alert.alert(
-            "Trip Started 🚀",
-            eventData.message,
-            [{ text: "OK" }]
-          );
-          break;
-          
-        case 'trip_cancelled':
-          Alert.alert(
-            "Trip Cancelled ❌",
-            eventData.message,
-            [{ text: "OK" }]
-          );
-          break;
-      }
-    };
-
-    // Since real-time updates are handled in the useRealTimeUpdates hook,
-    // we need to find a way to connect them. For now, we'll let the polling handle updates
-    // This is a placeholder for when real-time integration is fully connected
-
-    return () => {
-      // Cleanup if needed
-    };
-  }, [activeMatches?.handleTripEvent]);
-
-  // Clear active matches on logout
-  useEffect(() => {
-    const clearMatchesOnLogout = async () => {
-      const token = await AsyncStorage.getItem('token');
-      if (!token && activeMatches?.clearMatches) {
-        activeMatches.clearMatches();
-      }
-    };
-    
-    clearMatchesOnLogout();
-  }, [activeMatches?.clearMatches]);
 
   // Poll sender status when there's an active trip request
   useEffect(() => {
@@ -1291,132 +1188,64 @@ export default function HomeScreen() {
   // UI
   return (
     <View style={styles.container}>
-      {/* Purple Gradient Header */}
-      <View style={styles.gradientHeader}>
-        <View style={styles.headerTop}>
-          <View style={styles.userInfo}>
-            <View style={styles.avatarContainer}>
-              <Ionicons name="person-circle" size={40} color="white" />
-            </View>
-            <View>
-              <ThemedText style={styles.userName}>{user?.userName || 'Your Name'}</ThemedText>
-              <ThemedText style={styles.userSubtext}>12 min (3.4 Km)</ThemedText>
-            </View>
-          </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerButton} onPress={handleCurrentLocation}>
-              <Ionicons name="location" size={20} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerButton} onPress={() => setAvailabilityModalVisible(true)}>
-              <Ionicons name={availability ? "toggle" : "toggle-outline"} size={20} color="white" />
-            </TouchableOpacity>
-          </View>
+      {/* Top Bar — Logo + Title + Buttons */}
+      <View style={styles.topBar}>
+        <View style={styles.logoContainer}>
+          <Image source={BeSideLogo} style={styles.logo} resizeMode="contain" accessibilityLabel="BeSide app logo" />
         </View>
-        
-        {/* Service Cards */}
-        <View style={styles.serviceCards}>
-          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => setTripHistoryVisible(true)}>
-            <Ionicons name="car" size={24} color="#8B5CF6" />
-            <ThemedText style={styles.serviceCardTitle}>Trips</ThemedText>
-            <ThemedText style={styles.serviceCardSubtext}>4.1 Km, 12 min</ThemedText>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => setActiveMatchModalVisible(true)}>
-            <Ionicons name="people" size={24} color="#8B5CF6" />
-            <ThemedText style={styles.serviceCardTitle}>Active</ThemedText>
-            <ThemedText style={styles.serviceCardSubtext}>2.3 Km, 15 min</ThemedText>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => handleSOS("000")}>
-            <Ionicons name="shield-checkmark" size={24} color="#8B5CF6" />
-            <ThemedText style={styles.serviceCardTitle}>SOS Station</ThemedText>
-            <ThemedText style={styles.serviceCardSubtext}>4.5 Km, 18 min</ThemedText>
-          </TouchableOpacity>
-        </View>
-        
-        {/* Secondary Service Row */}
-        <View style={styles.secondaryServices}>
-          <TouchableOpacity style={styles.secondaryCard} onPress={() => router.push('/profile')}>
-            <Ionicons name="wallet" size={20} color="#8B5CF6" />
-            <ThemedText style={styles.secondaryCardText}>Profile</ThemedText>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.secondaryCard} onPress={() => setTripHistoryVisible(true)}>
-            <Ionicons name="restaurant" size={20} color="#8B5CF6" />
-            <ThemedText style={styles.secondaryCardText}>History</ThemedText>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.secondaryCard} onPress={() => router.push('/emergencyContacts')}>
-            <Ionicons name="medical" size={20} color="#8B5CF6" />
-            <ThemedText style={styles.secondaryCardText}>Emergency</ThemedText>
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      {/* Central Find Companion Section */}
-      <View style={styles.findCompanionSection}>
-        <View style={styles.companionContainer}>
-          <ThemedText style={styles.companionTitle}>Find Your Travel Companion</ThemedText>
-          <ThemedText style={styles.companionSubtext}>Connect with nearby travelers for safer journeys</ThemedText>
-          
-          <TouchableOpacity 
-            style={styles.findCompanionButton}
-            onPress={handleFindCompanion}
-            disabled={isSearching}
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <ThemedText type="title" style={styles.titleText}>BeSide</ThemedText>
+        </View>
+
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <TouchableOpacity
+            style={[styles.topIconButton, { backgroundColor: "#fceaea" }]}
+            onPress={handleCurrentLocation}
+            accessibilityLabel="Center map on current location"
           >
-            <View style={styles.findButtonContent}>
-              <Ionicons name="people" size={24} color="white" />
-              <ThemedText style={styles.findButtonText}>
-                {isSearching ? 'Searching...' : 'Find Companion'}
-              </ThemedText>
-            </View>
-            {isSearching && (
-              <View style={styles.searchingIndicator}>
-                <Ionicons name="radio-button-on" size={12} color="white" />
-              </View>
-            )}
+            <Ionicons name="location" size={28} color="#e63946" />
           </TouchableOpacity>
-          
-          {senderRequestStatus?.status === 'pending' && (
-            <TouchableOpacity 
-              style={styles.statusButton}
-              onPress={() => setSentRequestStatusVisible(true)}
-            >
-              <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
-            </TouchableOpacity>
-          )}
+
+          <TouchableOpacity
+            style={[styles.topIconButton, { backgroundColor: availability ? "#e6f8f1" : "#f0f0f0" }]}
+            onPress={() => setAvailabilityModalVisible(true)}
+            accessibilityLabel="Change availability status"
+          >
+            <Ionicons name={availability ? "toggle" : "toggle-outline"} size={28} color={availability ? "#2ca07b" : "#999"} />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Compact Map */}
-      <View style={styles.compactMapContainer}>
+      {/* Map */}
+      <View style={styles.mapContainer}>
         {currentLocation && currentLocation.latitude && currentLocation.longitude ? (
           <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
             customMapStyle={customMapStyle}
-            style={styles.compactMap}
+            style={styles.map}
             showsUserLocation
             followsUserLocation
             region={{
               latitude: currentLocation.latitude,
               longitude: currentLocation.longitude,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
             }}
-            showsCompass={false}
-            showsScale={false}
-            showsTraffic={false}
-            showsBuildings={true}
-            showsIndoors={false}
+            showsCompass
+            showsScale
+            showsTraffic
+            showsBuildings
+            showsIndoors
             showsMyLocationButton={false}
-            showsPointsOfInterest={true}
-            zoomEnabled={true}
-            zoomControlEnabled={false}
-            rotateEnabled={false}
-            scrollEnabled={true}
-            pitchEnabled={false}
-            toolbarEnabled={false}
+            showsPointsOfInterest
+            zoomEnabled
+            zoomControlEnabled
+            rotateEnabled
+            scrollEnabled
+            pitchEnabled
+            toolbarEnabled
           >
             <Marker coordinate={currentLocation}>
               <Callout>
@@ -1531,14 +1360,48 @@ export default function HomeScreen() {
             })}
           </MapView>
         ) : (
-          <View style={styles.loadingMapContainer}>
-            <ThemedText type="default" style={styles.loadingMapText}>Loading map...</ThemedText>
-          </View>
+          <ThemedText type="default">Loading map...</ThemedText>
         )}
       </View>
 
-      {/* Show searching status when active */}
-      {isSearching && (
+      {/* Destination Search Input */}
+      {!isSearching && (
+        <View style={styles.destinationSearchContainer}>
+          <GooglePlacesInput
+            placeholder="Where are you going? 🎯"
+            onLocationSelected={(location) => {
+              console.log("📍 Destination selected:", location);
+              // Store destination in location store
+              const { setDestinationLocation } = useLocationStore.getState();
+              setDestinationLocation(location);
+              
+              // Show confirmation
+              Alert.alert(
+                "Destination Set! 🎯",
+                `You'll travel to: ${location.address}`,
+                [{ text: "OK" }]
+              );
+            }}
+            icon="navigate-circle"
+            containerStyle={styles.destinationInputContainer}
+            currentLocationButton={false}
+          />
+        </View>
+      )}
+
+      {/* Find/CANCEL */}
+      {!isSearching ? (
+        <TouchableOpacity
+          style={[styles.actionButton, styles.connectButton]}
+          onPress={handleFindCompanion}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="people" size={22} color="#fff" style={{ marginRight: 8 }} />
+          <ThemedText type="buttonText" style={{ color: "#fff", fontSize: 16 }}>
+            Find Companion
+          </ThemedText>
+        </TouchableOpacity>
+      ) : (
         <View style={styles.searchingContainer}>
           {/* Persistent Search Status */}
           {persistentSearch.isSearchActive && (
@@ -1700,73 +1563,83 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Modern Bottom Navigation */}
-      <View style={[styles.bottomNavigation, { paddingBottom: insets.bottom || 10 }]}>
-        <TouchableOpacity 
-          style={styles.bottomNavItem} 
-          onPress={() => {
-            console.log("🔔 Opening Notifications Modal");
-            try {
-              setRequestNotificationVisible(true);
-              requestPolling.markAsViewed();
-            } catch (error) {
-              console.error("❌ Error opening notifications:", error);
-              Alert.alert("Error", "Could not open notifications. Please try again.");
-            }
-          }}
-        >
-          <View style={styles.navIconWithBadge}>
-            <Ionicons name="notifications-outline" size={24} color="#8B5CF6" />
-            {requestPolling.hasNewRequests && (
-              <View style={styles.modernBadge}>
-                <ThemedText style={styles.modernBadgeText}>
-                  {requestPolling.requestCount || 0}
-                </ThemedText>
+      {/* Bottom Navigation Bar (hidden while searching) */}
+      {!isSearching && (
+        <View style={[styles.navContainer, { paddingBottom: insets.bottom || 10 }]}>
+          <View style={styles.navBar}>
+            <TouchableOpacity style={styles.navButton} onPress={() => router.push("/profile")}>
+              <Ionicons name="person-circle-outline" size={24} color="#fff" />
+              <ThemedText style={styles.navLabel}>Profile</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navButton} onPress={() => router.push("/emergencyContacts")}>
+              <Ionicons name="people-outline" size={24} color="#fff" />
+              <ThemedText style={styles.navLabel}>Contacts</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navButton} onPress={() => setTripHistoryVisible(true)}>
+              <Ionicons name="time-outline" size={24} color="#fff" />
+              <ThemedText style={styles.navLabel}>Trip History</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.navButton} 
+              onPress={() => {
+                const matchCount = activeMatches?.matches?.length || 0;
+                Alert.alert(
+                  "Active Trips", 
+                  matchCount > 0 
+                    ? `You have ${matchCount} active trip${matchCount > 1 ? 's' : ''}. Trip details and routes are displayed on the map above.`
+                    : "No active trips at the moment. Accept a companion request to start a trip!",
+                  [{ text: "OK" }]
+                );
+              }}
+            >
+              <View style={styles.notificationIconContainer}>
+                <Ionicons name="people" size={24} color="#fff" />
+                {(activeMatches?.matches?.length || 0) > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <ThemedText style={styles.badgeText}>{activeMatches?.matches?.length || 0}</ThemedText>
+                  </View>
+                )}
               </View>
-            )}
-          </View>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.bottomNavItem}
-          onPress={() => {
-            console.log("🚗 Opening Active Trips Modal");
-            setActiveMatchModalVisible(true);
-          }}
-        >
-          <View style={styles.navIconWithBadge}>
-            <Ionicons name="car-outline" size={24} color="#8B5CF6" />
-            {(activeMatches?.matches?.length || 0) > 0 && (
-              <View style={styles.modernBadge}>
-                <ThemedText style={styles.modernBadgeText}>
-                  {activeMatches?.matches?.length || 0}
-                </ThemedText>
+              <ThemedText style={styles.navLabel}>Active Trips</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={() => {
+                setRequestNotificationVisible(true);
+                requestPolling.markAsViewed();
+              }}
+            >
+              <View style={styles.notificationIconContainer}>
+                <Ionicons name="notifications-outline" size={24} color="#fff" />
+                {requestPolling.hasNewRequests && (
+                  <View style={styles.notificationBadge}>
+                    <ThemedText style={styles.badgeText}>{requestPolling.requestCount}</ThemedText>
+                  </View>
+                )}
+                {requestPolling.networkError && (
+                  <View style={styles.errorIndicator}>
+                    <Ionicons name="warning-outline" size={12} color="#ff4444" />
+                  </View>
+                )}
               </View>
-            )}
+              <ThemedText style={styles.navLabel}>
+                Notifications
+                {requestPolling.isRateLimited && (
+                  <ThemedText style={styles.rateLimitText}> (Limited)</ThemedText>
+                )}
+              </ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navButton} onPress={() => handleSOS("000")}>
+              <Ionicons name="alert" size={24} color="#fff" />
+              <ThemedText style={styles.navLabel}>SOS</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navButton} onPress={handleLogout}>
+              <Ionicons name="exit-outline" size={24} color="#fff" />
+              <ThemedText style={styles.navLabel}>Logout</ThemedText>
+            </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.bottomNavItem}
-          onPress={handleCurrentLocation}
-        >
-          <Ionicons name="location-outline" size={24} color="#8B5CF6" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.bottomNavItem}
-          onPress={() => router.push("/profile")}
-        >
-          <Ionicons name="person-outline" size={24} color="#8B5CF6" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.bottomNavItem}
-          onPress={() => router.push('/emergencyContacts')}
-        >
-          <Ionicons name="shield-outline" size={24} color="#8B5CF6" />
-        </TouchableOpacity>
-      </View>
+        </View>
+      )}
 
       {/* User Card */}
       <Modal transparent animationType="slide" visible={!!selectedUser} onRequestClose={() => setSelectedUser(null)}>
@@ -1953,36 +1826,6 @@ export default function HomeScreen() {
         }}
       />
 
-      {/* Active Match Modal */}
-      <ActiveMatchModal
-        visible={activeMatchModalVisible}
-        onClose={() => setActiveMatchModalVisible(false)}
-        matches={activeMatches?.matches || []}
-        isLoading={activeMatches?.loading}
-        onRefresh={() => activeMatches?.refresh()}
-        onUpdateStatus={async (matchId, status) => {
-          try {
-            await activeMatches.updateMatchStatus(matchId, status);
-            Alert.alert("Success", `Trip ${status === 'in-progress' ? 'started' : status} successfully!`);
-          } catch (error) {
-            Alert.alert("Error", error.message || "Failed to update trip status");
-          }
-        }}
-        onViewDetails={(match) => {
-          // For now, just show an alert. Later we can integrate TripMatchCoordinationModal
-          Alert.alert(
-            "Trip Details",
-            `Match ID: ${match.matchId}\nStatus: ${match.status}\nDestination: ${match.tripDetails?.destination || 'Unknown'}`,
-            [{ text: "OK" }]
-          );
-        }}
-        onSetMeetingPoint={(matchId, meetingPoint) => {
-          return activeMatches.setMeetingPoint(matchId, meetingPoint);
-        }}
-        currentLocation={currentLocation}
-        currentUserId={user?._id}
-      />
-
       {/* Enhanced Consent Modal for Receivers */}
       <EnhancedConsentModal
         visible={enhancedConsentVisible}
@@ -2057,240 +1900,20 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8fafc" },
-  
-  // Purple Gradient Header
-  gradientHeader: {
-    backgroundColor: "#8B5CF6",
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
-  },
-  headerTop: {
+  container: { flex: 1, backgroundColor: Colors.light.surface },
+  topBar: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
-  },
-  userInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  avatarContainer: {
-    marginRight: 12,
-  },
-  userName: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  userSubtext: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 12,
-  },
-  headerActions: {
-    flexDirection: "row",
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 10,
-  },
-  
-  // Service Cards
-  serviceCards: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 15,
-  },
-  serviceCard: {
-    flex: 1,
-    backgroundColor: "white",
-    padding: 15,
-    borderRadius: 15,
-    alignItems: "center",
-    marginHorizontal: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  primaryCard: {
-    backgroundColor: "white",
-  },
-  serviceCardTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1f2937",
-    marginTop: 8,
-  },
-  serviceCardSubtext: {
-    fontSize: 10,
-    color: "#6b7280",
-    marginTop: 2,
-  },
-  
-  // Secondary Services
-  secondaryServices: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  secondaryCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 15,
+    backgroundColor: Colors.light.surface,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
+    marginTop: 40,
+    borderBottomWidth: 1,
+    borderColor: "#e0e0e0",
   },
-  secondaryCardText: {
-    color: "white",
-    fontSize: 12,
-    marginLeft: 6,
-  },
-  
-  // Find Companion Section
-  findCompanionSection: {
-    padding: 20,
-    backgroundColor: "#f8fafc",
-  },
-  companionContainer: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 24,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  companionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1f2937",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  companionSubtext: {
-    fontSize: 14,
-    color: "#6b7280",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  findCompanionButton: {
-    backgroundColor: "#8B5CF6",
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 25,
-    flexDirection: "row",
-    alignItems: "center",
-    shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  findButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  findButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  searchingIndicator: {
-    marginLeft: 12,
-  },
-  statusButton: {
-    marginTop: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 15,
-  },
-  statusButtonText: {
-    color: "#8B5CF6",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  
-  // Compact Map
-  compactMapContainer: {
-    flex: 1,
-    margin: 20,
-    borderRadius: 20,
-    overflow: "hidden",
-    backgroundColor: "white",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  compactMap: { 
-    width: "100%", 
-    height: "100%",
-    minHeight: 200,
-  },
-  
-  // Bottom Navigation
-  bottomNavigation: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    backgroundColor: "white",
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
-  },
-  bottomNavItem: {
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 8,
-  },
-  navIconWithBadge: {
-    position: "relative",
-  },
-  modernBadge: {
-    position: "absolute",
-    top: -8,
-    right: -8,
-    backgroundColor: "#ef4444",
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modernBadgeText: {
-    color: "white",
-    fontSize: 10,
-    fontWeight: "600",
-  },
-  
-  // Loading states
-  loadingMapContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f3f4f6",
-  },
-  loadingMapText: {
-    color: "#6b7280",
-    fontSize: 16,
-  },
+  mapContainer: { flex: 1 },
+  map: { width: "100%", height: "100%" },
   actionButton: {
     position: "absolute",
     bottom: 130,

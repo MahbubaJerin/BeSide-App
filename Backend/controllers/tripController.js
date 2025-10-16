@@ -73,6 +73,50 @@ const catchAsync = require("../utils/catchAsync");
         receiverConsent: false
       }
     });
+
+    // ✨ AUTO-DISTRIBUTE: Automatically send trip request to nearby users
+    console.log('🚀 [AUTO-DISTRIBUTE] Automatically sending trip request to nearby users...');
+    
+    try {
+      // Import notification controller functions
+      const { sendTripRequestToNearby } = require('./notificationController');
+      const UserLocation = require('../models/userLocationModel');
+      
+      // Create a mock req object for sendTripRequestToNearby
+      const mockReq = {
+        user: { _id: existingUser._id },
+        body: {
+          tripReqId: newTripRequest.tripReqId,
+          startCoordinates: {
+            latitude: startLocation?.latitude,
+            longitude: startLocation?.longitude
+          },
+          searchRadius: 1000 // Default 1km radius
+        }
+      };
+      
+      // Create a mock res object
+      let distributionResult = null;
+      const mockRes = {
+        status: (code) => ({
+          json: (data) => {
+            distributionResult = data;
+            console.log(`✅ [AUTO-DISTRIBUTE] Trip sent to ${data.data?.recipientCount || 0} nearby users`);
+          }
+        })
+      };
+      
+      // Call the function
+      await sendTripRequestToNearby(mockReq, mockRes, (error) => {
+        if (error) {
+          console.log('⚠️ [AUTO-DISTRIBUTE] Failed to auto-distribute:', error.message);
+        }
+      });
+      
+    } catch (error) {
+      console.log('⚠️ [AUTO-DISTRIBUTE] Auto-distribution error:', error.message);
+      // Don't fail the trip creation if auto-distribution fails
+    }
   
     res.status(201).json({
       status: "success",
