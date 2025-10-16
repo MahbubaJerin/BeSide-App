@@ -40,8 +40,34 @@ const broadcastToUsers = (userIds, eventType, data) => {
 };
 
 // SSE endpoint for real-time updates
-exports.connectRealtime = catchAsync(async (req, res, next) => {
-    const userId = req.user._id.toString();
+const connectRealtime = catchAsync(async (req, res, next) => {
+    // Handle authentication inside the controller
+    const jwt = require("jsonwebtoken");
+    const User = require("../models/userModel");
+    
+    let token;
+    
+    // Get token from query params (for EventSource compatibility)
+    if (req.query.token) {
+        token = req.query.token;
+    } else if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
+        token = req.headers.authorization.split(" ")[1];
+    }
+    
+    if (!token) {
+        return next(new AppError("You are not logged in! Please log in to get access.", 401));
+    }
+    
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Check if user still exists
+    const currentUser = await User.findById(decoded.id);
+    if (!currentUser) {
+        return next(new AppError("The user belonging to this token does no longer exist.", 401));
+    }
+    
+    const userId = currentUser._id.toString();
     
     console.log(`🔌 [SSE] User ${userId} connecting to real-time stream`);
     
@@ -90,7 +116,7 @@ exports.connectRealtime = catchAsync(async (req, res, next) => {
 });
 
 // Get list of currently connected users (for debugging)
-exports.getConnectedUsers = catchAsync(async (req, res, next) => {
+const getConnectedUsers = catchAsync(async (req, res, next) => {
     const connectedUsers = Array.from(activeConnections.keys());
     
     res.status(200).json({
@@ -104,8 +130,8 @@ exports.getConnectedUsers = catchAsync(async (req, res, next) => {
 
 // Export utility functions
 module.exports = {
-    connectRealtime: exports.connectRealtime,
-    getConnectedUsers: exports.getConnectedUsers,
+    connectRealtime,
+    getConnectedUsers,
     sendEventToUser,
     broadcastToUsers,
     activeConnections

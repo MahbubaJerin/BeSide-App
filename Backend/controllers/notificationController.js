@@ -5,7 +5,19 @@ const User = require("../models/userModel");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
 const { retryDatabaseOperation, withFallback } = require("../utils/retryHandler");
-const { sendEventToUser, broadcastToUsers } = require("./realtimeController");
+// Temporarily disable real-time events to fix server crash
+// const { sendEventToUser, broadcastToUsers } = require("./realtimeController");
+
+// Dummy functions to prevent crashes
+const sendEventToUser = (userId, eventType, data) => {
+    console.log(`[REALTIME DISABLED] Would send ${eventType} to user ${userId}`);
+    return false;
+};
+
+const broadcastToUsers = (userIds, eventType, data) => {
+    console.log(`[REALTIME DISABLED] Would broadcast ${eventType} to ${userIds.length} users`);
+    return { delivered: [], failed: userIds };
+};
 
 // Schedule automatic cleanup every 1 minute (to handle 2-minute expiration)
 let cleanupInterval = null;

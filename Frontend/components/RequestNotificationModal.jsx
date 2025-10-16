@@ -15,6 +15,7 @@ import { ThemedButton } from "@/components/ThemedButton";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { BASE_URL } from "../config";
+import { useRequestPolling } from "../hooks/useRequestPolling";
 
 // Simple request card component with sender photo
 function RequestCard({ request, onResponse, respondingTo }) {
@@ -150,80 +151,41 @@ export default function RequestNotificationModal({
   onRequestAccepted,
   currentLocation
 }) {
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [respondingTo, setRespondingTo] = useState(null);
 
-  const fetchPendingRequests = async () => {
-    // Prevent multiple simultaneous requests
-    if (loading) return;
-    
-    try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        console.log("❌ [NOTIFICATIONS] No token found");
-        return;
-      }
+  // Use optimized polling hook with balanced rate limiting
+  const { 
+    pendingRequests: requests, 
+    hasNewRequests, 
+    isPolling,
+    networkError,
+    refetch,
+    markAsViewed,
+    isRateLimited 
+  } = useRequestPolling(20000, visible); // Poll every 20 seconds when modal is visible
 
-      setLoading(true);
-      const API_URL = BASE_URL.replace(/\/+$/, "");
-      
-      // Add timeout to prevent hanging
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const response = await fetch(`${API_URL}/api/v1/trip/pending-requests`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal
+  // Log requests for debugging when they update
+  useEffect(() => {
+    if (requests.length > 0) {
+      console.log(`📋 [NOTIFICATIONS] Found ${requests.length} pending requests via polling`);
+      requests.forEach((req, index) => {
+        console.log(`📋 [REQUEST ${index + 1}]`, {
+          tripReqId: req.tripReqId,
+          senderName: req.user?.userName,
+          destination: req.destination,
+          hasPhoto: !!(req.user?.requestPhoto || req.user?.profilePhoto || req.photo?.url),
+          photoUrl: req.user?.requestPhoto || req.user?.profilePhoto || req.photo?.url
+        });
       });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log("📋 [NOTIFICATIONS] API Response:", result);
-        
-        if (result.status === "success") {
-          const pendingRequests = result.data.requests || [];
-          setRequests(pendingRequests);
-          console.log(`📋 [NOTIFICATIONS] Found ${pendingRequests.length} pending requests`);
-          
-          // Log request details for debugging
-          pendingRequests.forEach((req, index) => {
-            console.log(`📋 [REQUEST ${index + 1}]`, {
-              tripReqId: req.tripReqId,
-              senderName: req.user?.userName,
-              destination: req.destination,
-              hasPhoto: !!(req.user?.requestPhoto || req.user?.profilePhoto || req.photo?.url),
-              photoUrl: req.user?.requestPhoto || req.user?.profilePhoto || req.photo?.url
-            });
-          });
-        } else {
-          console.log("❌ [NOTIFICATIONS] API error:", result.message);
-          setRequests([]); // Clear on error
-        }
-      } else {
-        const errorText = await response.text();
-        console.log("❌ [NOTIFICATIONS] HTTP Error:", response.status, errorText);
-        
-        if (response.status === 401) {
-          console.log("❌ [NOTIFICATIONS] Authentication error - token might be invalid");
-          // Could add token refresh logic here
-        }
-        
-        setRequests([]); // Clear on error
-      }
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        console.log("⏱️ [NOTIFICATIONS] Request timed out");
-      } else {
-        console.error("❌ [NOTIFICATIONS] Network error:", error);
-      }
-      setRequests([]); // Clear on error to prevent freeze
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [requests]);
+
+  // Mark as viewed when modal opens
+  useEffect(() => {
+    if (visible && hasNewRequests) {
+      markAsViewed();
+    }
+  }, [visible, hasNewRequests, markAsViewed]);
 
   const handleResponse = async (tripReqId, response) => {
     if (respondingTo === tripReqId) return;
@@ -277,25 +239,13 @@ export default function RequestNotificationModal({
   useEffect(() => {
     if (visible) {
       setRespondingTo(null);
-      setRequests([]); // Clear previous requests
-      fetchPendingRequests();
-      
-      // Safety timeout to prevent freezing
-      const safetyTimeout = setTimeout(() => {
-        if (loading) {
-          console.log("⚠️ [NOTIFICATIONS] Safety timeout - closing loading state");
-          setLoading(false);
-        }
-      }, 15000); // 15 second safety timeout
-      
-      return () => clearTimeout(safetyTimeout);
+      // Polling will automatically start when visible becomes true
+      refetch(); // Manual refresh when modal opens
     } else {
       // Reset state when modal closes
-      setRequests([]);
-      setLoading(false);
       setRespondingTo(null);
     }
-  }, [visible]);
+  }, [visible, refetch]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -318,22 +268,25 @@ export default function RequestNotificationModal({
           </View>
 
           <View style={styles.contentContainer}>
-            {loading ? (
-              <View style={styles.emptyContainer}>
-                <ThemedText style={styles.loadingText}>Loading...</ThemedText>
-              </View>
-            ) : requests.length === 0 ? (
+            {requests.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <ThemedText style={styles.emptyIcon}>📭</ThemedText>
-                <ThemedText style={styles.emptyText}>No trip requests</ThemedText>
+                <ThemedText style={styles.emptyText}>
+                  {isPolling ? "Searching for requests..." : "No trip requests"}
+                </ThemedText>
                 <ThemedText style={styles.emptySubtext}>
-                  New companion requests from nearby users will appear here.
+                  {networkError ? `Network issue: ${networkError}` :
+                   isRateLimited ? "Rate limited - polling slower" :
+                   "New companion requests from nearby users will appear here."}
                 </ThemedText>
                 <TouchableOpacity 
                   style={styles.refreshButton}
-                  onPress={fetchPendingRequests}
+                  onPress={refetch}
+                  disabled={isRateLimited}
                 >
-                  <ThemedText style={styles.refreshButtonText}>🔄 Refresh</ThemedText>
+                  <ThemedText style={[styles.refreshButtonText, isRateLimited && { opacity: 0.5 }]}>
+                    🔄 {isRateLimited ? "Rate Limited" : "Refresh"}
+                  </ThemedText>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -353,9 +306,7 @@ export default function RequestNotificationModal({
           <ThemedButton
             title="Close"
             onPress={() => {
-              console.log("🚪 [NOTIFICATIONS] Force closing modal");
-              setLoading(false);
-              setRequests([]);
+              console.log("🚪 [NOTIFICATIONS] Closing modal");
               setRespondingTo(null);
               onClose();
             }}
