@@ -33,14 +33,20 @@ const tripMatchSchema = new mongoose.Schema({
   tripDetails: {
     destination: { type: String, required: true },
     destinationType: { type: String, required: true },
-    startCoordinates: {
+    startLocation: {
+      latitude: { type: Number, required: true },
+      longitude: { type: Number, required: true },
+      address: { type: String }
+    },
+    destinationLocation: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+      address: { type: String }
+    },
+    routeCoordinates: [{
       latitude: { type: Number, required: true },
       longitude: { type: Number, required: true }
-    },
-    destinationCoordinates: {
-      latitude: { type: Number },
-      longitude: { type: Number }
-    },
+    }],
     plannedDate: { type: Date, required: true },
     plannedTime: { type: String, required: true },
     genderPreference: { type: String, default: 'any' }
@@ -84,6 +90,7 @@ const tripMatchSchema = new mongoose.Schema({
       latitude: { type: Number },
       longitude: { type: Number }
     },
+    address: { type: String },
     type: { 
       type: String, 
       enum: ['midpoint', 'organizer', 'companion', 'current', 'custom'],

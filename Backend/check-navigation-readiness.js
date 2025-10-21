@@ -44,8 +44,8 @@ async function checkNavigationReadiness() {
         }
         
         // Check trip details
-        if (match.tripDetails && match.tripDetails.startCoordinates) {
-          console.log(`   🏁 Start Location: [${match.tripDetails.startCoordinates.longitude}, ${match.tripDetails.startCoordinates.latitude}]`);
+        if (match.tripDetails && match.tripDetails.startLocation) {
+          console.log(`   🏁 Start Location: [${match.tripDetails.startLocation.longitude}, ${match.tripDetails.startLocation.latitude}]`);
           console.log(`   🎯 Destination: ${match.tripDetails.destination}`);
         }
       });

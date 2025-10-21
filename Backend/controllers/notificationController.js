@@ -178,10 +178,10 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
         senderPhoto: tripRequest.photo?.url || tripRequest.user.userImage,
         destination: tripRequest.destination,
         destinationType: tripRequest.destinationType,
-        startingLocation: {
-            address: tripRequest.startingLocation?.address || "Starting Location",
-            latitude: tripRequest.startingLocation?.latitude,
-            longitude: tripRequest.startingLocation?.longitude
+        startLocation: {
+            address: tripRequest.startLocation?.address || "Starting Location",
+            latitude: tripRequest.startLocation?.latitude,
+            longitude: tripRequest.startLocation?.longitude
         },
         tripDate: tripRequest.date,
         tripTime: tripRequest.time,
@@ -506,10 +506,17 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             tripDetails: {
                 destination: tripRequest.destination,
                 destinationType: tripRequest.destinationType,
-                startCoordinates: {
-                    latitude: tripRequest.startCoordinates?.latitude || 0,
-                    longitude: tripRequest.startCoordinates?.longitude || 0
+                startLocation: {
+                    latitude: tripRequest.startLocation?.latitude || 0,
+                    longitude: tripRequest.startLocation?.longitude || 0,
+                    address: tripRequest.startLocation?.address || 'Starting location'
                 },
+                destinationLocation: {
+                    latitude: tripRequest.destinationLocation?.latitude || null,
+                    longitude: tripRequest.destinationLocation?.longitude || null,
+                    address: tripRequest.destinationLocation?.address || null
+                },
+                routeCoordinates: Array.isArray(tripRequest.routeCoordinates) ? tripRequest.routeCoordinates : [],
                 plannedDate: tripRequest.date,
                 plannedTime: tripRequest.time,
                 genderPreference: tripRequest.genderPreference
@@ -519,9 +526,10 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
                 name: 'Meeting Point (Sender\'s Start Location)',
                 description: 'Starting location of the trip organizer',
                 location: {
-                    latitude: tripRequest.startLocation?.latitude || tripRequest.startCoordinates?.latitude || 0,
-                    longitude: tripRequest.startLocation?.longitude || tripRequest.startCoordinates?.longitude || 0
+                    latitude: tripRequest.startLocation?.latitude || 0,
+                    longitude: tripRequest.startLocation?.longitude || 0
                 },
+                address: tripRequest.startLocation?.address || 'Starting location',
                 type: 'organizer',
                 setBy: tripRequest.user.userName,
                 setAt: new Date()
@@ -557,7 +565,7 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
         responseData.routeData = {
             startLocation: tripRequest.startLocation,
             destinationLocation: tripRequest.destinationLocation,
-            routeCoordinates: tripRequest.routeCoordinates,
+            routeCoordinates: Array.isArray(tripRequest.routeCoordinates) ? tripRequest.routeCoordinates : [],
             transportMode: tripRequest.transportMode,
             meetingPoint: tripRequest.meetingPoint
         };
@@ -576,20 +584,20 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
         const receiverLocation = await UserLocation.findOne({ userId: userId });
         const senderLocation = await UserLocation.findOne({ userId: tripRequest.user.userId });
         
-        if (receiverLocation && receiverLocation.currentLocation && receiverLocation.currentLocation.coordinates) {
+        if (receiverLocation?.location?.coordinates?.length === 2) {
             responseData.receiverLocation = {
-                latitude: receiverLocation.currentLocation.coordinates[1],
-                longitude: receiverLocation.currentLocation.coordinates[0]
+                latitude: receiverLocation.location.coordinates[1],
+                longitude: receiverLocation.location.coordinates[0]
             };
             console.log('📍 [RECEIVER LOCATION] Added receiver location to response:', responseData.receiverLocation);
         } else {
             console.warn('⚠️ [RECEIVER LOCATION] No valid location found for receiver:', userId);
         }
         
-        if (senderLocation && senderLocation.currentLocation && senderLocation.currentLocation.coordinates) {
+        if (senderLocation?.location?.coordinates?.length === 2) {
             responseData.senderCurrentLocation = {
-                latitude: senderLocation.currentLocation.coordinates[1],
-                longitude: senderLocation.currentLocation.coordinates[0]
+                latitude: senderLocation.location.coordinates[1],
+                longitude: senderLocation.location.coordinates[0]
             };
             console.log('📍 [SENDER LOCATION] Added sender location to response:', responseData.senderCurrentLocation);
         } else {

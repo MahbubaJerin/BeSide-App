@@ -23,7 +23,7 @@ const TripReqSchema = new Schema(
         },
     },
 
-    startingLocation: {
+    startLocation: {
         address: {
             type: String,
             required: [true, "Starting location address is required"],

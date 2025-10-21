@@ -357,6 +357,118 @@ export default function HomeScreen() {
     setRequestNotificationVisible(false);
   }, []);
 
+  const handleNotificationRouteUpdate = useCallback(
+    (routeInfo) => {
+      if (!routeInfo) return;
+
+      const normalizePoint = (point) =>
+        point && typeof point.latitude === "number" && typeof point.longitude === "number"
+          ? { latitude: point.latitude, longitude: point.longitude, address: point.address }
+          : null;
+
+      const routePoints = Array.isArray(routeInfo.routeCoordinates)
+        ? routeInfo.routeCoordinates.filter(
+            (coord) =>
+              coord &&
+              typeof coord.latitude === "number" &&
+              typeof coord.longitude === "number"
+          )
+        : [];
+
+      setRouteCoordinates(routePoints);
+
+      const meetingSource =
+        routeInfo.meetingPoint?.location ||
+        routeInfo.meetingPoint ||
+        routeInfo.startLocation;
+      const meetingPoint = normalizePoint(meetingSource);
+
+      if (meetingPoint) {
+        setStartMarker({
+          latitude: meetingPoint.latitude,
+          longitude: meetingPoint.longitude,
+          address:
+            routeInfo.meetingPoint?.address ||
+            routeInfo.startLocation?.address ||
+            meetingPoint.address ||
+            "Meeting Point",
+        });
+      } else {
+        setStartMarker(null);
+      }
+
+      const destinationPoint = normalizePoint(routeInfo.destinationLocation);
+      if (destinationPoint) {
+        setEndMarker({
+          latitude: destinationPoint.latitude,
+          longitude: destinationPoint.longitude,
+          address: destinationPoint.address || "Destination",
+        });
+      } else {
+        setEndMarker(null);
+      }
+
+      const receiverPoint =
+        normalizePoint(routeInfo.receiverLocation) ||
+        normalizePoint(currentLocation);
+
+      const fitTargets = [];
+      if (routePoints.length) {
+        fitTargets.push(...routePoints);
+      }
+      if (meetingPoint) {
+        fitTargets.push({
+          latitude: meetingPoint.latitude,
+          longitude: meetingPoint.longitude,
+        });
+      }
+      if (destinationPoint) {
+        fitTargets.push({
+          latitude: destinationPoint.latitude,
+          longitude: destinationPoint.longitude,
+        });
+      }
+      if (receiverPoint) {
+        fitTargets.push({
+          latitude: receiverPoint.latitude,
+          longitude: receiverPoint.longitude,
+        });
+      }
+
+      if (fitTargets.length >= 2 && mapRef.current?.fitToCoordinates) {
+        mapRef.current.fitToCoordinates(fitTargets, {
+          edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+          animated: true,
+        });
+      }
+
+      setCurrentNavigationRoute({
+        origin: receiverPoint || undefined,
+        destination: destinationPoint
+          ? { latitude: destinationPoint.latitude, longitude: destinationPoint.longitude }
+          : undefined,
+        destinationAddress: destinationPoint?.address || "Destination",
+        meetingPoint: meetingPoint
+          ? { latitude: meetingPoint.latitude, longitude: meetingPoint.longitude }
+          : undefined,
+        meetingPointAddress:
+          routeInfo.meetingPoint?.address ||
+          routeInfo.startLocation?.address ||
+          meetingPoint?.address ||
+          "Meeting Point",
+        routeInfo: {
+          coordinates: routePoints,
+          transportMode: routeInfo.transportMode || "walking",
+        },
+        type: "accepted-route",
+        tripMatchId: routeInfo.tripMatch?.matchId,
+      });
+
+      setShowRadius(true);
+    },
+    [currentLocation]
+  );
+
   // Sender request status polling is now handled in useEffect
 
   const currentLocation = locationTracking.currentLocation;
@@ -1858,98 +1970,34 @@ export default function HomeScreen() {
         visible={requestNotificationVisible}
         onClose={() => safeCloseModal(setRequestNotificationVisible)}
         currentLocation={currentLocation}
-        onRequestAccepted={(tripRequest) => {
-          console.log("Request accepted:", tripRequest);
-          // Refresh active matches to show the new match
-          activeMatches.refresh();
-          
-          // Close notification modal
+        onRequestAccepted={(payload) => {
+          console.log("Request accepted:", payload);
+          activeMatches.refresh?.();
           setRequestNotificationVisible(false);
-          
-          // Show success message instead of opening modal
+
+          if (payload?.routeData) {
+            handleNotificationRouteUpdate({
+              ...payload.routeData,
+              senderLocation: payload.senderCurrentLocation,
+              receiverLocation: payload.receiverLocation,
+              tripMatch: payload.tripMatch,
+              tripRequest: payload.tripRequest,
+            });
+          }
+
+          const acceptedDestination =
+            payload?.tripRequest?.destination || payload?.tripMatch?.tripDetails?.destination;
+
           Alert.alert(
-            "Request Accepted! 🎉",
-            "You've successfully accepted the companion request. Your trip routes are now displayed on the map.",
+            "Request Accepted! dYZ%",
+            acceptedDestination
+              ? `You've accepted the companion request to ${acceptedDestination}. The shared route is now visible.`
+              : "You've successfully accepted the companion request. Your trip routes are now displayed on the map.",
             [{ text: "Got it!" }]
           );
         }}
         onRouteUpdate={(routeData) => {
-          console.log("🗺️ [HOME] Updating map with receiver route:", routeData);
-          
-          // Update map markers and route based on route type
-          if (routeData.routeType === 'to-meeting-point') {
-            // CORRECTED: Display route from receiver to meeting point (sender's start)
-            console.log('🎯 [HOME] Displaying route to meeting point');
-            setRouteCoordinates(routeData.receiverRoute.coordinates);
-            
-            // Show meeting point marker (where receiver needs to go)
-            if (routeData.meetingPoint && routeData.meetingPoint.coordinates) {
-              setEndMarker(routeData.meetingPoint.coordinates);
-            }
-            
-            // Show receiver's current location as start
-            setStartMarker(currentLocation);
-            
-            // Store navigation data for the navigation button
-            setCurrentNavigationRoute({
-              destination: routeData.meetingPoint?.coordinates,
-              destinationAddress: routeData.meetingPoint?.address || 'Meeting Point',
-              origin: currentLocation,
-              routeInfo: routeData.receiverRoute,
-              companion: routeData.companion,
-              type: 'to-meeting-point'
-            });
-            
-          } else if (routeData.routeType === 'two-step') {
-            // Display two-step route: receiver → meeting point → destination
-            const allCoords = [
-              ...routeData.receiverRoute.step1.coordinates,
-              ...routeData.receiverRoute.step2.coordinates
-            ];
-            setRouteCoordinates(allCoords);
-            
-            // Set markers for meeting point and destination
-            if (routeData.meetingPoint) {
-              setStartMarker(routeData.meetingPoint);
-            }
-            if (routeData.destination) {
-              setEndMarker(routeData.destination);
-            }
-            
-            // Store navigation data for two-step route
-            setCurrentNavigationRoute({
-              destination: routeData.destination?.coordinates,
-              destinationAddress: routeData.destination?.address || 'Final Destination',
-              meetingPoint: routeData.meetingPoint?.coordinates,
-              meetingPointAddress: routeData.meetingPoint?.address || 'Meeting Point',
-              origin: currentLocation,
-              routeInfo: routeData.receiverRoute,
-              type: 'two-step'
-            });
-            
-          } else {
-            // Display direct route: receiver → destination
-            setRouteCoordinates(routeData.receiverRoute.coordinates);
-            setStartMarker(currentLocation);
-            setEndMarker(routeData.destination);
-            
-            // Store navigation data for direct route
-            setCurrentNavigationRoute({
-              destination: routeData.destination?.coordinates,
-              destinationAddress: routeData.destination?.address || 'Destination',
-              origin: currentLocation,
-              routeInfo: routeData.receiverRoute,
-              type: 'direct'
-            });
-          }
-          
-          // Fit map to show the complete route
-          if (routeData.mapRegion && mapRef.current) {
-            mapRef.current.animateToRegion(routeData.mapRegion, 1000);
-          }
-          
-          // Show route overlay
-          setShowRadius(true);
+          handleNotificationRouteUpdate(routeData);
         }}
       />
 

@@ -46,7 +46,7 @@ const catchAsync = require("../utils/catchAsync");
         userName: existingUser.userName,
         userImage: existingUser.profilePhoto || "default.jpg"
       },
-      startingLocation: startLocation, // Use the new field name
+      startLocation, // Persist sender-selected meeting point
       destination,
       destinationType,
       date,

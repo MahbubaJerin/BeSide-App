@@ -135,7 +135,7 @@ async function testNotificationAPI() {
                 requests.forEach((req, index) => {
                     console.log(`  ${index + 1}. Trip ID: ${req.tripReqId}`);
                     console.log(`      From: ${req.user?.firstName || req.user?.userName || 'Unknown'} ${req.user?.lastName || ''}`);
-                    console.log(`      Location: ${req.startingLocation?.address || req.from || 'N/A'} → ${req.destination || req.to || 'N/A'}`);
+                    console.log(`      Location: ${req.startLocation?.address || req.from || 'N/A'} → ${req.destination || req.to || 'N/A'}`);
                     console.log(`      Photo: ${req.user?.displayPhoto ? 'Yes' : 'No'} (${req.user?.displayPhoto || 'None'})`);
                     console.log(`      Status: ${req.status}`);
                     console.log(`      Expires: ${req.expiresAt}`);

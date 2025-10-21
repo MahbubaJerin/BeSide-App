@@ -96,12 +96,12 @@ function RequestCard({ request, onResponse, respondingTo }) {
               </View>
             </View>
             
-            {request.startingLocation?.address && (
+            {request.startLocation?.address && (
               <View style={styles.tripDetailRow}>
                 <Text style={styles.tripDetailIcon}>🚩</Text>
                 <View style={styles.tripDetailContent}>
                   <Text style={styles.tripDetailLabel}>Starting From</Text>
-                  <Text style={styles.tripDetailValue}>{request.startingLocation.address}</Text>
+                  <Text style={styles.tripDetailValue}>{request.startLocation.address}</Text>
                 </View>
               </View>
             )}
@@ -149,7 +149,8 @@ export default function RequestNotificationModal({
   visible, 
   onClose, 
   onRequestAccepted,
-  currentLocation
+  currentLocation,
+  onRouteUpdate
 }) {
   const [respondingTo, setRespondingTo] = useState(null);
 
@@ -209,14 +210,27 @@ export default function RequestNotificationModal({
 
       if (result.status === "success") {
         if (response === "accepted") {
+          const payload = result.data || {};
+
           onClose();
+
+          if (payload.routeData) {
+            onRouteUpdate?.({
+              ...payload.routeData,
+              senderLocation: payload.senderCurrentLocation,
+              receiverLocation: payload.receiverLocation,
+              tripMatch: payload.tripMatch,
+              tripRequest: payload.tripRequest,
+            });
+          }
+
           Alert.alert(
             "Request Accepted! 🎉", 
             "You have successfully accepted the companion request.",
             [{ 
               text: "OK",
               onPress: () => {
-                onRequestAccepted?.(result.data.tripRequest);
+                onRequestAccepted?.(payload);
               }
             }]
           );

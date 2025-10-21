@@ -43,10 +43,10 @@ const TripMatchCoordinationModal = ({
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         });
-      } else if (tripMatch.tripDetails?.destinationCoordinates) {
+      } else if (tripMatch.tripDetails?.destinationLocation) {
         setMapRegion({
-          latitude: tripMatch.tripDetails.destinationCoordinates.latitude,
-          longitude: tripMatch.tripDetails.destinationCoordinates.longitude,
+          latitude: tripMatch.tripDetails.destinationLocation.latitude,
+          longitude: tripMatch.tripDetails.destinationLocation.longitude,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         });
@@ -249,9 +249,9 @@ const TripMatchCoordinationModal = ({
                   )}
                   
                   {/* Destination marker */}
-                  {tripMatch.tripDetails?.destinationCoordinates && (
+                  {tripMatch.tripDetails?.destinationLocation && (
                     <Marker
-                      coordinate={tripMatch.tripDetails.destinationCoordinates}
+                      coordinate={tripMatch.tripDetails.destinationLocation}
                       title="Destination"
                       description={tripMatch.tripDetails.destination}
                       pinColor="red"
