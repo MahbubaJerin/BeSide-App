@@ -2079,9 +2079,6 @@ export default function HomeScreen() {
         }}
         acceptanceData={acceptanceData}
       />
-        currentLocation={currentLocation}
-        currentUserId={user?._id}
-      />
 
       {/* Enhanced Consent Modal for Receivers */}
       <EnhancedConsentModal
