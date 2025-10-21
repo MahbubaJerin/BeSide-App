@@ -991,25 +991,33 @@ export default function HomeScreen() {
   // ⬇️ CHANGED: no search starts here; only createTripReq + open modal
   const handleFindCompanion = async () => {
     try {
+      console.log("🚀 [FIND COMPANION] Starting companion search flow...");
       const storedUser = await AsyncStorage.getItem("user");
       const token = await AsyncStorage.getItem("token");
       if (!storedUser || !token) {
+        console.log("❌ [FIND COMPANION] No user/token found, redirecting to login");
         router.replace("/login");
         return;
       }
       const parsed = JSON.parse(storedUser);
+      console.log("👤 [FIND COMPANION] User:", parsed.userName, "ID:", parsed._id);
 
       if (!parsed.isVerified) {
+        console.log("⚠️ [FIND COMPANION] User not verified");
         setModalVisible(true);
         return;
       }
       if (!currentLocation) {
+        console.log("❌ [FIND COMPANION] No current location");
         Alert.alert("Location Required", "Please enable location services to find companions.");
         return;
       }
 
+      console.log("📍 [FIND COMPANION] Current location:", currentLocation);
+
       // 1) create trip request
       const API_URL = BASE_URL.replace(/\/+$/, "");
+      console.log("📤 [CREATE REQUEST] Calling API:", `${API_URL}/api/v1/trip/createTripReq`);
       const response = await fetch(`${API_URL}/api/v1/trip/createTripReq`, {
         method: "POST",
         headers: {
@@ -1033,19 +1041,28 @@ export default function HomeScreen() {
           transportMode: "walking" // Will be updated when preferences are submitted
         }),
       });
+      
+      console.log("📥 [CREATE REQUEST] Response status:", response.status);
       const result = await response.json();
+      console.log("📋 [CREATE REQUEST] Result:", JSON.stringify(result, null, 2));
 
       if (result.status !== "success") {
+        console.log("❌ [CREATE REQUEST] Failed:", result.message);
         throw new Error(result.message || "Failed to create trip request");
       }
-      setCurrentTripRequestId(result.data.tripRequest.tripReqId);
+      
+      const tripReqId = result.data.tripRequest.tripReqId;
+      console.log("✅ [CREATE REQUEST] Success! Trip Request ID:", tripReqId);
+      setCurrentTripRequestId(tripReqId);
 
       // 2) prompt consent -> selfie -> preferences
+      console.log("📝 [FIND COMPANION] Opening consent modal...");
       setConsentVisible(true);
 
       // 3) DO NOT START SEARCH YET
       setShowRadius(false);
     } catch (e) {
+      console.error("❌ [FIND COMPANION] Error:", e);
       Alert.alert("Error", e?.message || "Failed to start companion search.");
     }
   };
@@ -1087,10 +1104,12 @@ export default function HomeScreen() {
   // NEW: Send trip request to nearby users
   const sendTripRequestToNearby = async (startCoordinates) => {
     try {
+      console.log("📡 [SEND TO NEARBY] Starting...");
       const token = await AsyncStorage.getItem("token");
       const user = await AsyncStorage.getItem("user");
 
       if (!token || !currentTripRequestId) {
+        console.log("❌ [SEND TO NEARBY] Missing token or trip request ID");
         Alert.alert(
           "Debug Error",
           `Missing: ${!token ? "Token" : ""} ${!currentTripRequestId ? "Trip Request ID" : ""}`
@@ -1105,6 +1124,9 @@ export default function HomeScreen() {
         searchRadius: 500,
       };
 
+      console.log("📤 [SEND TO NEARBY] Request body:", JSON.stringify(requestBody, null, 2));
+      console.log("📤 [SEND TO NEARBY] Calling API:", `${API_URL}/api/v1/trip/send-to-nearby`);
+
       const response = await fetch(`${API_URL}/api/v1/trip/send-to-nearby`, {
         method: "POST",
         headers: {
@@ -1114,22 +1136,27 @@ export default function HomeScreen() {
         body: JSON.stringify(requestBody),
       });
 
+      console.log("📥 [SEND TO NEARBY] Response status:", response.status);
       const result = await response.json();
+      console.log("📋 [SEND TO NEARBY] Result:", JSON.stringify(result, null, 2));
 
       if (result.status === "success") {
+        console.log(`✅ [SEND TO NEARBY] Success! Sent to ${result.data.recipientCount} users`);
         Alert.alert(
           "Request Sent! 🚀",
-          `Your companion request has been sent to ${result.data.recipientCount} active users within 500m radius.\n\nThe request is valid for 2 minutes. You'll be notified when someone accepts your request.`,
+          `Your companion request has been sent to ${result.data.recipientCount} active users within 500m radius.\n\nThe request is valid for 30 minutes. You'll be notified when someone accepts your request.`,
           [{ text: "OK" }]
         );
         
         // Stop any searching animation since request is sent
         await companionSearch.stopSearch();
       } else {
+        console.log("❌ [SEND TO NEARBY] Failed:", result.message);
         Alert.alert("API Error", result.message || "Failed to send request");
         throw new Error(result.message || "Failed to send request to nearby users");
       }
     } catch (error) {
+      console.error("❌ [SEND TO NEARBY] Error:", error);
       Alert.alert("Debug Error", `Network/Parse Error: ${error.message}`);
     }
   };
@@ -1818,6 +1845,8 @@ export default function HomeScreen() {
           style={styles.bottomNavItem} 
           onPress={() => {
             console.log("🔔 Opening Notifications Modal");
+            console.log(`📊 Current requests count: ${requestPolling.pendingRequests?.length || 0}`);
+            console.log(`📊 Requests data:`, requestPolling.pendingRequests);
             try {
               setRequestNotificationVisible(true);
               requestPolling.markAsViewed();
@@ -1970,6 +1999,9 @@ export default function HomeScreen() {
         visible={requestNotificationVisible}
         onClose={() => safeCloseModal(setRequestNotificationVisible)}
         currentLocation={currentLocation}
+        requests={requestPolling.pendingRequests}
+        isPolling={requestPolling.isPolling}
+        onRefetch={requestPolling.refetch}
         onRequestAccepted={(payload) => {
           console.log("Request accepted:", payload);
           activeMatches.refresh?.();
@@ -2115,6 +2147,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomLeftRadius: 25,
     borderBottomRightRadius: 25,
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   headerTop: {
     flexDirection: "row",
@@ -2165,14 +2202,16 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     marginHorizontal: 4,
-    shadowColor: "#000",
+    shadowColor: "#8B5CF6",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
     elevation: 3,
   },
   primaryCard: {
     backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.1)",
   },
   serviceCardTitle: {
     fontSize: 14,
@@ -2194,10 +2233,12 @@ const styles = StyleSheet.create({
   secondaryCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.25)",
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
   },
   secondaryCardText: {
     color: "white",
@@ -2215,11 +2256,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: "#8B5CF6",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.1)",
   },
   companionTitle: {
     fontSize: 20,
@@ -2238,14 +2281,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#8B5CF6",
     paddingHorizontal: 32,
     paddingVertical: 16,
-    borderRadius: 25,
+    borderRadius: 30,
     flexDirection: "row",
     alignItems: "center",
     shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 0,
   },
   findButtonContent: {
     flexDirection: "row",
@@ -2301,12 +2345,20 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
+    borderTopColor: "rgba(139, 92, 246, 0.1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 8,
   },
   bottomNavItem: {
     alignItems: "center",
     justifyContent: "center",
-    padding: 8,
+    padding: 10,
+    borderRadius: 12,
+    minWidth: 48,
+    minHeight: 48,
   },
   navIconWithBadge: {
     position: "relative",
@@ -2316,16 +2368,23 @@ const styles = StyleSheet.create({
     top: -8,
     right: -8,
     backgroundColor: "#ef4444",
-    borderRadius: 10,
+    borderRadius: 12,
     minWidth: 20,
     height: 20,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "white",
+    shadowColor: "#ef4444",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
   },
   modernBadgeText: {
     color: "white",
     fontSize: 10,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   
   // Loading states

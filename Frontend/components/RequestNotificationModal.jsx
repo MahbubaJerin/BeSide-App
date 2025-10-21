@@ -150,25 +150,33 @@ export default function RequestNotificationModal({
   onClose, 
   onRequestAccepted,
   currentLocation,
-  onRouteUpdate
+  onRouteUpdate,
+  requests: externalRequests,
+  isPolling: externalIsPolling,
+  onRefetch: externalRefetch
 }) {
   const [respondingTo, setRespondingTo] = useState(null);
 
-  // Use optimized polling hook with balanced rate limiting
-  const { 
-    pendingRequests: requests, 
-    hasNewRequests, 
-    isPolling,
-    networkError,
-    refetch,
-    markAsViewed,
-    isRateLimited 
-  } = useRequestPolling(20000, visible); // Poll every 20 seconds when modal is visible
+  // Use external requests if provided (from parent's polling), otherwise use own polling
+  const hasExternalData = externalRequests !== undefined;
+  
+  // Only use internal polling if no external data provided
+  const internalPolling = useRequestPolling(20000, visible && !hasExternalData);
+  
+  // Use external data if available, otherwise fallback to internal polling
+  const requests = hasExternalData ? externalRequests : internalPolling.pendingRequests;
+  const isPolling = hasExternalData ? externalIsPolling : internalPolling.isPolling;
+  const refetch = hasExternalData ? externalRefetch : internalPolling.refetch;
+  const hasNewRequests = hasExternalData ? requests.length > 0 : internalPolling.hasNewRequests;
+  const networkError = hasExternalData ? null : internalPolling.networkError;
+  const markAsViewed = hasExternalData ? () => {} : internalPolling.markAsViewed;
+  const isRateLimited = hasExternalData ? false : internalPolling.isRateLimited;
 
   // Log requests for debugging when they update
   useEffect(() => {
+    console.log(`📋 [MODAL] Requests updated - Count: ${requests.length}, Using external: ${hasExternalData}, Modal visible: ${visible}`);
     if (requests.length > 0) {
-      console.log(`📋 [NOTIFICATIONS] Found ${requests.length} pending requests via polling`);
+      console.log(`📋 [NOTIFICATIONS] Found ${requests.length} pending requests`);
       requests.forEach((req, index) => {
         console.log(`📋 [REQUEST ${index + 1}]`, {
           tripReqId: req.tripReqId,
@@ -179,7 +187,7 @@ export default function RequestNotificationModal({
         });
       });
     }
-  }, [requests]);
+  }, [requests, hasExternalData, visible]);
 
   // Mark as viewed when modal opens
   useEffect(() => {
@@ -266,7 +274,7 @@ export default function RequestNotificationModal({
       <View style={styles.overlay}>
         <View style={styles.container}>
           <View style={styles.header}>
-            <ThemedText type="subtitle">🔔 Trip Requests</ThemedText>
+            <ThemedText type="subtitle" style={styles.headerTitle}>🔔 Trip Requests</ThemedText>
             <TouchableOpacity 
               onPress={() => {
                 console.log("🚪 [NOTIFICATIONS] Closing modal");
@@ -339,25 +347,43 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: Colors.light.surface,
-    borderRadius: 16,
+    borderRadius: 20,
     width: "90%",
     maxHeight: "80%",
     overflow: "hidden",
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    padding: 20,
+    backgroundColor: "#8B5CF6",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  headerTitle: {
+    color: "white",
+    fontSize: 20,
+    fontWeight: "600",
   },
   closeButton: {
     padding: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    minWidth: 36,
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
   },
   closeText: {
-    fontSize: 18,
-    color: Colors.light.text,
+    fontSize: 20,
+    color: "white",
+    fontWeight: "600",
   },
   requestsList: {
     maxHeight: 400,
@@ -384,10 +410,15 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     backgroundColor: "#8B5CF6",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
     alignSelf: "center",
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   refreshButtonText: {
     color: "white",
@@ -397,25 +428,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.light.textSecondary,
   },
-  contentContainer: {
-    flex: 1,
-  },
-  closeButtonBottom: {
-    margin: 16,
-  },
-  
   // Request card styles
   requestCard: {
     margin: 16,
     borderRadius: 16,
     backgroundColor: Colors.light.surface,
-    shadowColor: '#000',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
     elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.1)',
   },
   curvedHeader: {
+    backgroundColor: '#8B5CF6',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    position: 'relative',
+  },rvedHeader: {
     backgroundColor: '#4A90E2',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
