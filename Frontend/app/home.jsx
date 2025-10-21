@@ -307,8 +307,8 @@ export default function HomeScreen() {
   // hooks
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
-  const requestPolling = useRequestPolling(120000, true); // Poll every 2 minutes to avoid rate limiting
-  const activeMatches = useActiveMatches(60000); // Poll for matches every minute
+  const requestPolling = useRequestPolling(5000, true); // Poll every 5 seconds for incoming requests
+  const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds
   const tripNotifications = useTripNotifications();
   const realTimeUpdates = useRealTimeUpdates();
   const { 

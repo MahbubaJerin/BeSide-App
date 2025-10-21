@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../config';
 
-export const useRequestPolling = (intervalMs = 30000, enabled = true) => { // Increased default from 10s to 30s
+export const useRequestPolling = (intervalMs = 5000, enabled = true) => { // Changed to 5 seconds for faster notifications
   const [pendingRequests, setPendingRequests] = useState([]);
   const [hasNewRequests, setHasNewRequests] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
   const [networkError, setNetworkError] = useState(null);
+  const [requestCount, setRequestCount] = useState(0); // Add request count state
   const intervalRef = useRef(null);
   const lastCountRef = useRef(0);
   const rateLimitRef = useRef(false);
@@ -76,6 +77,7 @@ export const useRequestPolling = (intervalMs = 30000, enabled = true) => { // In
         
         lastCountRef.current = newRequests.length;
         setPendingRequests(newRequests);
+        setRequestCount(newRequests.length); // Update request count
 
         // Send heartbeat to keep user visible for notifications
         try {

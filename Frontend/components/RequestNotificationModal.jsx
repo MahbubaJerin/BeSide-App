@@ -224,8 +224,8 @@ export default function RequestNotificationModal({
           Alert.alert("Success", "Request declined successfully");
         }
         
-        // Remove the request from the list
-        setRequests(prev => prev.filter(req => req.tripReqId !== tripReqId));
+        // Refresh the request list
+        refetch();
       } else {
         throw new Error(result.message || "Failed to respond to request");
       }
@@ -256,8 +256,6 @@ export default function RequestNotificationModal({
             <TouchableOpacity 
               onPress={() => {
                 console.log("🚪 [NOTIFICATIONS] Closing modal");
-                setLoading(false);
-                setRequests([]);
                 setRespondingTo(null);
                 onClose();
               }} 
