@@ -757,9 +757,27 @@ export default function HomeScreen() {
   }, [currentLocation, activeRequest?.meetingPointCoordinates]);
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem("user");
-    await AsyncStorage.removeItem("token");
-    router.replace("/login");
+    try {
+      const token = await AsyncStorage.getItem("token");
+      
+      // Call cleanup endpoint before logging out
+      if (token) {
+        await fetch(`${BASE_URL}/api/v1/trip/cleanup-user-data`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Error during logout cleanup:", error);
+    } finally {
+      // Always clear local storage and logout
+      await AsyncStorage.removeItem("user");
+      await AsyncStorage.removeItem("token");
+      router.replace("/login");
+    }
   };
 
   const handleMarkArrived = async () => {

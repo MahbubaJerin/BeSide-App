@@ -150,6 +150,11 @@ router.get(
   notificationController.getActiveMatches
 );
 
+router.post(
+  "/cleanup-user-data",
+  notificationController.cleanupUserData
+);
+
 router.get(
   "/match-history",
   notificationController.getMatchHistory

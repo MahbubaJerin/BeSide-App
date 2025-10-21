@@ -162,7 +162,22 @@ tripMatchSchema.statics.generateMatchId = function() {
 };
 
 // Static method to find active matches for a user
-tripMatchSchema.statics.findUserActiveMatches = function(userId) {
+tripMatchSchema.statics.findUserActiveMatches = async function(userId) {
+  // Clean up old matches (older than 10 minutes) that are still marked as 'active' but not 'in-progress'
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+  
+  await this.updateMany({
+    $or: [
+      { 'organizer.userId': userId },
+      { 'companion.userId': userId }
+    ],
+    status: 'active',
+    'progression.matched': { $lt: tenMinutesAgo }
+  }, {
+    $set: { status: 'cancelled' }
+  });
+
+  // Return only truly active matches
   return this.find({
     $or: [
       { 'organizer.userId': userId },

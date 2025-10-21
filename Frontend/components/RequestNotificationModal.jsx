@@ -175,22 +175,12 @@ export default function RequestNotificationModal({
   const markAsViewed = hasExternalData ? () => {} : internalPolling.markAsViewed;
   const isRateLimited = hasExternalData ? false : internalPolling.isRateLimited;
 
-  // Log requests for debugging when they update
+  // Log requests for debugging only when count changes
   useEffect(() => {
-    console.log(`📋 [MODAL] Requests updated - Count: ${requests.length}, Using external: ${hasExternalData}, Modal visible: ${visible}`);
     if (requests.length > 0) {
-      console.log(`📋 [NOTIFICATIONS] Found ${requests.length} pending requests`);
-      requests.forEach((req, index) => {
-        console.log(`📋 [REQUEST ${index + 1}]`, {
-          tripReqId: req.tripReqId,
-          senderName: req.user?.userName,
-          destination: req.destination,
-          hasPhoto: !!(req.user?.requestPhoto || req.user?.profilePhoto || req.photo?.url),
-          photoUrl: req.user?.requestPhoto || req.user?.profilePhoto || req.photo?.url
-        });
-      });
+      console.log(`� ${requests.length} request(s) pending`);
     }
-  }, [requests, hasExternalData, visible]);
+  }, [requests.length]);
 
   // Mark as viewed when modal opens
   useEffect(() => {

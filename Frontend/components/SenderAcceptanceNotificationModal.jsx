@@ -13,12 +13,7 @@ export default function SenderAcceptanceNotificationModal({
   onClose, 
   acceptanceData 
 }) {
-  // Debug logging
-  console.log("🎉 [SENDER MODAL] Visible:", visible);
-  console.log("🎉 [SENDER MODAL] Acceptance Data:", JSON.stringify(acceptanceData, null, 2));
-
   if (!acceptanceData) {
-    console.warn("⚠️ [SENDER MODAL] No acceptance data provided");
     return null;
   }
 

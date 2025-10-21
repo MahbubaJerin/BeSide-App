@@ -25,20 +25,43 @@ export default function ReceiverPhotoConsentModal({
   const [isUploading, setIsUploading] = useState(false);
 
   const requestCameraPermission = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Camera Permission Required",
-        "Please enable camera access to take your verification photo."
-      );
+    console.log("🔐 [RECEIVER PHOTO] Requesting camera permission");
+    
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      console.log("🔐 [RECEIVER PHOTO] Permission status:", status);
+      
+      if (status !== "granted") {
+        Alert.alert(
+          "Camera Permission Required",
+          "Please enable camera access in your device settings to take your verification photo.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Open Settings", onPress: () => {
+              console.log("⚙️ [RECEIVER PHOTO] User chose to open settings");
+            }}
+          ]
+        );
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error("❌ [RECEIVER PHOTO] Permission error:", error);
+      Alert.alert("Error", "Failed to request camera permission. Please try again.");
       return false;
     }
-    return true;
   };
 
   const handleTakePhoto = async () => {
+    console.log("📷 [RECEIVER PHOTO] Take photo button pressed");
+    
     const hasPermission = await requestCameraPermission();
-    if (!hasPermission) return;
+    if (!hasPermission) {
+      console.log("❌ [RECEIVER PHOTO] Camera permission denied");
+      return;
+    }
+
+    console.log("✅ [RECEIVER PHOTO] Camera permission granted, launching camera");
 
     try {
       const result = await ImagePicker.launchCameraAsync({
@@ -48,11 +71,17 @@ export default function ReceiverPhotoConsentModal({
         quality: 0.8,
       });
 
+      console.log("📷 [RECEIVER PHOTO] Camera result:", result);
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setReceiverPhoto(result.assets[0].uri);
+        const photoUri = result.assets[0].uri;
+        console.log("✅ [RECEIVER PHOTO] Photo captured:", photoUri);
+        setReceiverPhoto(photoUri);
+      } else {
+        console.log("⚠️ [RECEIVER PHOTO] Photo capture cancelled");
       }
     } catch (error) {
-      console.error("Error taking photo:", error);
+      console.error("❌ [RECEIVER PHOTO] Error taking photo:", error);
       Alert.alert("Error", "Failed to take photo. Please try again.");
     }
   };
@@ -124,6 +153,7 @@ export default function ReceiverPhotoConsentModal({
               <TouchableOpacity 
                 style={styles.cameraButton}
                 onPress={handleTakePhoto}
+                activeOpacity={0.7}
               >
                 <Text style={styles.cameraIcon}>📷</Text>
                 <Text style={styles.cameraButtonText}>Take Verification Photo</Text>

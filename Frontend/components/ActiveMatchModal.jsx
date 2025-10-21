@@ -189,7 +189,6 @@ export default function ActiveMatchModal({
               matches.map((match) => {
                 // Safety checks
                 if (!match?.organizer?.userId || !match?.companion?.userId || !currentUserId) {
-                  console.warn('⚠️ Missing user data in match:', match);
                   return null;
                 }
                 
