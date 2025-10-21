@@ -37,6 +37,7 @@ import EnhancedConsentModal from "@/components/EnhancedConsentModal";
 import TwoStepTripModal from "@/components/TwoStepTripModal";
 import { usePersistentSearch } from "@/hooks/usePersistentSearch";
 import RequestNotificationModal from "@/components/RequestNotificationModal";
+import SenderAcceptanceNotificationModal from "@/components/SenderAcceptanceNotificationModal";
 import ActiveMatchModal from "@/components/ActiveMatchModal";
 import BeSideLogo from "../assets/images/BeSide.png";
 import { BASE_URL } from "../config";
@@ -276,6 +277,8 @@ export default function HomeScreen() {
   const persistentSearch = usePersistentSearch();
   const [requestNotificationVisible, setRequestNotificationVisible] = useState(false);
   const [activeMatchModalVisible, setActiveMatchModalVisible] = useState(false);
+  const [senderAcceptanceVisible, setSenderAcceptanceVisible] = useState(false);
+  const [acceptanceData, setAcceptanceData] = useState(null);
 
   const [consent, setConsent] = useState({ noTouch: false, respectful: false, safety: false });
   const [photoUrl, setPhotoUrl] = useState(null);
@@ -552,14 +555,16 @@ export default function HomeScreen() {
       switch (eventType) {
         case 'request_response':
           if (eventData.response === 'accepted') {
-            // New match created
-            setTimeout(() => {
-              Alert.alert(
-                "Request Accepted! 🎉",
-                `${eventData.responderName} accepted your companion request!`,
-                [{ text: "View Trip", onPress: () => setActiveMatchModalVisible(true) }]
-              );
-            }, 500);
+            // New match created - show sender acceptance modal
+            const modalData = {
+              receiverName: eventData.responderName,
+              receiverPhoto: eventData.responderPhoto,
+              receiverLocation: eventData.receiverLocation,
+              destination: eventData.destination,
+              transportMode: eventData.transportMode
+            };
+            setAcceptanceData(modalData);
+            setSenderAcceptanceVisible(true);
           } else if (eventData.response === 'declined') {
             // Request declined - show brief notification
             setTimeout(() => {
@@ -2059,6 +2064,21 @@ export default function HomeScreen() {
         onSetMeetingPoint={(matchId, meetingPoint) => {
           return activeMatches.setMeetingPoint(matchId, meetingPoint);
         }}
+      />
+
+      {/* Sender Acceptance Notification Modal */}
+      <SenderAcceptanceNotificationModal
+        visible={senderAcceptanceVisible}
+        onClose={() => {
+          setSenderAcceptanceVisible(false);
+          setAcceptanceData(null);
+          // Refresh active matches when sender acknowledges
+          activeMatches.refresh?.();
+          // Optionally show active matches modal
+          setActiveMatchModalVisible(true);
+        }}
+        acceptanceData={acceptanceData}
+      />
         currentLocation={currentLocation}
         currentUserId={user?._id}
       />

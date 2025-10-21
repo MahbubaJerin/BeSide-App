@@ -16,9 +16,10 @@ import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";
+import ReceiverPhotoConsentModal from "./ReceiverPhotoConsentModal";
 
 // Simple request card component with sender photo
-function RequestCard({ request, onResponse, respondingTo }) {
+function RequestCard({ request, onResponse, respondingTo, onAcceptClick }) {
   return (
     <View style={styles.requestCard}>
       {/* Header with curved background */}
@@ -122,7 +123,7 @@ function RequestCard({ request, onResponse, respondingTo }) {
         <View style={styles.actionButtonsCard}>
           <TouchableOpacity
             style={[styles.actionButtonCard, styles.acceptButtonCard, respondingTo === request.tripReqId && styles.disabledButton]}
-            onPress={() => onResponse(request.tripReqId, "accepted")}
+            onPress={() => onAcceptClick(request)}
             disabled={respondingTo === request.tripReqId}
           >
             <Text style={styles.acceptButtonText}>
@@ -156,6 +157,8 @@ export default function RequestNotificationModal({
   onRefetch: externalRefetch
 }) {
   const [respondingTo, setRespondingTo] = useState(null);
+  const [showReceiverPhotoModal, setShowReceiverPhotoModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   // Use external requests if provided (from parent's polling), otherwise use own polling
   const hasExternalData = externalRequests !== undefined;
@@ -196,7 +199,20 @@ export default function RequestNotificationModal({
     }
   }, [visible, hasNewRequests, markAsViewed]);
 
-  const handleResponse = async (tripReqId, response) => {
+  const handleAcceptClick = (request) => {
+    setSelectedRequest(request);
+    setShowReceiverPhotoModal(true);
+  };
+
+  const handleReceiverPhotoConfirm = async (receiverPhotoUri) => {
+    if (!selectedRequest) return;
+
+    setShowReceiverPhotoModal(false);
+    await handleResponse(selectedRequest.tripReqId, "accepted", receiverPhotoUri);
+    setSelectedRequest(null);
+  };
+
+  const handleResponse = async (tripReqId, response, receiverPhotoUri = null) => {
     if (respondingTo === tripReqId) return;
     
     try {
@@ -205,13 +221,40 @@ export default function RequestNotificationModal({
       if (!token) return;
 
       const API_URL = BASE_URL.replace(/\/+$/, "");
+      
+      // For accept with photo, use FormData
+      let requestBody;
+      let headers = {
+        Authorization: `Bearer ${token}`,
+      };
+
+      if (response === "accepted" && receiverPhotoUri) {
+        const formData = new FormData();
+        formData.append("tripReqId", tripReqId);
+        formData.append("response", response);
+        
+        // Add receiver photo
+        const filename = receiverPhotoUri.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        
+        formData.append("receiverPhoto", {
+          uri: receiverPhotoUri,
+          name: filename,
+          type: type,
+        });
+
+        requestBody = formData;
+        // Don't set Content-Type for FormData - let fetch handle it
+      } else {
+        headers["Content-Type"] = "application/json";
+        requestBody = JSON.stringify({ tripReqId, response });
+      }
+
       const apiResponse = await fetch(`${API_URL}/api/v1/trip/respond-request`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ tripReqId, response }),
+        headers,
+        body: requestBody,
       });
 
       const result = await apiResponse.json();
@@ -316,6 +359,7 @@ export default function RequestNotificationModal({
                     key={request.tripReqId}
                     request={request}
                     onResponse={handleResponse}
+                    onAcceptClick={handleAcceptClick}
                     respondingTo={respondingTo}
                   />
                 ))}
@@ -334,6 +378,17 @@ export default function RequestNotificationModal({
           />
         </View>
       </View>
+
+      {/* Receiver Photo Consent Modal */}
+      <ReceiverPhotoConsentModal
+        visible={showReceiverPhotoModal}
+        onClose={() => {
+          setShowReceiverPhotoModal(false);
+          setSelectedRequest(null);
+        }}
+        onConfirm={handleReceiverPhotoConfirm}
+        senderName={selectedRequest?.user?.userName || "the sender"}
+      />
     </Modal>
   );
 }

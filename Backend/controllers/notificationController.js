@@ -404,12 +404,21 @@ exports.updateUserHeartbeat = catchAsync(async (req, res, next) => {
 exports.respondToTripRequest = catchAsync(async (req, res, next) => {
     const { tripReqId, response } = req.body;
     const userId = req.user._id.toString();
+    const receiverPhoto = req.file; // Receiver's verification photo
 
     console.log("🎯 [BACKEND] Responding to trip request:", tripReqId, "with:", response);
+    if (receiverPhoto) {
+        console.log("📸 [BACKEND] Receiver photo included:", receiverPhoto.originalname);
+    }
 
     // Validate response
     if (!["accepted", "declined"].includes(response)) {
         return next(new AppError("Response must be either 'accepted' or 'declined'", 400));
+    }
+
+    // For acceptance, receiver photo is required
+    if (response === "accepted" && !receiverPhoto) {
+        return next(new AppError("Verification photo is required to accept the request", 400));
     }
 
     // First, cleanup expired requests
@@ -457,12 +466,32 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             return next(new AppError("This request has already been accepted by someone else", 409));
         }
 
+        // Upload receiver's verification photo to Cloudinary
+        const { uploadToCloudinary } = require("../utils/fileUpload");
+        let receiverPhotoData = null;
+        
+        if (receiverPhoto) {
+            try {
+                console.log("📤 [PHOTO UPLOAD] Uploading receiver's verification photo...");
+                receiverPhotoData = await uploadToCloudinary(
+                    receiverPhoto,
+                    "trip-requests/receiver-photos",
+                    userId
+                );
+                console.log("✅ [PHOTO UPLOAD] Receiver photo uploaded:", receiverPhotoData.url);
+            } catch (uploadError) {
+                console.error("❌ [PHOTO UPLOAD] Failed to upload receiver photo:", uploadError);
+                return next(new AppError("Failed to upload verification photo. Please try again.", 500));
+            }
+        }
+
         // Update trip request
         tripRequest.status = "accepted";
         tripRequest.acceptedBy = {
             userId: userId,
             userName: req.user.userName,
-            acceptedAt: new Date()
+            acceptedAt: new Date(),
+            verificationPhoto: receiverPhotoData // Store receiver's photo
         };
 
         // Mark all other recipients as declined
@@ -643,16 +672,18 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
         tripReqId: tripRequest.tripReqId,
         responderId: userId,
         responderName: req.user.userName,
-        responderPhoto: req.user.userImage || req.user.profilePhoto,
+        responderPhoto: receiverPhotoData?.url || req.user.userImage || req.user.profilePhoto,
+        receiverLocation: responseData.receiverLocation, // Include receiver's location
         response: response,
         message: response === "accepted" 
             ? `🎉 ${req.user.userName} accepted your companion request!`
             : `❌ ${req.user.userName} declined your request`,
         detailedMessage: response === "accepted"
-            ? `Great! ${req.user.userName} will join you on your trip to ${tripRequest.destination}. Check Active Trips for coordination.`
+            ? `Great! ${req.user.userName} will join you on your trip to ${tripRequest.destination}. Check the photo to verify their identity at the meeting point.`
             : `${req.user.userName} declined to join your trip to ${tripRequest.destination}. Your request is still active for other nearby users.`,
         tripMatch: response === "accepted" ? tripRequest.matchedTripId : null,
         destination: tripRequest.destination,
+        transportMode: tripRequest.transportMode || tripRequest.destinationType,
         tripDate: tripRequest.date,
         tripTime: tripRequest.time,
         timestamp: new Date().toISOString()

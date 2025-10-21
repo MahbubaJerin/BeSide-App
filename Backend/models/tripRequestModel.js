@@ -119,6 +119,20 @@ const TripReqSchema = new Schema(
         acceptedAt: {
             type: Date,
             default: null
+        },
+        verificationPhoto: {
+            url: {
+                type: String,
+                default: ""
+            },
+            filename: {
+                type: String,
+                default: ""
+            },
+            publicId: {
+                type: String,
+                default: ""
+            }
         }
     },
 

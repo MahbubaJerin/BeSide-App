@@ -125,6 +125,7 @@ router.post(
 
 router.post(
   "/respond-request",
+  uploadSingle("receiverPhoto"), // Add multer middleware for receiver photo
   notificationController.respondToTripRequest
 );
 
