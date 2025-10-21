@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  Image,
 } from "react-native";
 import { ThemedButton } from "@/components/ThemedButton";
 import { ThemedText } from "@/components/ThemedText";
@@ -220,14 +221,29 @@ export default function ActiveMatchModal({
                       </View>
                     </View>
 
-                    <View style={styles.matchDetails}>
-                      <View style={styles.detailRow}>
-                        <Ionicons name="person-outline" size={16} color={Colors.light.tabIconDefault} />
-                        <ThemedText style={styles.detailText}>
-                          With: {otherUser.userName}
-                        </ThemedText>
+                    {/* Companion Info Card */}
+                    <View style={styles.companionCard}>
+                      <View style={styles.companionHeader}>
+                        <Image 
+                          source={{ uri: otherUser.userImage && otherUser.userImage !== 'default.jpg' 
+                            ? otherUser.userImage 
+                            : 'https://via.placeholder.com/80?text=No+Photo' 
+                          }} 
+                          style={styles.companionPhoto}
+                        />
+                        <View style={styles.companionInfo}>
+                          <Text style={styles.companionName}>{otherUser.userName}</Text>
+                          <Text style={styles.companionRole}>{myRole === 'Organizer' ? '🤝 Your Companion' : '💼 Trip Organizer'}</Text>
+                          {otherUser.joinedAt && (
+                            <Text style={styles.companionJoined}>
+                              Joined: {formatTimeAgo(otherUser.joinedAt)}
+                            </Text>
+                          )}
+                        </View>
                       </View>
-                      
+                    </View>
+
+                    <View style={styles.matchDetails}>
                       <View style={styles.detailRow}>
                         <Ionicons name="location-outline" size={16} color={Colors.light.tabIconDefault} />
                         <ThemedText style={styles.detailText}>
@@ -735,5 +751,45 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
+  },
+  companionCard: {
+    backgroundColor: "#f8f9fa",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  companionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  companionPhoto: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#e2e8f0",
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: "#8B5CF6",
+  },
+  companionInfo: {
+    flex: 1,
+  },
+  companionName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1f2937",
+    marginBottom: 2,
+  },
+  companionRole: {
+    fontSize: 13,
+    color: "#8B5CF6",
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  companionJoined: {
+    fontSize: 11,
+    color: "#6b7280",
   },
 });

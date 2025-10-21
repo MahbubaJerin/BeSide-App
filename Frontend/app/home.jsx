@@ -2008,10 +2008,8 @@ export default function HomeScreen() {
         isPolling={requestPolling.isPolling}
         onRefetch={requestPolling.refetch}
         onRequestAccepted={(payload) => {
-          console.log("Request accepted:", payload);
-          activeMatches.refresh?.();
-          setRequestNotificationVisible(false);
-
+          console.log("✅ [RECEIVER] Request accepted:", payload);
+          
           if (payload?.routeData) {
             handleNotificationRouteUpdate({
               ...payload.routeData,
@@ -2022,15 +2020,22 @@ export default function HomeScreen() {
             });
           }
 
+          // Refresh active matches and show the active match modal
+          activeMatches.refresh?.();
+          
           const acceptedDestination =
             payload?.tripRequest?.destination || payload?.tripMatch?.tripDetails?.destination;
 
+          // Show success alert then open active matches
           Alert.alert(
-            "Request Accepted! dYZ%",
+            "🎉 Request Accepted!",
             acceptedDestination
-              ? `You've accepted the companion request to ${acceptedDestination}. The shared route is now visible.`
-              : "You've successfully accepted the companion request. Your trip routes are now displayed on the map.",
-            [{ text: "Got it!" }]
+              ? `You've accepted the companion request to ${acceptedDestination}. Check your active trip now!`
+              : "You've successfully accepted the companion request. Your trip is now active!",
+            [{ 
+              text: "View Trip", 
+              onPress: () => setActiveMatchModalVisible(true)
+            }]
           );
         }}
         onRouteUpdate={(routeData) => {

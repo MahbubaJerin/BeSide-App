@@ -263,8 +263,6 @@ export default function RequestNotificationModal({
         if (response === "accepted") {
           const payload = result.data || {};
 
-          onClose();
-
           if (payload.routeData) {
             onRouteUpdate?.({
               ...payload.routeData,
@@ -275,18 +273,12 @@ export default function RequestNotificationModal({
             });
           }
 
-          Alert.alert(
-            "Request Accepted! 🎉", 
-            "You have successfully accepted the companion request.",
-            [{ 
-              text: "OK",
-              onPress: () => {
-                onRequestAccepted?.(payload);
-              }
-            }]
-          );
+          // Close modal and call callback
+          onClose();
+          onRequestAccepted?.(payload);
         } else {
           Alert.alert("Success", "Request declined successfully");
+          onClose();
         }
         
         // Refresh the request list
