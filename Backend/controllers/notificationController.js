@@ -459,6 +459,9 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
 
     recipient.responseStatus = response;
 
+    // Declare receiverPhotoData outside the if block so it's accessible in notification code
+    let receiverPhotoData = null;
+
     // If accepted, update trip request status, set acceptedBy, and create match
     if (response === "accepted") {
         // Check if someone else already accepted
@@ -468,7 +471,6 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
 
         // Upload receiver's verification photo to Cloudinary
         const { uploadToCloudinary } = require("../utils/fileUpload");
-        let receiverPhotoData = null;
         
         if (receiverPhoto) {
             try {
@@ -672,7 +674,7 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
         tripReqId: tripRequest.tripReqId,
         responderId: userId,
         responderName: req.user.userName,
-        responderPhoto: receiverPhotoData?.url || req.user.userImage || req.user.profilePhoto,
+        responderPhoto: receiverPhotoData?.url || req.user.profilePhoto?.url || "default.jpg",
         receiverLocation: responseData.receiverLocation, // Include receiver's location
         response: response,
         message: response === "accepted" 
