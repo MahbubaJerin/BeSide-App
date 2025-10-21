@@ -119,12 +119,20 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
         // Check if user actually exists in Users collection
         const userExists = await User.findById(user.userId);
         
-        console.log(`- User ${user.userName}: isNotSender=${isNotSender}, notAlreadyRecipient=${notAlreadyRecipient}, userExists=${!!userExists}`);
+        // Check gender preference
+        let matchesGenderPreference = true;
+        if (userExists && tripRequest.genderPreference && tripRequest.genderPreference !== 'any') {
+            matchesGenderPreference = userExists.gender === tripRequest.genderPreference;
+        }
         
-        if (isNotSender && notAlreadyRecipient && userExists) {
+        console.log(`- User ${user.userName}: isNotSender=${isNotSender}, notAlreadyRecipient=${notAlreadyRecipient}, userExists=${!!userExists}, matchesGender=${matchesGenderPreference}`);
+        
+        if (isNotSender && notAlreadyRecipient && userExists && matchesGenderPreference) {
             eligibleUsers.push(user);
         } else if (!userExists) {
             console.log(`⚠️ [BACKEND] User ${user.userName} (${user.userId}) exists in UserLocation but not in Users collection - skipping`);
+        } else if (!matchesGenderPreference) {
+            console.log(`⚠️ [BACKEND] User ${user.userName} doesn't match gender preference: ${tripRequest.genderPreference}`);
         }
     }
 
@@ -220,25 +228,23 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
 });
 
 // Get pending requests for current user
-// Cleanup expired requests - DELETE unsuccessful/pending requests older than 5 minutes
+// Cleanup expired requests - DELETE unsuccessful/pending requests older than 30 minutes
 exports.cleanupExpiredRequests = catchAsync(async () => {
     console.log("🧹 [BACKEND] Cleaning up expired requests...");
     
-    // Find requests that are expired or unsuccessful (pending/declined) and older than 5 minutes
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    
-    // Delete expired requests (past expiresAt time) OR unsuccessful requests older than 5 minutes
+    // Find requests that are expired (only based on expiresAt field)
+    // Don't delete pending requests that are still within their 30-minute window
     const deleteResult = await TripRequest.deleteMany({
         $or: [
-            // Delete expired requests
+            // Delete truly expired requests (past their expiresAt time)
             {
                 status: "pending",
                 expiresAt: { $lt: new Date() }
             },
-            // Delete unsuccessful requests older than 5 minutes
+            // Delete declined/expired status requests older than 30 minutes
             {
-                status: { $in: ["pending", "declined", "expired"] },
-                createdAt: { $lt: fiveMinutesAgo }
+                status: { $in: ["declined", "expired"] },
+                createdAt: { $lt: new Date(Date.now() - 30 * 60 * 1000) }
             }
         ]
     });
