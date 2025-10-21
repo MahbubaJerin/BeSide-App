@@ -529,7 +529,7 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             companion: {
                 userId: userId,
                 userName: req.user.userName,
-                userImage: req.user.userImage || "default.jpg",
+                userImage: req.user.profilePhoto?.url || "default.jpg",
                 joinedAt: new Date()
             },
             tripDetails: {

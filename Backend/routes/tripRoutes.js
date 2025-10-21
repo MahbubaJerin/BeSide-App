@@ -31,7 +31,7 @@ router.get(
 
 router.post(
   "/upload-photo/:tripReqId",
-  uploadSingle,
+  uploadSingle('photo'),
   tripController.uploadTripPhoto
 );
 

@@ -44,7 +44,7 @@ const catchAsync = require("../utils/catchAsync");
       user: {
         userId: existingUser._id.toString(),
         userName: existingUser.userName,
-        userImage: existingUser.profilePhoto || "default.jpg"
+        userImage: existingUser.profilePhoto?.url || "default.jpg"
       },
       startLocation, // Persist sender-selected meeting point
       destination,
@@ -106,12 +106,12 @@ exports.createTrip = catchAsync(async (req, res, next) => {
     user: {
       userId: existingUser._id.toString(),
       userName: existingUser.userName,
-      userImage: existingUser.profilePhoto || "default.jpg"
+      userImage: existingUser.profilePhoto?.url || "default.jpg"
     },
     companion: {
       userId: existingCompanion._id.toString(),
       userName: existingCompanion.userName,
-      userImage: existingCompanion.profilePhoto || "default.jpg"
+      userImage: existingCompanion.profilePhoto?.url || "default.jpg"
     },
     consent,
     distanceMaintained,
