@@ -50,15 +50,7 @@ export default function ProfileSettingsModal({
                 onClose();
               }}
             />
-            <SidebarItem
-              icon="visibility"
-              label="Visibility Settings"
-              onPress={() => {
-                onVisibility();
-                onClose();
-              }}
-            />
-
+  
             {/* Section 2 */}
             <Text style={styles.sectionTitle}>Account</Text>
             <SidebarItem

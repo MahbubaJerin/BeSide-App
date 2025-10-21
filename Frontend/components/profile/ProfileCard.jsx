@@ -4,14 +4,12 @@ import {
   Text,
   Image,
   StyleSheet,
-  Dimensions,
   TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { Picker } from "@react-native-picker/picker";
 import PlacesAutocomplete from "@/app/PlacesAutocomplete";
-
-const { width } = Dimensions.get("window");
 
 export default function ProfileCard({
   profile,
@@ -19,6 +17,9 @@ export default function ProfileCard({
   setters,
   editMode,
   colors,
+  onSave,
+  onCancel,
+  saving,
 }) {
   const {
     photo,
@@ -30,17 +31,18 @@ export default function ProfileCard({
     address,
     firstName,
     lastName,
+    mobileNo,
   } = fields;
 
-  const { setEmail, setGender, setDateOfBirth, setAddress } = setters;
+  const { setUserName, setMobileNo, setAddress } = setters;
   const { text } = colors;
 
-  // combine first + last name
-  const fullName = `${firstName || ""} ${lastName || ""}`.trim() || "Not specified";
+  const fullName =
+    `${firstName || ""} ${lastName || ""}`.trim() || "Not specified";
 
   return (
     <View style={styles.container}>
-      {/* Banner + avatar */}
+      {/* Header Banner */}
       <View style={styles.headerBanner}>
         <Image
           source={{ uri: photo || "https://via.placeholder.com/150" }}
@@ -48,9 +50,11 @@ export default function ProfileCard({
         />
       </View>
 
-      {/* Name & email */}
+      {/* Top Section */}
       <View style={styles.topSection}>
-        <Text style={[styles.name, { color: text }]}>{userName || "Unknown User"}</Text>
+        <Text style={[styles.name, { color: text }]}>
+          {userName || "Unknown User"}
+        </Text>
         <Text style={styles.email}>{email || "No email provided"}</Text>
         {profile?.isVerified && (
           <View style={styles.verifiedRow}>
@@ -60,10 +64,19 @@ export default function ProfileCard({
         )}
       </View>
 
-      {/* Info list */}
+      {/* Info Fields */}
       <View style={styles.infoList}>
-        {/* ✅ New Full Name row */}
-        <InfoRow label="Full Name" value={firstName + " " + lastName} />
+        <InfoRow label="Name" value={fullName} />
+
+        {/* ✅ Username */}
+        <InfoRow
+          label="Username"
+          value={userName}
+          editMode={editMode}
+          type="input"
+          onChange={setUserName}
+          placeholder="Enter your username"
+        />
 
         <InfoRow label="User ID" value={profile?.userId || "Not generated"} />
 
@@ -72,23 +85,26 @@ export default function ProfileCard({
           value={
             dateOfBirth
               ? new Date(dateOfBirth).toLocaleDateString(undefined, {
-                           day: "numeric",
+                  day: "numeric",
                   month: "long",
-                         year: "numeric",
-
+                  year: "numeric",
                 })
               : "Not specified"
           }
-          onChange={setDateOfBirth}
-          placeholder="DD-MM-YYYY"
-          type="input"
         />
+
+        <InfoRow label="Gender" value={gender || "Not specified"} />
+
+        {/* ✅ Mobile Number */}
         <InfoRow
-          label="Gender"
-          value={gender || "Not specified"}
-          onChange={setGender}
-          type="picker"
+          label="Mobile Number"
+          value={mobileNo}
+          editMode={editMode}
+          type="input"
+          onChange={setMobileNo}
+          placeholder="Enter your mobile number"
         />
+
         <InfoRow
           label="Availability"
           valueComponent={
@@ -105,20 +121,66 @@ export default function ProfileCard({
             </Text>
           }
         />
+
         <InfoRow
           label="Location"
           editMode={editMode}
-          value={address?.addressString || address?.street || "Not specified"}
           type="places"
-          onSelect={setAddress}
+          value={address?.addressString || ""}
+          onChange={(t) =>
+            setAddress((prev) => ({ ...prev, addressString: t }))
+          }
+          onSelect={(place) =>
+            setAddress((prev) => ({
+              ...prev,
+              addressString: place?.description || "",
+              lat: place?.lat,
+              lng: place?.lng,
+            }))
+          }
         />
+
+        {/* ✅ Save / Cancel Buttons */}
+        {editMode && (
+          <View style={styles.editButtons}>
+            <TouchableOpacity
+              style={[styles.button, styles.saveButton]}
+              onPress={onSave}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Save Profile</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={onCancel}
+            >
+              <Text style={[styles.buttonText, { color: "#111827" }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </View>
   );
 }
 
 /* ---- Reusable InfoRow ---- */
-function InfoRow({ label, value, editMode, onChange, type, placeholder, valueComponent, onSelect }) {
+function InfoRow({
+  label,
+  value,
+  editMode,
+  onChange,
+  onSelect,
+  type,
+  placeholder,
+  valueComponent,
+}) {
   return (
     <View style={styles.row}>
       <Text style={styles.label}>{label}</Text>
@@ -132,28 +194,12 @@ function InfoRow({ label, value, editMode, onChange, type, placeholder, valueCom
             value={value}
             onChangeText={onChange}
           />
-        ) : type === "picker" && editMode ? (
-          <Picker selectedValue={value} onValueChange={onChange} style={styles.picker}>
-            <Picker.Item label="Select Gender" value="" />
-            <Picker.Item label="Female" value="Female" />
-            <Picker.Item label="Male" value="Male" />
-            <Picker.Item label="Non-binary" value="Non-binary" />
-            <Picker.Item label="Other" value="Other" />
-            <Picker.Item label="Prefer not to say" value="Prefer not to say" />
-          </Picker>
         ) : type === "places" && editMode ? (
           <PlacesAutocomplete
             placeholder="Enter your location"
             value={value}
-            onChangeText={(t) => onSelect((prev) => ({ ...prev, addressString: t }))}
-            onSelect={(place) =>
-              onSelect((prev) => ({
-                ...prev,
-                addressString: place?.description || "",
-                lat: place?.lat,
-                lng: place?.lng,
-              }))
-            }
+            onChangeText={onChange}
+            onSelect={onSelect}
           />
         ) : (
           <Text style={styles.value}>{value}</Text>
@@ -251,10 +297,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F9FAFB",
     textAlign: "left",
   },
-  picker: {
-    height: 40,
-    color: "#111827",
-  },
   badge: {
     fontSize: 13,
     paddingVertical: 3,
@@ -262,5 +304,31 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: "hidden",
     fontWeight: "600",
+  },
+  editButtons: {
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    marginTop: 25,
+    marginBottom: 40,
+  },
+  button: {
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  saveButton: {
+    backgroundColor: "#111827",
+    borderColor: "#111827",
+  },
+  cancelButton: {
+    backgroundColor: "#fff",
+    borderColor: "#111827",
+  },
+  buttonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#fff",
+    textAlign: "center",
   },
 });
