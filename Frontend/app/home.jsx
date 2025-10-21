@@ -556,6 +556,8 @@ export default function HomeScreen() {
         case 'request_response':
           if (eventData.response === 'accepted') {
             // New match created - show sender acceptance modal
+            console.log("🎉 [HOME] Received acceptance event data:", JSON.stringify(eventData, null, 2));
+            
             const modalData = {
               receiverName: eventData.responderName,
               receiverPhoto: eventData.responderPhoto,
@@ -563,6 +565,8 @@ export default function HomeScreen() {
               destination: eventData.destination,
               transportMode: eventData.transportMode
             };
+            
+            console.log("🎉 [HOME] Prepared modal data:", JSON.stringify(modalData, null, 2));
             setAcceptanceData(modalData);
             setSenderAcceptanceVisible(true);
           } else if (eventData.response === 'declined') {
@@ -2010,6 +2014,10 @@ export default function HomeScreen() {
         onRequestAccepted={(payload) => {
           console.log("✅ [RECEIVER] Request accepted:", payload);
           
+          // Close the request modal immediately
+          setRequestNotificationVisible(false);
+          
+          // Update route on map if available
           if (payload?.routeData) {
             handleNotificationRouteUpdate({
               ...payload.routeData,
@@ -2019,24 +2027,14 @@ export default function HomeScreen() {
               tripRequest: payload.tripRequest,
             });
           }
-
-          // Refresh active matches and show the active match modal
+          
+          // Refresh active matches to show the new trip
           activeMatches.refresh?.();
           
-          const acceptedDestination =
-            payload?.tripRequest?.destination || payload?.tripMatch?.tripDetails?.destination;
-
-          // Show success alert then open active matches
-          Alert.alert(
-            "🎉 Request Accepted!",
-            acceptedDestination
-              ? `You've accepted the companion request to ${acceptedDestination}. Check your active trip now!`
-              : "You've successfully accepted the companion request. Your trip is now active!",
-            [{ 
-              text: "View Trip", 
-              onPress: () => setActiveMatchModalVisible(true)
-            }]
-          );
+          // Automatically show the active match modal after a brief delay
+          setTimeout(() => {
+            setActiveMatchModalVisible(true);
+          }, 300);
         }}
         onRouteUpdate={(routeData) => {
           handleNotificationRouteUpdate(routeData);

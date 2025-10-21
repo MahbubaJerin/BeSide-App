@@ -8,6 +8,9 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { ThemedText } from "@/components/ThemedText";
@@ -80,7 +83,10 @@ export default function ReceiverPhotoConsentModal({
 
   return (
     <Modal visible={visible} animationType="fade" transparent>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.overlay}
+      >
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
@@ -90,8 +96,12 @@ export default function ReceiverPhotoConsentModal({
             </TouchableOpacity>
           </View>
 
-          {/* Content */}
-          <View style={styles.content}>
+          {/* Scrollable Content */}
+          <ScrollView 
+            style={styles.scrollContent}
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.infoBox}>
               <Text style={styles.infoIcon}>🛡️</Text>
               <Text style={styles.infoText}>
@@ -128,9 +138,9 @@ export default function ReceiverPhotoConsentModal({
               <Text style={styles.noteItem}>✓ Ensures accountability for both users</Text>
               <Text style={styles.noteItem}>✓ Enhances trip safety and security</Text>
             </View>
-          </View>
+          </ScrollView>
 
-          {/* Action buttons */}
+          {/* Action buttons - Fixed at bottom */}
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={styles.cancelButton}
@@ -158,7 +168,7 @@ export default function ReceiverPhotoConsentModal({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -173,6 +183,7 @@ const styles = StyleSheet.create({
   container: {
     width: "90%",
     maxWidth: 450,
+    maxHeight: "85%",
     backgroundColor: "#fff",
     borderRadius: 20,
     overflow: "hidden",
@@ -207,6 +218,12 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#fff",
     fontWeight: "600",
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
+    padding: 20,
   },
   content: {
     padding: 20,

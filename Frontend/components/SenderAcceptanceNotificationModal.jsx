@@ -13,7 +13,14 @@ export default function SenderAcceptanceNotificationModal({
   onClose, 
   acceptanceData 
 }) {
-  if (!acceptanceData) return null;
+  // Debug logging
+  console.log("🎉 [SENDER MODAL] Visible:", visible);
+  console.log("🎉 [SENDER MODAL] Acceptance Data:", JSON.stringify(acceptanceData, null, 2));
+
+  if (!acceptanceData) {
+    console.warn("⚠️ [SENDER MODAL] No acceptance data provided");
+    return null;
+  }
 
   const { 
     receiverName, 
@@ -23,7 +30,16 @@ export default function SenderAcceptanceNotificationModal({
     transportMode 
   } = acceptanceData;
 
+  // Validate required data
+  if (!receiverName) {
+    console.warn("⚠️ [SENDER MODAL] Missing receiver name");
+  }
+  if (!receiverPhoto) {
+    console.warn("⚠️ [SENDER MODAL] Missing receiver photo");
+  }
+
   const handleAcknowledge = () => {
+    console.log("👍 [SENDER MODAL] User acknowledged");
     onClose();
   };
 
