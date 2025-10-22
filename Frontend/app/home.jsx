@@ -306,14 +306,15 @@ export default function HomeScreen() {
   const mapRef = useRef(null);
   const [currentTripRequestId, setCurrentTripRequestId] = useState(null);
   const [showRadius, setShowRadius] = useState(false);
+  const expirationTimeoutRef = useRef(null); // Store timeout ID to clear it when match is created
 
   // hooks
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
   const requestPolling = useRequestPolling(5000, true); // Poll every 5 seconds for incoming requests
-  // Enable match polling only when user opens Active Trips modal or after a real match event
-  const [enableMatchPolling, setEnableMatchPolling] = useState(false);
-  const activeMatches = useActiveMatches(15000, enableMatchPolling); // gated polling
+  // Enable match polling - always on to show active trip details
+  const [enableMatchPolling, setEnableMatchPolling] = useState(true); // Changed from false to true
+  const activeMatches = useActiveMatches(15000, enableMatchPolling); // polling enabled by default
   const tripNotifications = useTripNotifications();
   // Disable real-time updates for now (backend endpoint not active in RN)
   const realTimeUpdates = useRealTimeUpdates(false);
@@ -532,6 +533,13 @@ export default function HomeScreen() {
       setRequestNotificationVisible(false);
       setSentRequestStatusVisible(false);
       
+      // Clear expiration timeout since match was created
+      if (expirationTimeoutRef.current) {
+        console.log("✅ Match created, clearing expiration timeout");
+        clearTimeout(expirationTimeoutRef.current);
+        expirationTimeoutRef.current = null;
+      }
+      
       Alert.alert(
         "Match Created! 🎉",
         "You've successfully matched with a companion! Your trip routes and meeting point are now displayed on the map.",
@@ -726,6 +734,12 @@ export default function HomeScreen() {
           locationTracking.stopTracking();
           companionSearch.cleanup();
           resetAllModals(); // Ensure all modals are closed when leaving
+          
+          // Clear expiration timeout on unmount
+          if (expirationTimeoutRef.current) {
+            clearTimeout(expirationTimeoutRef.current);
+            expirationTimeoutRef.current = null;
+          }
         } catch (error) {
           console.error('Error during cleanup:', error);
         }
@@ -1025,7 +1039,7 @@ export default function HomeScreen() {
     );
   };
 
-  // ⬇️ CHANGED: no search starts here; only createTripReq + open modal
+  // ⬇️ CHANGED: Only open consent modal - NO trip creation yet!
   const handleFindCompanion = async () => {
     try {
       console.log("🚀 [FIND COMPANION] Starting companion search flow...");
@@ -1052,51 +1066,9 @@ export default function HomeScreen() {
 
       console.log("📍 [FIND COMPANION] Current location:", currentLocation);
 
-      // 1) create trip request
-      const API_URL = BASE_URL.replace(/\/+$/, "");
-      console.log("📤 [CREATE REQUEST] Calling API:", `${API_URL}/api/v1/trip/createTripReq`);
-      const response = await fetch(`${API_URL}/api/v1/trip/createTripReq`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          user: { userId: parsed._id, userName: parsed.userName, userImage: parsed.userImage || "default.jpg" },
-          destination: "Find Companion", // Will be updated with actual preferences
-          destinationType: "By Walk", // Will be updated with actual preferences  
-          date: new Date(),
-          time: "12:00",
-          genderPreference: "any", // Will be updated with actual preferences
-          startLocation: {
-            latitude: currentLocation.latitude,
-            longitude: currentLocation.longitude,
-            address: "Current location"
-          },
-          destinationLocation: null, // Will be updated when preferences are submitted
-          routeCoordinates: [], // Will be updated when route is calculated
-          transportMode: "walking" // Will be updated when preferences are submitted
-        }),
-      });
-      
-      console.log("📥 [CREATE REQUEST] Response status:", response.status);
-      const result = await response.json();
-      console.log("📋 [CREATE REQUEST] Result:", JSON.stringify(result, null, 2));
-
-      if (result.status !== "success") {
-        console.log("❌ [CREATE REQUEST] Failed:", result.message);
-        throw new Error(result.message || "Failed to create trip request");
-      }
-      
-      const tripReqId = result.data.tripRequest.tripReqId;
-      console.log("✅ [CREATE REQUEST] Success! Trip Request ID:", tripReqId);
-      setCurrentTripRequestId(tripReqId);
-
-      // 2) prompt consent -> selfie -> preferences
+      // Just open consent modal - trip will be created later with all data
       console.log("📝 [FIND COMPANION] Opening consent modal...");
       setConsentVisible(true);
-
-      // 3) DO NOT START SEARCH YET
       setShowRadius(false);
     } catch (e) {
       console.error("❌ [FIND COMPANION] Error:", e);
@@ -1105,58 +1077,35 @@ export default function HomeScreen() {
   };
 
   const handlePhotoSubmit = async (uri) => {
-    if (!currentTripRequestId) {
-      Alert.alert("Error", "No active trip request found.");
-      return;
-    }
-    try {
-      const storedUser = await AsyncStorage.getItem("user");
-      const token = await AsyncStorage.getItem("token");
-      if (!storedUser || !token) {
-        Alert.alert("Error", "User not logged in.");
-        router.replace("/login");
-        return;
-      }
-      const API_URL = BASE_URL;
-      const formData = new FormData();
-      formData.append("photo", { uri, type: "image/jpeg", name: `selfie-${Date.now()}.jpg` });
-      const response = await fetch(`${API_URL}api/v1/trip/upload-photo/${currentTripRequestId}`, {
-        method: "POST",
-        body: formData,
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await response.json();
-      if (result.status === "success") {
-        setPhotoUrl(result.data.photoUrl);
-        setPhotoUploadVisible(false);
-        setPreferencesVisible(true);
-      } else {
-        throw new Error(result.message || "Failed to upload photo");
-      }
-    } catch (error) {
-      Alert.alert("Error", error.message || "Failed to upload photo.");
-    }
+    // Just store photo temporarily and move to preferences
+    console.log("📸 [PHOTO] Photo captured, storing temporarily");
+    setPhotoUrl(uri);
+    setPhotoUploadVisible(false);
+    setPreferencesVisible(true);
   };
 
   // NEW: Send trip request to nearby users
-  const sendTripRequestToNearby = async (startCoordinates) => {
+  const sendTripRequestToNearby = async (startCoordinates, tripReqId = null) => {
     try {
       console.log("📡 [SEND TO NEARBY] Starting...");
       const token = await AsyncStorage.getItem("token");
       const user = await AsyncStorage.getItem("user");
 
-      if (!token || !currentTripRequestId) {
+      // Use passed tripReqId or fallback to state
+      const requestId = tripReqId || currentTripRequestId;
+
+      if (!token || !requestId) {
         console.log("❌ [SEND TO NEARBY] Missing token or trip request ID");
         Alert.alert(
           "Debug Error",
-          `Missing: ${!token ? "Token" : ""} ${!currentTripRequestId ? "Trip Request ID" : ""}`
+          `Missing: ${!token ? "Token" : ""} ${!requestId ? "Trip Request ID" : ""}`
         );
         return;
       }
 
       const API_URL = BASE_URL.replace(/\/+$/, "");
       const requestBody = {
-        tripReqId: currentTripRequestId,
+        tripReqId: requestId,
         startCoordinates: { longitude: startCoordinates.longitude, latitude: startCoordinates.latitude },
         searchRadius: 500,
       };
@@ -1200,11 +1149,22 @@ export default function HomeScreen() {
 
   const handlePreferencesSubmit = async (preferences) => {
     try {
+      console.log("📝 [PREFERENCES] Received preferences:", preferences);
+      
+      const storedUser = await AsyncStorage.getItem("user");
+      const token = await AsyncStorage.getItem("token");
+      if (!storedUser || !token) {
+        Alert.alert("Error", "User not logged in.");
+        router.replace("/login");
+        return;
+      }
+      const parsed = JSON.parse(storedUser);
+
       setStartMarker(preferences.startCoordinates);
       setEndMarker(preferences.destinationCoordinates);
       setShowRadius(true);
 
-      // Calculate route
+      // Calculate route first
       const url =
         "https://maps.googleapis.com/maps/api/directions/json" +
         `?origin=${preferences.startCoordinates.latitude},${preferences.startCoordinates.longitude}` +
@@ -1217,17 +1177,15 @@ export default function HomeScreen() {
             : "transit"
         }` +
         `&key=${GOOGLE_MAPS_KEY}`;
-      console.log('🗺️ [ROUTE CALC] Making Google Maps API call:', url);
-      const response = await fetch(url);
-      console.log('📡 [ROUTE CALC] Response status:', response.status);
+      console.log('🗺️ [ROUTE CALC] Making Google Maps API call');
+      const routeResponse = await fetch(url);
+      const routeData = await routeResponse.json();
       
-      const data = await response.json();
-      console.log('📊 [ROUTE CALC] Google Maps response:', JSON.stringify(data, null, 2));
-      
-      if (data.routes && data.routes[0]) {
-        const points = data.routes[0].overview_polyline.points;
+      let validCoords = [];
+      if (routeData.routes && routeData.routes[0]) {
+        const points = routeData.routes[0].overview_polyline.points;
         const coords = decodePolyline(points);
-        const validCoords = coords.filter(
+        validCoords = coords.filter(
           (c) =>
             c.latitude >= -90 &&
             c.latitude <= 90 &&
@@ -1236,93 +1194,136 @@ export default function HomeScreen() {
         );
         setRouteCoordinates(validCoords);
         
-        // Update trip request with route data for persistence
-        if (currentTripRequestId && validCoords.length > 0) {
-          console.log('📍 [ROUTE UPDATE] Updating trip request with route data:', {
-            tripReqId: currentTripRequestId,
-            routePoints: validCoords.length,
-            transportMode: preferences.transport === "car" ? "driving" : 
-                          preferences.transport === "walk" ? "walking" : "transit",
-            startCoords: preferences.startCoordinates,
-            destCoords: preferences.destinationCoordinates
-          });
-          
-          await activeMatches.updateTripRequest(currentTripRequestId, {
-            destination: preferences.destinationAddress || 'Destination',
-            destinationType: preferences.transport === "car" ? "By Car" : 
-                            preferences.transport === "walk" ? "By Walk" : "By Transit",
-            routeCoordinates: validCoords,
-            startLocation: {
-              latitude: preferences.startCoordinates.latitude,
-              longitude: preferences.startCoordinates.longitude,
-              address: preferences.startAddress || 'Start location'
-            },
-            destinationLocation: {
-              latitude: preferences.destinationCoordinates.latitude,
-              longitude: preferences.destinationCoordinates.longitude,
-              address: preferences.destinationAddress || 'Destination'
-            },
-            transportMode: preferences.transport === "car" ? "driving" : 
-                          preferences.transport === "walk" ? "walking" : "transit"
-          });
-          
-          console.log('✅ [ROUTE UPDATE] Trip request updated successfully');
-        } else {
-          console.warn('⚠️ [ROUTE UPDATE] Cannot update trip request:', {
-            hasTripRequestId: !!currentTripRequestId,
-            routePointsCount: validCoords.length
-          });
-        }
-        
         if (validCoords.length > 0) {
           mapRef.current?.fitToCoordinates(validCoords, {
             edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
             animated: true,
           });
         }
-
-        // Send trip request to nearby users (no persistent searching)
-        if (currentTripRequestId) {
-          await sendTripRequestToNearby(preferences.startCoordinates);
-          
-          // Set 2-minute timeout for the request
-          setTimeout(async () => {
-            try {
-              const token = await AsyncStorage.getItem("token");
-              if (token && currentTripRequestId) {
-                await fetch(`${BASE_URL}/api/v1/trip/${currentTripRequestId}/expire`, {
-                  method: 'PUT',
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                  }
-                });
-                
-                Alert.alert(
-                  "Request Expired ⏰",
-                  "Your companion request has expired after 2 minutes. You can send a new request if needed.",
-                  [{ text: "OK" }]
-                );
-              }
-            } catch (error) {
-              console.error('Error expiring request:', error);
-            }
-          }, 2 * 60 * 1000); // 2 minutes
-        }
-      } else {
-        console.warn('⚠️ [ROUTE CALC] No routes found in Google Maps response');
-        Alert.alert(
-          "Route Not Found", 
-          "We couldn't calculate a route between these locations. You can still send the request manually."
-        );
-        
-        // Still send trip request even without route
-        if (currentTripRequestId) {
-          await sendTripRequestToNearby(preferences.startCoordinates);
-        }
       }
+
+      // NOW create trip request with ALL data (photo, preferences, route)
+      console.log("📤 [CREATE REQUEST] Creating trip request with complete data...");
+      
+      const API_URL = BASE_URL.replace(/\/+$/, "");
+      const formData = new FormData();
+      
+      // Add user data
+      formData.append("user", JSON.stringify({
+        userId: parsed._id,
+        userName: parsed.userName,
+        userImage: parsed.userImage || "default.jpg"
+      }));
+      
+      // Add trip details
+      formData.append("destination", preferences.destinationAddress || "Destination");
+      formData.append("destinationType", preferences.transport === "car" ? "By Car" : 
+                      preferences.transport === "walk" ? "By Walk" : "By Transit");
+      formData.append("date", new Date().toISOString());
+      formData.append("time", new Date().toLocaleTimeString());
+      formData.append("genderPreference", preferences.genderPreference || "any");
+      
+      // Add locations
+      formData.append("startLocation", JSON.stringify({
+        latitude: preferences.startCoordinates.latitude,
+        longitude: preferences.startCoordinates.longitude,
+        address: preferences.startAddress || "Start location"
+      }));
+      
+      formData.append("destinationLocation", JSON.stringify({
+        latitude: preferences.destinationCoordinates.latitude,
+        longitude: preferences.destinationCoordinates.longitude,
+        address: preferences.destinationAddress || "Destination"
+      }));
+      
+      if (validCoords.length > 0) {
+        formData.append("routeCoordinates", JSON.stringify(validCoords));
+      }
+      
+      formData.append("transportMode", preferences.transport === "car" ? "driving" : 
+                      preferences.transport === "walk" ? "walking" : "transit");
+      
+      // Add photo if available
+      if (photoUrl) {
+        formData.append("photo", {
+          uri: photoUrl,
+          type: "image/jpeg",
+          name: `selfie-${Date.now()}.jpg`
+        });
+      }
+      
+      const createResponse = await fetch(`${API_URL}/api/v1/trip/createTripReq`, {
+        method: "POST",
+        body: formData,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      console.log("📥 [CREATE REQUEST] Response status:", createResponse.status);
+      const createResult = await createResponse.json();
+      console.log("📋 [CREATE REQUEST] Result:", JSON.stringify(createResult, null, 2));
+
+      if (createResult.status !== "success") {
+        console.log("❌ [CREATE REQUEST] Failed:", createResult.message);
+        throw new Error(createResult.message || "Failed to create trip request");
+      }
+      
+      const tripReqId = createResult.data.tripRequest.tripReqId;
+      console.log("✅ [CREATE REQUEST] Success! Trip Request ID:", tripReqId);
+      setCurrentTripRequestId(tripReqId);
+
+      // NOW send to nearby users (receivers will get complete info)
+      // Pass tripReqId directly since state update is async
+      await sendTripRequestToNearby(preferences.startCoordinates, tripReqId);
+      
+      // Set expiration timeout
+      if (expirationTimeoutRef.current) {
+        clearTimeout(expirationTimeoutRef.current);
+      }
+      
+      expirationTimeoutRef.current = setTimeout(async () => {
+        try {
+          const token = await AsyncStorage.getItem("token");
+          if (token && tripReqId) {
+            // Check if a match was created before showing expiration
+            const matchResponse = await fetch(`${BASE_URL.replace(/\/+$/, '')}/api/v1/trip/active-matches`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            const matchResult = await matchResponse.json();
+            const hasActiveMatch = matchResult?.data?.matches?.length > 0;
+            
+            // Only expire and show alert if no match was created
+            if (!hasActiveMatch) {
+              await fetch(`${BASE_URL}/api/v1/trip/${tripReqId}/expire`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              Alert.alert(
+                "Request Expired ⏰",
+                "Your companion request has expired after 2 minutes. You can send a new request if needed.",
+                [{ text: "OK" }]
+              );
+            } else {
+              console.log("✅ Match was created, skipping expiration notification");
+            }
+          }
+        } catch (error) {
+          console.error('Error handling request expiration:', error);
+        }
+      }, 2 * 60 * 1000); // 2 minutes
+      
+      // Close preferences modal
+      setPreferencesVisible(false);
     } catch (error) {
-      Alert.alert("Error", "Failed to fetch route information");
+      console.error("❌ [PREFERENCES] Error:", error);
+      Alert.alert("Error", error.message || "Failed to process your request");
     }
   };
 
@@ -1910,7 +1911,7 @@ export default function HomeScreen() {
           onPress={() => {
             console.log("🚗 Opening Active Trips Modal");
             setActiveMatchModalVisible(true);
-            setEnableMatchPolling(true); // start polling only when user opens Active Trips
+            // Polling is already enabled in background
           }}
         >
           <View style={styles.navIconWithBadge}>
@@ -2075,11 +2076,12 @@ export default function HomeScreen() {
         visible={activeMatchModalVisible}
         onClose={() => {
           setActiveMatchModalVisible(false);
-          setEnableMatchPolling(false); // stop polling when user closes modal
+          // Keep polling enabled so match updates continue in background
         }}
         matches={activeMatches?.matches || []}
         isLoading={activeMatches?.loading}
         onRefresh={() => activeMatches?.refresh()}
+        currentUserId={user?._id} // Pass current user ID to identify organizer vs companion
         onUpdateStatus={async (matchId, status) => {
           try {
             await activeMatches.updateMatchStatus(matchId, status);
@@ -2729,4 +2731,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ff4444',
   },
-});
+})

@@ -14,6 +14,7 @@ router.use(authController.protect);
 
 router.post(
   "/createTripReq",
+  uploadSingle('photo'), // Support optional photo upload
   tripController.createTripReq
 );
 router.post(

@@ -543,13 +543,13 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             organizer: {
                 userId: tripRequest.user.userId,
                 userName: tripRequest.user.userName,
-                userImage: tripRequest.user.userImage,
+                userImage: tripRequest.photo?.url || tripRequest.user.userImage || "default.jpg", // Use sender's selfie
                 joinedAt: new Date(tripRequest.createdAt)
             },
             companion: {
                 userId: userId,
                 userName: req.user.userName,
-                userImage: req.user.profilePhoto?.url || "default.jpg",
+                userImage: receiverPhotoData?.url || req.user.profilePhoto?.url || "default.jpg", // Use receiver's selfie
                 joinedAt: new Date()
             },
             tripDetails: {
@@ -593,8 +593,8 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
 
         console.log("✅ [MATCH CREATION] Match created successfully:");
         console.log("- Match ID:", matchId);
-        console.log("- Organizer:", tripRequest.user.userName);
-        console.log("- Companion:", req.user.userName);
+        console.log("- Organizer:", tripRequest.user.userName, "| Photo:", tripRequest.photo?.url || "No selfie");
+        console.log("- Companion:", req.user.userName, "| Photo:", receiverPhotoData?.url || "No selfie");
     }
 
     await tripRequest.save();

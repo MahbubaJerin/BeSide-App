@@ -8,19 +8,39 @@ const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
 
   exports.createTripReq = catchAsync(async (req, res, next) => {
-    const { 
-      user, 
-      destination, 
-      destinationType, 
-      date, 
-      time, 
-      genderPreference,
-      startLocation,
-      destinationLocation,
-      routeCoordinates,
-      transportMode,
-      searchDuration = 2 * 60 * 1000 // Default 2 minutes
-    } = req.body;
+    // Parse data from FormData or JSON
+    let user, destination, destinationType, date, time, genderPreference;
+    let startLocation, destinationLocation, routeCoordinates, transportMode;
+    const searchDuration = 2 * 60 * 1000; // Default 2 minutes
+    
+    // Check if request contains file (FormData) or is JSON
+    if (req.file || req.files) {
+      // FormData request - parse JSON fields
+      user = req.body.user ? JSON.parse(req.body.user) : null;
+      destination = req.body.destination;
+      destinationType = req.body.destinationType;
+      date = req.body.date;
+      time = req.body.time;
+      genderPreference = req.body.genderPreference;
+      startLocation = req.body.startLocation ? JSON.parse(req.body.startLocation) : null;
+      destinationLocation = req.body.destinationLocation ? JSON.parse(req.body.destinationLocation) : null;
+      routeCoordinates = req.body.routeCoordinates ? JSON.parse(req.body.routeCoordinates) : [];
+      transportMode = req.body.transportMode;
+    } else {
+      // JSON request
+      ({
+        user, 
+        destination, 
+        destinationType, 
+        date, 
+        time, 
+        genderPreference,
+        startLocation,
+        destinationLocation,
+        routeCoordinates,
+        transportMode
+      } = req.body);
+    }
   
     if (!user || !user.userName) {
       return next(new AppError("User name is required", 400));
@@ -74,48 +94,28 @@ const catchAsync = require("../utils/catchAsync");
       }
     });
 
-    // ✨ AUTO-DISTRIBUTE: Automatically send trip request to nearby users
-    console.log('🚀 [AUTO-DISTRIBUTE] Automatically sending trip request to nearby users...');
-    
-    try {
-      // Import notification controller functions
-      const { sendTripRequestToNearby } = require('./notificationController');
-      const UserLocation = require('../models/userLocationModel');
-      
-      // Create a mock req object for sendTripRequestToNearby
-      const mockReq = {
-        user: { _id: existingUser._id },
-        body: {
-          tripReqId: newTripRequest.tripReqId,
-          startCoordinates: {
-            latitude: startLocation?.latitude,
-            longitude: startLocation?.longitude
-          },
-          searchRadius: 1000 // Default 1km radius
-        }
-      };
-      
-      // Create a mock res object
-      let distributionResult = null;
-      const mockRes = {
-        status: (code) => ({
-          json: (data) => {
-            distributionResult = data;
-            console.log(`✅ [AUTO-DISTRIBUTE] Trip sent to ${data.data?.recipientCount || 0} nearby users`);
-          }
-        })
-      };
-      
-      // Call the function
-      await sendTripRequestToNearby(mockReq, mockRes, (error) => {
-        if (error) {
-          console.log('⚠️ [AUTO-DISTRIBUTE] Failed to auto-distribute:', error.message);
-        }
-      });
-      
-    } catch (error) {
-      console.log('⚠️ [AUTO-DISTRIBUTE] Auto-distribution error:', error.message);
-      // Don't fail the trip creation if auto-distribution fails
+    // ⚠️ REMOVED AUTO-DISTRIBUTE: Trip request will be sent to nearby users manually
+    // after sender completes the full flow (consent → photo → preferences)
+    // This prevents receivers from seeing incomplete/updating trip information
+    console.log('📋 [CREATE TRIP] Trip request created successfully (not yet distributed)');
+    console.log('📋 [CREATE TRIP] Waiting for sender to complete photo and preferences...');
+  
+    // Upload photo if provided (FormData request)
+    if (req.file) {
+      console.log('📸 [CREATE TRIP] Photo provided, uploading to Cloudinary...');
+      try {
+        const uploadResult = await uploadToCloudinary(
+          req.file,
+          "trip-photos",
+          existingUser._id.toString()
+        );
+        newTripRequest.photo = uploadResult;
+        await newTripRequest.save();
+        console.log('✅ [CREATE TRIP] Photo uploaded:', uploadResult.url);
+      } catch (uploadError) {
+        console.error('❌ [CREATE TRIP] Photo upload failed:', uploadError);
+        // Don't fail the request, just continue without photo
+      }
     }
   
     res.status(201).json({
