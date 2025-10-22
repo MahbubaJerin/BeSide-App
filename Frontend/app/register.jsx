@@ -108,12 +108,28 @@ export default function RegisterScreen() {
   const passwordChecks = getPasswordChecks(password);
 
   const validateStep = () => {
-    if (step === 0)
-      return firstName && lastName && emailValid && dob && calcAge(dob) >= 13;
-    if (step === 1) return mobileNo;
-    if (step === 2) return password.length >= 8;
-    if (step === 3) return termsAccepted;
-    return true;
+    if (step === 0) {
+      if (!firstName || !lastName || !emailValid || !dob) return false;
+      const age = calcAge(dob);
+      if (age < 13) {
+        Alert.alert("Age Restriction", "You must be at least 13 years old to register.");
+        return false;
+      }
+      return true;
+    }
+    if (step === 1) {
+      if (!mobileNo) return false;
+      return true;
+    }
+    if (step === 2) {
+      if (passwordChecks.some((c) => !c.ok)) return false;
+      return true;
+    }
+    if (step === 3) {
+      if (!street || !termsAccepted) return false;
+      return true;
+    }
+    return false;
   };
 
   const handleRegister = async () => {
@@ -124,27 +140,30 @@ export default function RegisterScreen() {
       );
       return;
     }
-
-    try {
-      const payload = {
-        userName: username || email,
-        email: email.trim().toLowerCase(),
-        mobileNo: mobileNo.trim(),
-        password,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        gender,
-        dob: dob ? formatDateYMD(dob) : undefined,
-        address: {
-          street: street.trim(),
-          city: city.trim(),
-          state: state.trim(),
-          postalCode: postalCode.trim(),
-          country,
-          countryCode,
-        },
-        geo,
-      };
+  try {
+    const payload = {
+      userName: username || email,
+      email: email.trim().toLowerCase(),
+      mobileNo: mobileNo.trim(),
+      password,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      gender,
+      dob: dob ? formatDateYMD(dob) : undefined,
+      address: {
+        street: street.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        postalCode: postalCode.trim(),
+        country,
+        countryCode,
+        addressString: street.trim(), // For display purposes
+      },
+      geo: geo ? {
+        lat: Number(geo.lat),
+        lng: Number(geo.lng)
+      } : null
+    };
 
       const registerResponse = await fetch(`${BASE_URL}api/v1/auth/register`, {
         method: "POST",

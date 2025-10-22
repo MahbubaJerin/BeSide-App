@@ -40,7 +40,7 @@ export default function ProfileSettingsModal({
           </View>
 
           <ScrollView contentContainerStyle={styles.scroll}>
-            {/* Section 1 */}
+            {/* Profile Section */}
             <Text style={styles.sectionTitle}>Profile</Text>
             <SidebarItem
               icon="edit"
@@ -50,8 +50,16 @@ export default function ProfileSettingsModal({
                 onClose();
               }}
             />
+            <SidebarItem
+              icon="visibility"
+              label="Profile Visibility"
+              onPress={() => {
+                onVisibility();
+                onClose();
+              }}
+            />
   
-            {/* Section 2 */}
+            {/* Account Section */}
             <Text style={styles.sectionTitle}>Account</Text>
             <SidebarItem
               icon="delete-outline"

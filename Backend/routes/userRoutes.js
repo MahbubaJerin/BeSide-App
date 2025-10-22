@@ -24,6 +24,8 @@ router.post(
 // Settings management
 router.post("/consent", userController.updateConsent);
 router.put("/profile-settings", userController.updateProfileSettings);
+// Alias for frontend compatibility
+router.put("/profile/visibility", userController.updateProfileSettings);
 router.patch("/availability", userController.updateAvailability);
 
 // Emergency Contact Routes (NEW) 

@@ -49,19 +49,23 @@ export default function ProfilePreviewModal({
       visible={visible}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalView, { backgroundColor: surface }]}>
-         <TouchableOpacity
-  style={styles.closeButton}
-  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-  activeOpacity={0.7}
-  onPress={() => requestAnimationFrame(onClose)}
-  accessibilityLabel="Close Preview"
-  accessibilityRole="button"
->
-  <MaterialIcons name="close" size={24} color={text} />
-</TouchableOpacity>
-
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={[styles.modalView, { backgroundColor: surface }]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <TouchableOpacity
+            style={styles.closeButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={onClose}
+          >
+            <MaterialIcons name="close" size={24} color={text} />
+          </TouchableOpacity>
 
           <Text style={[styles.modalTitle, { color: text }]}>
             Profile Preview
@@ -131,8 +135,8 @@ export default function ProfilePreviewModal({
               ) : null}
             </View>
           </ScrollView>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }
@@ -140,8 +144,7 @@ export default function ProfilePreviewModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "flex-end", 
     backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalView: {
@@ -151,18 +154,19 @@ const styles = StyleSheet.create({
     padding: 20,
     maxHeight: "80%",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 5,
   },
   closeButton: {
     position: "absolute",
-    top: 10,
-    right: 10,
-    borderWidth: 2,
-    borderRadius: 8,
-    padding: 5,
+    top: 15,
+    right: 15,
+    zIndex: 1,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.05)",
   },
   modalTitle: {
     fontSize: 20,

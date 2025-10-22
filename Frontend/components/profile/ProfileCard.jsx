@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import PlacesAutocomplete from "@/app/PlacesAutocomplete";
+import { formatDatePretty } from "../../utils/dateUtils";
 
 export default function ProfileCard({
   profile,
@@ -34,7 +35,8 @@ export default function ProfileCard({
     mobileNo,
   } = fields;
 
-  const { setUserName, setMobileNo, setAddress } = setters;
+  const { setUserName, setMobileNo, setAddress, setDateOfBirth, setShowDatePicker } =
+    setters;
   const { text } = colors;
 
   const fullName =
@@ -82,15 +84,8 @@ export default function ProfileCard({
 
         <InfoRow
           label="Date of Birth"
-          value={
-            dateOfBirth
-              ? new Date(dateOfBirth).toLocaleDateString(undefined, {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })
-              : "Not specified"
-          }
+          value={formatDatePretty(fields.dateOfBirth)}
+          editMode={false} 
         />
 
         <InfoRow label="Gender" value={gender || "Not specified"} />
@@ -124,20 +119,19 @@ export default function ProfileCard({
 
         <InfoRow
           label="Location"
+          value={address?.addressString || null }
           editMode={editMode}
           type="places"
-          value={address?.addressString || ""}
-          onChange={(t) =>
-            setAddress((prev) => ({ ...prev, addressString: t }))
-          }
-          onSelect={(place) =>
-            setAddress((prev) => ({
-              ...prev,
-              addressString: place?.description || "",
-              lat: place?.lat,
-              lng: place?.lng,
-            }))
-          }
+          onChange={(text) => setAddress(prev => ({ ...prev, addressString: text }))}
+          onSelect={(place) => setAddress(prev => ({
+            ...prev,
+            addressString: place.description,
+            lat: place.lat,
+            lng: place.lng,
+            city: place.city || prev.city,
+            state: place.state || prev.state,
+            postalCode: place.postalCode || prev.postalCode,
+          }))}
         />
 
         {/* ✅ Save / Cancel Buttons */}

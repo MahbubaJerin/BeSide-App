@@ -61,7 +61,6 @@ const UserSchema = new Schema(
   },
 },
 
-
     mobileNo: {
       type: String,
       required: [true, "Mobile number is required"],
@@ -90,6 +89,10 @@ const UserSchema = new Schema(
         maxlength: 3,
       },
     },
+      geo: {
+    lat: { type: Number },
+    lng: { type: Number }
+  },
     profilePhoto: {
       url: {
         type: String,
