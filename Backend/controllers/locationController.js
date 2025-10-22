@@ -45,18 +45,21 @@ const updateLocation = catchAsync(async (req, res, next) => {
 
       if (userLocation) {
         console.log(`🔄 [LOCATION UPDATE] Updating existing location record for: ${userName}`);
-        // Update existing location
-        await userLocation.updateLocation(
-          longitude,
-          latitude,
-          accuracy,
-          speed,
-          heading
-        );
-        console.log(`✅ [LOCATION UPDATE] Location updated successfully for: ${userName}`);
+        // Update existing location and ensure user is discoverable
+        userLocation.location.coordinates = [longitude, latitude];
+        userLocation.locationAccuracy = accuracy;
+        userLocation.speed = speed;
+        userLocation.heading = heading;
+        userLocation.isActive = true;
+        userLocation.lastSeen = new Date();
+        // Ensure user is visible to others (default to true if not explicitly set)
+        if (userLocation.shareLocation === undefined) userLocation.shareLocation = true;
+        if (userLocation.visibleToOthers === undefined) userLocation.visibleToOthers = true;
+        await userLocation.save();
+        console.log(`✅ [LOCATION UPDATE] Location updated successfully for: ${userName} (shareLocation: ${userLocation.shareLocation}, visibleToOthers: ${userLocation.visibleToOthers})`);
       } else {
         console.log(`🆕 [LOCATION UPDATE] Creating new location record for: ${userName}`);
-        // Create new location record
+        // Create new location record with default visibility enabled
         userLocation = new UserLocation({
           userId,
           userName,
@@ -65,6 +68,8 @@ const updateLocation = catchAsync(async (req, res, next) => {
             coordinates: [longitude, latitude],
           },
           isActive: true,
+          shareLocation: true, // Default to visible
+          visibleToOthers: true, // Default to discoverable
           locationAccuracy: accuracy,
           speed,
           heading,
@@ -76,7 +81,7 @@ const updateLocation = catchAsync(async (req, res, next) => {
           },
         });
         await userLocation.save();
-        console.log(`✅ [LOCATION UPDATE] New location record created for: ${userName}`);
+        console.log(`✅ [LOCATION UPDATE] New location record created for: ${userName} (shareLocation: true, visibleToOthers: true)`);
       }
 
           console.log(`🎯 [LOCATION UPDATE] Success response sent for: ${userName}`);
@@ -158,6 +163,16 @@ const findNearbyCompanions = catchAsync(async (req, res, next) => {
     
     console.log(`✅ [COMPANION SEARCH] User location updated and search mode enabled for: ${userId}`);
 
+    // Debug: Check total discoverable users in database
+    const totalDiscoverable = await UserLocation.countDocuments({
+      isActive: true,
+      shareLocation: true,
+      visibleToOthers: true,
+      lastSeen: { $gte: new Date(Date.now() - 15 * 60 * 1000) },
+      userId: { $ne: userId }
+    });
+    console.log(`📊 [COMPANION SEARCH] Total discoverable users in database: ${totalDiscoverable}`);
+
     // Find nearby users
     console.log(`🔍 [COMPANION SEARCH] Searching for companions within ${searchRadius}m radius...`);
     const nearbyUsers = await UserLocation.findNearbyUsers(
@@ -167,7 +182,7 @@ const findNearbyCompanions = catchAsync(async (req, res, next) => {
       userId
     );
     
-    console.log(`📊 [COMPANION SEARCH] Found ${nearbyUsers.length} nearby companions for user: ${userId}`);
+    console.log(`📊 [COMPANION SEARCH] Found ${nearbyUsers.length} nearby companions within ${searchRadius}m for user: ${userId}`);
 
     // Calculate distances and add additional info
     console.log(`🧮 [COMPANION SEARCH] Calculating distances for ${nearbyUsers.length} companions...`);
@@ -329,6 +344,57 @@ const cleanOldLocations = catchAsync(async (req, res, next) => {
   }
 });
 
+// Debug endpoint to check active users
+const getActiveUsers = catchAsync(async (req, res, next) => {
+  const timeWindowMinutes = parseInt(req.query.timeWindow) || 15;
+  const cutoffTime = new Date(Date.now() - timeWindowMinutes * 60 * 1000);
+
+  try {
+    // Get all users with recent activity
+    const allUsers = await UserLocation.find({
+      lastSeen: { $gte: cutoffTime }
+    }).select('userId userName isActive shareLocation visibleToOthers lastSeen location');
+
+    // Get discoverable users (what others can find)
+    const discoverableUsers = await UserLocation.find({
+      isActive: true,
+      shareLocation: true,
+      visibleToOthers: true,
+      lastSeen: { $gte: cutoffTime }
+    }).select('userId userName lastSeen location');
+
+    console.log(`📊 [ACTIVE USERS DEBUG] Last ${timeWindowMinutes} minutes:`);
+    console.log(`   - Total users with activity: ${allUsers.length}`);
+    console.log(`   - Discoverable users: ${discoverableUsers.length}`);
+    
+    allUsers.forEach(user => {
+      const minutesAgo = Math.round((Date.now() - new Date(user.lastSeen).getTime()) / 60000);
+      console.log(`   - ${user.userName}: active=${user.isActive}, share=${user.shareLocation}, visible=${user.visibleToOthers}, lastSeen=${minutesAgo}min ago`);
+    });
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        timeWindowMinutes,
+        totalUsers: allUsers.length,
+        discoverableUsers: discoverableUsers.length,
+        users: allUsers.map(u => ({
+          userName: u.userName,
+          isActive: u.isActive,
+          shareLocation: u.shareLocation,
+          visibleToOthers: u.visibleToOthers,
+          lastSeen: u.lastSeen,
+          minutesAgo: Math.round((Date.now() - new Date(u.lastSeen).getTime()) / 60000)
+        })),
+        discoverable: discoverableUsers.map(u => u.userName)
+      }
+    });
+  } catch (error) {
+    console.error('❌ [ACTIVE USERS DEBUG] Error:', error);
+    return next(new AppError("Failed to get active users", 500));
+  }
+});
+
 // Utility function to calculate distance between two points using Haversine formula
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371e3; // Earth's radius in meters
@@ -352,4 +418,5 @@ module.exports = {
   getLocationStatus,
   updateLocationPreferences,
   cleanOldLocations,
+  getActiveUsers,
 };

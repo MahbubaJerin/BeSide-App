@@ -18,5 +18,6 @@ router.patch("/stop-searching", locationController.stopSearching);
 
 // Admin/utility routes
 router.delete("/clean-old", authController.restrictTo("admin"), locationController.cleanOldLocations);
+router.get("/active-users", locationController.getActiveUsers); // Debug endpoint
 
 module.exports = router;

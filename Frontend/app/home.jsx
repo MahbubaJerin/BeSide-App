@@ -168,13 +168,17 @@ function useCompanionSearch() {
       });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json?.status === "success") {
-        setCompanions(json.data?.companions || []);
+        const foundCompanions = json.data?.companions || [];
+        setCompanions(foundCompanions);
+        console.log(`👥 [COMPANION SEARCH] Found ${foundCompanions.length} nearby companions within ${searchRadius}m`);
         if (typeof json.data?.searchRadius === "number") {
           setSearchRadius(json.data.searchRadius);
         }
+      } else {
+        console.log('⚠️ [COMPANION SEARCH] Search failed:', json?.message || 'Unknown error');
       }
     } catch (e) {
-      console.log("companion fetch error:", e?.message || e);
+      console.log("❌ [COMPANION SEARCH] Error:", e?.message || e);
     } finally {
       setLoading(false);
     }
@@ -259,6 +263,7 @@ const hardcodedUsers = [
 export default function HomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
   const insets = useSafeAreaInsets();
   // modal stack
   const [modalVisible, setModalVisible] = useState(false); // not verified
@@ -798,16 +803,19 @@ export default function HomeScreen() {
     useCallback(() => {
       const load = async () => {
         try {
+          setIsLoadingUser(true);
           const stored = await AsyncStorage.getItem("user");
           if (stored) {
             const parsed = JSON.parse(stored);
             setUser(parsed);
+            setIsLoadingUser(false);
             await locationTracking.startTracking(true);
           } else {
             router.replace("/login");
           }
         } catch (error) {
           console.error('Error loading user data:', error);
+          setIsLoadingUser(false);
           router.replace("/login");
         }
       };
@@ -1538,12 +1546,11 @@ export default function HomeScreen() {
   // Remove excessive rendering logs to reduce noise
   // console.log("🏠 [HOME RENDER] Rendering home screen...");
   
-  // Safety check to prevent crashes
-  if (!user) {
-    console.log("⚠️ [HOME] No user found, showing loading state...");
+  // Show loading state while user data is being fetched
+  if (isLoadingUser || !user) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ThemedText type="default">Loading user data...</ThemedText>
+        <ThemedText type="default">Loading...</ThemedText>
       </View>
     );
   }
