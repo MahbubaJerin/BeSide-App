@@ -365,7 +365,7 @@ export default function HomeScreen() {
   }, []);
 
   const handleNotificationRouteUpdate = useCallback(
-    (routeInfo) => {
+    async (routeInfo) => {
       if (!routeInfo) return;
 
       const normalizePoint = (point) =>
@@ -373,23 +373,95 @@ export default function HomeScreen() {
           ? { latitude: point.latitude, longitude: point.longitude, address: point.address }
           : null;
 
-      const routePoints = Array.isArray(routeInfo.routeCoordinates)
-        ? routeInfo.routeCoordinates.filter(
-            (coord) =>
-              coord &&
-              typeof coord.latitude === "number" &&
-              typeof coord.longitude === "number"
-          )
-        : [];
-
-      setRouteCoordinates(routePoints);
-
       const meetingSource =
         routeInfo.meetingPoint?.location ||
         routeInfo.meetingPoint ||
         routeInfo.startLocation;
       const meetingPoint = normalizePoint(meetingSource);
+      const destinationPoint = normalizePoint(routeInfo.destinationLocation);
+      const receiverPoint = normalizePoint(routeInfo.receiverLocation) || normalizePoint(currentLocation);
 
+      // Calculate receiver's route: Current Location → Meeting Point → Destination
+      if (receiverPoint && meetingPoint && destinationPoint) {
+        try {
+          console.log('🗺️ [RECEIVER ROUTE] Calculating route with waypoint...');
+          console.log('  From:', receiverPoint);
+          console.log('  Via (Meeting Point):', meetingPoint);
+          console.log('  To:', destinationPoint);
+
+          // Use Google Directions API with waypoint
+          const url =
+            "https://maps.googleapis.com/maps/api/directions/json" +
+            `?origin=${receiverPoint.latitude},${receiverPoint.longitude}` +
+            `&destination=${destinationPoint.latitude},${destinationPoint.longitude}` +
+            `&waypoints=${meetingPoint.latitude},${meetingPoint.longitude}` +
+            `&mode=walking` + // Can be made dynamic based on transport preference
+            `&key=${GOOGLE_MAPS_KEY}`;
+
+          const routeResponse = await fetch(url);
+          const routeData = await routeResponse.json();
+
+          if (routeData.routes && routeData.routes[0]) {
+            const points = routeData.routes[0].overview_polyline.points;
+            const coords = decodePolyline(points);
+            const validCoords = coords.filter(
+              (c) =>
+                c.latitude >= -90 &&
+                c.latitude <= 90 &&
+                c.longitude >= -180 &&
+                c.longitude <= 180
+            );
+            
+            console.log('✅ [RECEIVER ROUTE] Route calculated with', validCoords.length, 'points');
+            setRouteCoordinates(validCoords);
+
+            // Fit map to show entire route
+            if (validCoords.length > 0) {
+              mapRef.current?.fitToCoordinates(validCoords, {
+                edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+                animated: true,
+              });
+            }
+          } else {
+            console.log('⚠️ [RECEIVER ROUTE] No route found, using original route');
+            // Fallback to original route if available
+            const routePoints = Array.isArray(routeInfo.routeCoordinates)
+              ? routeInfo.routeCoordinates.filter(
+                  (coord) =>
+                    coord &&
+                    typeof coord.latitude === "number" &&
+                    typeof coord.longitude === "number"
+                )
+              : [];
+            setRouteCoordinates(routePoints);
+          }
+        } catch (error) {
+          console.error('❌ [RECEIVER ROUTE] Error calculating route:', error);
+          // Fallback to original route
+          const routePoints = Array.isArray(routeInfo.routeCoordinates)
+            ? routeInfo.routeCoordinates.filter(
+                (coord) =>
+                  coord &&
+                  typeof coord.latitude === "number" &&
+                  typeof coord.longitude === "number"
+              )
+            : [];
+          setRouteCoordinates(routePoints);
+        }
+      } else {
+        // Fallback: use original sender's route if receiver info not available
+        const routePoints = Array.isArray(routeInfo.routeCoordinates)
+          ? routeInfo.routeCoordinates.filter(
+              (coord) =>
+                coord &&
+                typeof coord.latitude === "number" &&
+                typeof coord.longitude === "number"
+            )
+          : [];
+        setRouteCoordinates(routePoints);
+      }
+
+      // Set markers
       if (meetingPoint) {
         setStartMarker({
           latitude: meetingPoint.latitude,
@@ -404,7 +476,6 @@ export default function HomeScreen() {
         setStartMarker(null);
       }
 
-      const destinationPoint = normalizePoint(routeInfo.destinationLocation);
       if (destinationPoint) {
         setEndMarker({
           latitude: destinationPoint.latitude,
@@ -415,38 +486,24 @@ export default function HomeScreen() {
         setEndMarker(null);
       }
 
-      const receiverPoint =
-        normalizePoint(routeInfo.receiverLocation) ||
-        normalizePoint(currentLocation);
-
       const fitTargets = [];
-      if (routePoints.length) {
-        fitTargets.push(...routePoints);
-      }
-      if (meetingPoint) {
-        fitTargets.push({
-          latitude: meetingPoint.latitude,
-          longitude: meetingPoint.longitude,
-        });
-      }
-      if (destinationPoint) {
-        fitTargets.push({
-          latitude: destinationPoint.latitude,
-          longitude: destinationPoint.longitude,
-        });
-      }
-      if (receiverPoint) {
-        fitTargets.push({
-          latitude: receiverPoint.latitude,
-          longitude: receiverPoint.longitude,
-        });
-      }
-
-      if (fitTargets.length >= 2 && mapRef.current?.fitToCoordinates) {
-        mapRef.current.fitToCoordinates(fitTargets, {
-          edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
-          animated: true,
-        });
+      if (routeCoordinates.length) {
+        // Will be fitted by the route calculation above
+      } else if (meetingPoint && destinationPoint) {
+        fitTargets.push(
+          { latitude: meetingPoint.latitude, longitude: meetingPoint.longitude },
+          { latitude: destinationPoint.latitude, longitude: destinationPoint.longitude }
+        );
+        if (receiverPoint) {
+          fitTargets.push({ latitude: receiverPoint.latitude, longitude: receiverPoint.longitude });
+        }
+        
+        if (fitTargets.length > 0 && mapRef.current) {
+          mapRef.current.fitToCoordinates(fitTargets, {
+            edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+            animated: true,
+          });
+        }
       }
 
       setCurrentNavigationRoute({
@@ -1468,7 +1525,7 @@ export default function HomeScreen() {
   // UI
   return (
     <View style={styles.container}>
-      {/* Purple Gradient Header */}
+      {/* Simplified Header */}
       <View style={styles.gradientHeader}>
         <View style={styles.headerTop}>
           <View style={styles.userInfo}>
@@ -1477,95 +1534,36 @@ export default function HomeScreen() {
             </View>
             <View>
               <ThemedText style={styles.userName}>{user?.userName || 'Your Name'}</ThemedText>
-              <ThemedText style={styles.userSubtext}>12 min (3.4 Km)</ThemedText>
+              <ThemedText style={styles.userSubtext}>Safe Journey Companion</ThemedText>
             </View>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.headerButton} onPress={handleCurrentLocation}>
               <Ionicons name="location" size={20} color="white" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerButton} onPress={() => setAvailabilityModalVisible(true)}>
-              <Ionicons name={availability ? "toggle" : "toggle-outline"} size={20} color="white" />
-            </TouchableOpacity>
           </View>
         </View>
         
-        {/* Service Cards */}
+        {/* Compact Service Cards */}
         <View style={styles.serviceCards}>
-          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => setTripHistoryVisible(true)}>
-            <Ionicons name="car" size={24} color="#8B5CF6" />
-            <ThemedText style={styles.serviceCardTitle}>Trips</ThemedText>
-            <ThemedText style={styles.serviceCardSubtext}>4.1 Km, 12 min</ThemedText>
+          <TouchableOpacity style={styles.compactServiceCard} onPress={() => setTripHistoryVisible(true)}>
+            <Ionicons name="time-outline" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.compactCardText}>History</ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => setActiveMatchModalVisible(true)}>
-            <Ionicons name="people" size={24} color="#8B5CF6" />
-            <ThemedText style={styles.serviceCardTitle}>Active</ThemedText>
-            <ThemedText style={styles.serviceCardSubtext}>2.3 Km, 15 min</ThemedText>
+          <TouchableOpacity style={styles.compactServiceCard} onPress={() => router.push('/emergencyContacts')}>
+            <Ionicons name="call-outline" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.compactCardText}>Emergency</ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => handleSOS("000")}>
-            <Ionicons name="shield-checkmark" size={24} color="#8B5CF6" />
-            <ThemedText style={styles.serviceCardTitle}>SOS Station</ThemedText>
-            <ThemedText style={styles.serviceCardSubtext}>4.5 Km, 18 min</ThemedText>
-          </TouchableOpacity>
-        </View>
-        
-        {/* Secondary Service Row */}
-        <View style={styles.secondaryServices}>
-          <TouchableOpacity style={styles.secondaryCard} onPress={() => router.push('/profile')}>
-            <Ionicons name="wallet" size={20} color="#8B5CF6" />
-            <ThemedText style={styles.secondaryCardText}>Profile</ThemedText>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.secondaryCard} onPress={() => setTripHistoryVisible(true)}>
-            <Ionicons name="restaurant" size={20} color="#8B5CF6" />
-            <ThemedText style={styles.secondaryCardText}>History</ThemedText>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.secondaryCard} onPress={() => router.push('/emergencyContacts')}>
-            <Ionicons name="medical" size={20} color="#8B5CF6" />
-            <ThemedText style={styles.secondaryCardText}>Emergency</ThemedText>
+          <TouchableOpacity style={styles.compactServiceCard} onPress={() => handleSOS("000")}>
+            <Ionicons name="shield-checkmark-outline" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.compactCardText}>SOS</ThemedText>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Central Find Companion Section */}
-      <View style={styles.findCompanionSection}>
-        <View style={styles.companionContainer}>
-          <ThemedText style={styles.companionTitle}>Find Your Travel Companion</ThemedText>
-          <ThemedText style={styles.companionSubtext}>Connect with nearby travelers for safer journeys</ThemedText>
-          
-          <TouchableOpacity 
-            style={styles.findCompanionButton}
-            onPress={handleFindCompanion}
-            disabled={isSearching}
-          >
-            <View style={styles.findButtonContent}>
-              <Ionicons name="people" size={24} color="white" />
-              <ThemedText style={styles.findButtonText}>
-                {isSearching ? 'Searching...' : 'Find Companion'}
-              </ThemedText>
-            </View>
-            {isSearching && (
-              <View style={styles.searchingIndicator}>
-                <Ionicons name="radio-button-on" size={12} color="white" />
-              </View>
-            )}
-          </TouchableOpacity>
-          
-          {senderRequestStatus?.status === 'pending' && (
-            <TouchableOpacity 
-              style={styles.statusButton}
-              onPress={() => setSentRequestStatusVisible(true)}
-            >
-              <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Compact Map */}
+      {/* Compact Map - Now appears first */}
       <View style={styles.compactMapContainer}>
         {currentLocation && currentLocation.latitude && currentLocation.longitude ? (
           <MapView
@@ -1607,11 +1605,12 @@ export default function HomeScreen() {
             {startMarker && (
               <Marker coordinate={startMarker}>
                 <View style={styles.markerContainer}>
-                  <MaterialCommunityIcons name="map-marker" size={30} color="#4CAF50" />
+                  <MaterialCommunityIcons name="account-multiple" size={30} color="#10b981" />
                 </View>
                 <Callout>
-                  <View style={{ width: 140 }}>
-                    <ThemedText type="defaultSemiBold">Start Point</ThemedText>
+                  <View style={{ width: 160 }}>
+                    <ThemedText type="defaultSemiBold">Meeting Point</ThemedText>
+                    <ThemedText type="caption">{startMarker.address || "Where you'll meet"}</ThemedText>
                   </View>
                 </Callout>
               </Marker>
@@ -1620,11 +1619,12 @@ export default function HomeScreen() {
             {endMarker && (
               <Marker coordinate={endMarker}>
                 <View style={styles.markerContainer}>
-                  <MaterialCommunityIcons name="map-marker" size={30} color="#F44336" />
+                  <MaterialCommunityIcons name="flag-checkered" size={30} color="#F44336" />
                 </View>
                 <Callout>
-                  <View style={{ width: 140 }}>
+                  <View style={{ width: 160 }}>
                     <ThemedText type="defaultSemiBold">Destination</ThemedText>
+                    <ThemedText type="caption">{endMarker.address || "Final destination"}</ThemedText>
                   </View>
                 </Callout>
               </Marker>
@@ -1712,6 +1712,38 @@ export default function HomeScreen() {
             <ThemedText type="default" style={styles.loadingMapText}>Loading map...</ThemedText>
           </View>
         )}
+      </View>
+
+      {/* Compact Find Companion Section - Now appears after map */}
+      <View style={styles.findCompanionSection}>
+        <View style={styles.companionContainer}>
+          <TouchableOpacity 
+            style={styles.findCompanionButton}
+            onPress={handleFindCompanion}
+            disabled={isSearching}
+          >
+            <View style={styles.findButtonContent}>
+              <Ionicons name="people" size={24} color="white" />
+              <ThemedText style={styles.findButtonText}>
+                {isSearching ? 'Searching...' : 'Find Companion'}
+              </ThemedText>
+            </View>
+            {isSearching && (
+              <View style={styles.searchingIndicator}>
+                <Ionicons name="radio-button-on" size={12} color="white" />
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          {senderRequestStatus?.status === 'pending' && (
+            <TouchableOpacity 
+              style={styles.statusButton}
+              onPress={() => setSentRequestStatusVisible(true)}
+            >
+              <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Show searching status when active */}
@@ -2197,7 +2229,7 @@ const styles = StyleSheet.create({
   gradientHeader: {
     backgroundColor: "#8B5CF6",
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 15,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 25,
     borderBottomRightRadius: 25,
@@ -2211,7 +2243,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 15,
   },
   userInfo: {
     flexDirection: "row",
@@ -2243,48 +2275,12 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   
-  // Service Cards
+  // Compact Service Cards
   serviceCards: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 15,
-  },
-  serviceCard: {
-    flex: 1,
-    backgroundColor: "white",
-    padding: 15,
-    borderRadius: 15,
-    alignItems: "center",
-    marginHorizontal: 4,
-    shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  primaryCard: {
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.1)",
-  },
-  serviceCardTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1f2937",
-    marginTop: 8,
-  },
-  serviceCardSubtext: {
-    fontSize: 10,
-    color: "#6b7280",
-    marginTop: 2,
-  },
-  
-  // Secondary Services
-  secondaryServices: {
     flexDirection: "row",
     justifyContent: "space-around",
   },
-  secondaryCard: {
+  compactServiceCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.25)",
@@ -2294,55 +2290,58 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)",
   },
-  secondaryCardText: {
+  compactCardText: {
     color: "white",
     fontSize: 12,
     marginLeft: 6,
+    fontWeight: "500",
   },
   
-  // Find Companion Section
+  // Find Companion Section - Compact
   findCompanionSection: {
-    padding: 20,
+    padding: 15,
     backgroundColor: "#f8fafc",
   },
   companionContainer: {
     backgroundColor: "white",
-    borderRadius: 20,
-    padding: 24,
+    borderRadius: 15,
+    padding: 16,
     alignItems: "center",
     shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     borderWidth: 1,
     borderColor: "rgba(139, 92, 246, 0.1)",
   },
   companionTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "700",
     color: "#1f2937",
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: "center",
+    display: "none", // Hide title to make it more compact
   },
   companionSubtext: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#6b7280",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 12,
+    display: "none", // Hide subtitle to make it more compact
   },
   findCompanionButton: {
     backgroundColor: "#8B5CF6",
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 30,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 25,
     flexDirection: "row",
     alignItems: "center",
     shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
     borderWidth: 0,
   },
   findButtonContent: {
@@ -2351,7 +2350,7 @@ const styles = StyleSheet.create({
   },
   findButtonText: {
     color: "white",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
     marginLeft: 8,
   },
@@ -2359,22 +2358,23 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   statusButton: {
-    marginTop: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
     backgroundColor: "#f3f4f6",
-    borderRadius: 15,
+    borderRadius: 12,
   },
   statusButtonText: {
     color: "#8B5CF6",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
   },
   
-  // Compact Map
+  // Compact Map - Takes more space
   compactMapContainer: {
-    flex: 1,
-    margin: 20,
+    flex: 2,
+    margin: 15,
+    marginTop: 10,
     borderRadius: 20,
     overflow: "hidden",
     backgroundColor: "white",
@@ -2387,7 +2387,7 @@ const styles = StyleSheet.create({
   compactMap: { 
     width: "100%", 
     height: "100%",
-    minHeight: 200,
+    minHeight: 300,
   },
   
   // Bottom Navigation

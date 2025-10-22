@@ -43,6 +43,7 @@ export default function CompanionPreferencesModal({
   
   // New state for modern interface
   const [showDestinationSearch, setShowDestinationSearch] = useState(false);
+  const [showMeetingPointSearch, setShowMeetingPointSearch] = useState(false);
   const [routeDistance, setRouteDistance] = useState("4.2 km");
   const [routeDuration, setRouteDuration] = useState("15 min");
   const [mapRef, setMapRef] = useState(null);
@@ -126,7 +127,7 @@ export default function CompanionPreferencesModal({
   };
 
   const handleConfirm = () => {
-    if (!startCoordinates) return Alert.alert("Missing start", "Please choose a starting point.");
+    if (!startCoordinates) return Alert.alert("Missing Meeting Point", "Please choose a meeting point where you'll meet your companion.");
     if (!destinationCoordinates) return Alert.alert("Missing destination", "Please choose a destination.");
 
     onSubmit({
@@ -153,7 +154,7 @@ export default function CompanionPreferencesModal({
             <TouchableOpacity style={styles.backButton} onPress={onClose}>
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
-            <ThemedText style={styles.headerTitle}>Destination</ThemedText>
+            <ThemedText style={styles.headerTitle}>Meeting Point & Destination</ThemedText>
             <TouchableOpacity style={styles.headerButton}>
               <Ionicons name="notifications-outline" size={24} color="white" />
             </TouchableOpacity>
@@ -204,14 +205,14 @@ export default function CompanionPreferencesModal({
 
           {/* Destination Cards */}
           <View style={styles.destinationCards}>
-            {/* Your Location Card */}
-            <TouchableOpacity style={styles.destinationCard} onPress={() => setUseCurrent(true)}>
+            {/* Meeting Point Card */}
+            <TouchableOpacity style={styles.destinationCard} onPress={() => setShowMeetingPointSearch(true)}>
               <View style={styles.cardIcon}>
-                <Ionicons name="location" size={20} color="#10b981" />
+                <Ionicons name="people" size={20} color="#10b981" />
               </View>
               <View style={styles.cardContent}>
-                <ThemedText style={styles.cardTitle}>Your Location</ThemedText>
-                <ThemedText style={styles.cardSubtext}>0.8 km</ThemedText>
+                <ThemedText style={styles.cardTitle}>{startText || "Meeting Point"}</ThemedText>
+                <ThemedText style={styles.cardSubtext}>Where you'll meet</ThemedText>
               </View>
             </TouchableOpacity>
 
@@ -236,7 +237,51 @@ export default function CompanionPreferencesModal({
             )}
           </View>
 
-          {/* Search Overlay */}
+          {/* Search Overlays */}
+          {/* Meeting Point Search */}
+          {showMeetingPointSearch && (
+            <View style={styles.searchOverlay}>
+              <View style={styles.searchHeader}>
+                <TouchableOpacity onPress={() => setShowMeetingPointSearch(false)}>
+                  <Ionicons name="arrow-back" size={24} color="#333" />
+                </TouchableOpacity>
+                <ThemedText style={styles.searchTitle}>Choose Meeting Point</ThemedText>
+              </View>
+              
+              {/* Option to use current location */}
+              <TouchableOpacity 
+                style={styles.currentLocationOption}
+                onPress={() => {
+                  setUseCurrent(true);
+                  setShowMeetingPointSearch(false);
+                }}
+              >
+                <Ionicons name="locate" size={24} color="#10b981" />
+                <View style={styles.currentLocationText}>
+                  <ThemedText style={styles.currentLocationLabel}>Use Current Location</ThemedText>
+                  <ThemedText style={styles.currentLocationSubtext}>As meeting point</ThemedText>
+                </View>
+              </TouchableOpacity>
+              
+              <View style={styles.divider}>
+                <ThemedText style={styles.dividerText}>OR</ThemedText>
+              </View>
+              
+              <PlacesAutocomplete
+                placeholder="Search for meeting point..."
+                value={startText}
+                onChangeText={setStartText}
+                onSelect={(item) => {
+                  handleStartSelected(item);
+                  setShowMeetingPointSearch(false);
+                }}
+                country="au"
+                style={styles.searchInput}
+              />
+            </View>
+          )}
+          
+          {/* Destination Search */}
           {showDestinationSearch && (
             <View style={styles.searchOverlay}>
               <View style={styles.searchHeader}>
@@ -509,6 +554,44 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
+  },
+  
+  // Current Location Option in Search
+  currentLocationOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#10b981',
+  },
+  currentLocationText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  currentLocationLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  currentLocationSubtext: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dividerText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    paddingHorizontal: 12,
+    backgroundColor: 'white',
+    zIndex: 1,
   },
 
   // Bottom Panel
