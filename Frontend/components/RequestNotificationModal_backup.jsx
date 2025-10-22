@@ -330,13 +330,13 @@ export default function RequestNotificationModal({
                   fullTripRequest: tripRequest
                 });
                 
-                // Try fallback to startingLocation if meetingPoint is not set
-                const startingLocation = tripRequest.startingLocation;
-                if (startingLocation && startingLocation.latitude && startingLocation.longitude) {
-                  console.log('🔄 [DEBUG] Using startingLocation as fallback:', startingLocation);
-                  meetingPoint = startingLocation;
+                // Try fallback to startLocation if meetingPoint is not set
+                const startLocation = tripRequest.startLocation;
+                if (startLocation && startLocation.latitude && startLocation.longitude) {
+                  console.log('🔄 [DEBUG] Using startLocation as fallback:', startLocation);
+                  meetingPoint = startLocation;
                 } else {
-                  console.log('❌ [DEBUG] No valid starting location either:', startingLocation);
+                  console.log('❌ [DEBUG] No valid starting location either:', startLocation);
                   throw new Error('Meeting point (sender start location) not available');
                 }
               }

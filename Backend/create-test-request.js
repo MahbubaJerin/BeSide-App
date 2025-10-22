@@ -46,7 +46,7 @@ async function createTestRequest() {
                 userName: `${sender.firstName} ${sender.lastName}`,
                 userImage: sender.profilePhoto || sender.userImage || ""
             },
-            startingLocation: {
+            startLocation: {
                 address: "Test Start Location - Downtown",
                 latitude: -33.8688,  // Sydney CBD coordinates
                 longitude: 151.2093

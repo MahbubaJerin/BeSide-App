@@ -119,12 +119,20 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
         // Check if user actually exists in Users collection
         const userExists = await User.findById(user.userId);
         
-        console.log(`- User ${user.userName}: isNotSender=${isNotSender}, notAlreadyRecipient=${notAlreadyRecipient}, userExists=${!!userExists}`);
+        // Check gender preference
+        let matchesGenderPreference = true;
+        if (userExists && tripRequest.genderPreference && tripRequest.genderPreference !== 'any') {
+            matchesGenderPreference = userExists.gender === tripRequest.genderPreference;
+        }
         
-        if (isNotSender && notAlreadyRecipient && userExists) {
+        console.log(`- User ${user.userName}: isNotSender=${isNotSender}, notAlreadyRecipient=${notAlreadyRecipient}, userExists=${!!userExists}, matchesGender=${matchesGenderPreference}`);
+        
+        if (isNotSender && notAlreadyRecipient && userExists && matchesGenderPreference) {
             eligibleUsers.push(user);
         } else if (!userExists) {
             console.log(`⚠️ [BACKEND] User ${user.userName} (${user.userId}) exists in UserLocation but not in Users collection - skipping`);
+        } else if (!matchesGenderPreference) {
+            console.log(`⚠️ [BACKEND] User ${user.userName} doesn't match gender preference: ${tripRequest.genderPreference}`);
         }
     }
 
@@ -170,10 +178,10 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
         senderPhoto: tripRequest.photo?.url || tripRequest.user.userImage,
         destination: tripRequest.destination,
         destinationType: tripRequest.destinationType,
-        startingLocation: {
-            address: tripRequest.startingLocation?.address || "Starting Location",
-            latitude: tripRequest.startingLocation?.latitude,
-            longitude: tripRequest.startingLocation?.longitude
+        startLocation: {
+            address: tripRequest.startLocation?.address || "Starting Location",
+            latitude: tripRequest.startLocation?.latitude,
+            longitude: tripRequest.startLocation?.longitude
         },
         tripDate: tripRequest.date,
         tripTime: tripRequest.time,
@@ -220,40 +228,48 @@ exports.sendTripRequestToNearby = catchAsync(async (req, res, next) => {
 });
 
 // Get pending requests for current user
-// Cleanup expired requests - DELETE unsuccessful/pending requests older than 5 minutes
+// Cleanup expired requests - DELETE unsuccessful/pending requests older than 30 minutes
 exports.cleanupExpiredRequests = catchAsync(async () => {
-    console.log("🧹 [BACKEND] Cleaning up expired requests...");
+    // Only log cleanup once every 60 seconds
+    const now = Date.now();
+    const shouldLog = !global.lastCleanupLogTime || now - global.lastCleanupLogTime > 60000;
     
-    // Find requests that are expired or unsuccessful (pending/declined) and older than 5 minutes
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    if (shouldLog) {
+        console.log("🧹 [BACKEND] Cleaning up expired requests...");
+    }
     
-    // Delete expired requests (past expiresAt time) OR unsuccessful requests older than 5 minutes
+    // Find requests that are expired (only based on expiresAt field)
+    // Don't delete pending requests that are still within their 30-minute window
     const deleteResult = await TripRequest.deleteMany({
         $or: [
-            // Delete expired requests
+            // Delete truly expired requests (past their expiresAt time)
             {
                 status: "pending",
                 expiresAt: { $lt: new Date() }
             },
-            // Delete unsuccessful requests older than 5 minutes
+            // Delete declined/expired status requests older than 30 minutes
             {
-                status: { $in: ["pending", "declined", "expired"] },
-                createdAt: { $lt: fiveMinutesAgo }
+                status: { $in: ["declined", "expired"] },
+                createdAt: { $lt: new Date(Date.now() - 30 * 60 * 1000) }
             }
         ]
     });
     
-    if (deleteResult.deletedCount > 0) {
+    if (deleteResult.deletedCount > 0 && shouldLog) {
         console.log(`✅ [BACKEND] Deleted ${deleteResult.deletedCount} expired/unsuccessful requests`);
-    } else {
-        console.log("✅ [BACKEND] No expired/unsuccessful requests found to delete");
+        global.lastCleanupLogTime = now;
     }
 });
 
 exports.getPendingRequests = catchAsync(async (req, res, next) => {
     const userId = req.user._id.toString();
 
-    console.log("🔍 [BACKEND] Getting pending requests for user:", userId);
+    // Only log once every 30 seconds to reduce flooding
+    const now = Date.now();
+    if (!global.lastPendingLogTime || now - global.lastPendingLogTime > 30000) {
+        console.log("🔍 [BACKEND] Getting pending requests for user:", userId);
+        global.lastPendingLogTime = now;
+    }
     
     // Cleanup expired requests first
     await exports.cleanupExpiredRequests();
@@ -265,7 +281,9 @@ exports.getPendingRequests = catchAsync(async (req, res, next) => {
         expiresAt: { $gt: new Date() }
     });
 
-    console.log("📋 [BACKEND] Raw requests found:", requests.length);
+    if (!global.lastPendingLogTime || now - global.lastPendingLogTime > 30000) {
+        console.log("📋 [BACKEND] Raw requests found:", requests.length);
+    }
 
     // Filter requests where the current user hasn't responded and enrich with user data
     const pendingRequests = [];
@@ -280,19 +298,26 @@ exports.getPendingRequests = catchAsync(async (req, res, next) => {
                 const User = require("../models/userModel");
                 const senderUser = await User.findById(request.user.userId);
                 
-                console.log(`🔍 [USER DATA] For request ${request.tripReqId}:`);
-                console.log(`  - Sender User ID: ${request.user.userId}`);
-                console.log(`  - Found sender: ${!!senderUser}`);
-                console.log(`  - Request photo: ${request.photo?.url || "None"}`);
-                console.log(`  - User profile photo: ${senderUser?.profilePhoto || "None"}`);
-                console.log(`  - User image: ${senderUser?.userImage || "None"}`);
+                // Determine the best photo to use - extract URL if object
+                let photoToUse = request.photo?.url || null;
                 
-                // Determine the best photo to use
-                const photoToUse = request.photo?.url || // Request selfie first
-                                 senderUser?.profilePhoto || // User profile photo
-                                 senderUser?.userImage || // User image fallback
-                                 request.user.userImage || // Request user image
-                                 null; // No photo available
+                if (!photoToUse && senderUser?.profilePhoto) {
+                    photoToUse = typeof senderUser.profilePhoto === 'object' 
+                        ? senderUser.profilePhoto.url 
+                        : senderUser.profilePhoto;
+                }
+                
+                if (!photoToUse && senderUser?.userImage) {
+                    photoToUse = typeof senderUser.userImage === 'object'
+                        ? senderUser.userImage.url
+                        : senderUser.userImage;
+                }
+                
+                if (!photoToUse && request.user.userImage) {
+                    photoToUse = typeof request.user.userImage === 'object'
+                        ? request.user.userImage.url
+                        : request.user.userImage;
+                }
                 
                 // Enrich the request with sender's complete information
                 const enrichedRequest = {
@@ -310,19 +335,18 @@ exports.getPendingRequests = catchAsync(async (req, res, next) => {
                 };
                 
                 pendingRequests.push(enrichedRequest);
-                
-                console.log(`✅ [Request ${request.tripReqId}] Added with photo: ${photoToUse || "No photo"}`);
             } catch (error) {
                 console.error(`❌ [Request ${request.tripReqId}] Error enriching user data:`, error);
                 // Add request without enrichment as fallback
                 pendingRequests.push(request.toObject());
             }
-        } else {
-            console.log(`- Request ${request.tripReqId}: userRecipient=${!!userRecipient}, isEligible=${isEligible}`);
         }
     }
 
-    console.log("✅ [BACKEND] Filtered pending requests:", pendingRequests.length);
+    // Only log filtered results occasionally
+    if (!global.lastPendingLogTime || Date.now() - global.lastPendingLogTime > 30000) {
+        console.log("✅ [BACKEND] Filtered pending requests:", pendingRequests.length);
+    }
 
     res.status(200).json({
         status: "success",
@@ -363,7 +387,12 @@ exports.updateUserHeartbeat = catchAsync(async (req, res, next) => {
     const userId = req.user._id;
     const userName = req.user.userName;
 
-    console.log(`💓 [HEARTBEAT] Updating heartbeat for user: ${userName} (${userId})`);
+    // Only log heartbeats once every 60 seconds to reduce flooding
+    const now = Date.now();
+    if (!global.lastHeartbeatLogTime || now - global.lastHeartbeatLogTime > 60000) {
+        console.log(`💓 [HEARTBEAT] Updating heartbeat for user: ${userName} (${userId})`);
+        global.lastHeartbeatLogTime = now;
+    }
 
     try {
         // Check if user location record exists
@@ -374,12 +403,7 @@ exports.updateUserHeartbeat = catchAsync(async (req, res, next) => {
             userLocation.isActive = true;
             userLocation.lastSeen = new Date();
             await userLocation.save();
-        } else {
-            // Only create a new record if none exists - let them set location later
-            console.log(`ℹ️ [HEARTBEAT] No location record found for ${userName} - they need to update location first`);
         }
-
-        console.log(`✅ [HEARTBEAT] Heartbeat updated for user: ${userName}`);
 
         res.status(200).json({
             status: "success",
@@ -398,12 +422,21 @@ exports.updateUserHeartbeat = catchAsync(async (req, res, next) => {
 exports.respondToTripRequest = catchAsync(async (req, res, next) => {
     const { tripReqId, response } = req.body;
     const userId = req.user._id.toString();
+    const receiverPhoto = req.file; // Receiver's verification photo
 
     console.log("🎯 [BACKEND] Responding to trip request:", tripReqId, "with:", response);
+    if (receiverPhoto) {
+        console.log("📸 [BACKEND] Receiver photo included:", receiverPhoto.originalname);
+    }
 
     // Validate response
     if (!["accepted", "declined"].includes(response)) {
         return next(new AppError("Response must be either 'accepted' or 'declined'", 400));
+    }
+
+    // For acceptance, receiver photo is required
+    if (response === "accepted" && !receiverPhoto) {
+        return next(new AppError("Verification photo is required to accept the request", 400));
     }
 
     // First, cleanup expired requests
@@ -444,6 +477,9 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
 
     recipient.responseStatus = response;
 
+    // Declare receiverPhotoData outside the if block so it's accessible in notification code
+    let receiverPhotoData = null;
+
     // If accepted, update trip request status, set acceptedBy, and create match
     if (response === "accepted") {
         // Check if someone else already accepted
@@ -451,12 +487,31 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             return next(new AppError("This request has already been accepted by someone else", 409));
         }
 
+        // Upload receiver's verification photo to Cloudinary
+        const { uploadToCloudinary } = require("../utils/fileUpload");
+        
+        if (receiverPhoto) {
+            try {
+                console.log("📤 [PHOTO UPLOAD] Uploading receiver's verification photo...");
+                receiverPhotoData = await uploadToCloudinary(
+                    receiverPhoto,
+                    "trip-requests/receiver-photos",
+                    userId
+                );
+                console.log("✅ [PHOTO UPLOAD] Receiver photo uploaded:", receiverPhotoData.url);
+            } catch (uploadError) {
+                console.error("❌ [PHOTO UPLOAD] Failed to upload receiver photo:", uploadError);
+                return next(new AppError("Failed to upload verification photo. Please try again.", 500));
+            }
+        }
+
         // Update trip request
         tripRequest.status = "accepted";
         tripRequest.acceptedBy = {
             userId: userId,
             userName: req.user.userName,
-            acceptedAt: new Date()
+            acceptedAt: new Date(),
+            verificationPhoto: receiverPhotoData // Store receiver's photo
         };
 
         // Mark all other recipients as declined
@@ -494,16 +549,23 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             companion: {
                 userId: userId,
                 userName: req.user.userName,
-                userImage: req.user.userImage || "default.jpg",
+                userImage: req.user.profilePhoto?.url || "default.jpg",
                 joinedAt: new Date()
             },
             tripDetails: {
                 destination: tripRequest.destination,
                 destinationType: tripRequest.destinationType,
-                startCoordinates: {
-                    latitude: tripRequest.startCoordinates?.latitude || 0,
-                    longitude: tripRequest.startCoordinates?.longitude || 0
+                startLocation: {
+                    latitude: tripRequest.startLocation?.latitude || 0,
+                    longitude: tripRequest.startLocation?.longitude || 0,
+                    address: tripRequest.startLocation?.address || 'Starting location'
                 },
+                destinationLocation: {
+                    latitude: tripRequest.destinationLocation?.latitude || null,
+                    longitude: tripRequest.destinationLocation?.longitude || null,
+                    address: tripRequest.destinationLocation?.address || null
+                },
+                routeCoordinates: Array.isArray(tripRequest.routeCoordinates) ? tripRequest.routeCoordinates : [],
                 plannedDate: tripRequest.date,
                 plannedTime: tripRequest.time,
                 genderPreference: tripRequest.genderPreference
@@ -513,9 +575,10 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
                 name: 'Meeting Point (Sender\'s Start Location)',
                 description: 'Starting location of the trip organizer',
                 location: {
-                    latitude: tripRequest.startLocation?.latitude || tripRequest.startCoordinates?.latitude || 0,
-                    longitude: tripRequest.startLocation?.longitude || tripRequest.startCoordinates?.longitude || 0
+                    latitude: tripRequest.startLocation?.latitude || 0,
+                    longitude: tripRequest.startLocation?.longitude || 0
                 },
+                address: tripRequest.startLocation?.address || 'Starting location',
                 type: 'organizer',
                 setBy: tripRequest.user.userName,
                 setAt: new Date()
@@ -551,7 +614,7 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
         responseData.routeData = {
             startLocation: tripRequest.startLocation,
             destinationLocation: tripRequest.destinationLocation,
-            routeCoordinates: tripRequest.routeCoordinates,
+            routeCoordinates: Array.isArray(tripRequest.routeCoordinates) ? tripRequest.routeCoordinates : [],
             transportMode: tripRequest.transportMode,
             meetingPoint: tripRequest.meetingPoint
         };
@@ -570,20 +633,20 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
         const receiverLocation = await UserLocation.findOne({ userId: userId });
         const senderLocation = await UserLocation.findOne({ userId: tripRequest.user.userId });
         
-        if (receiverLocation && receiverLocation.currentLocation && receiverLocation.currentLocation.coordinates) {
+        if (receiverLocation?.location?.coordinates?.length === 2) {
             responseData.receiverLocation = {
-                latitude: receiverLocation.currentLocation.coordinates[1],
-                longitude: receiverLocation.currentLocation.coordinates[0]
+                latitude: receiverLocation.location.coordinates[1],
+                longitude: receiverLocation.location.coordinates[0]
             };
             console.log('📍 [RECEIVER LOCATION] Added receiver location to response:', responseData.receiverLocation);
         } else {
             console.warn('⚠️ [RECEIVER LOCATION] No valid location found for receiver:', userId);
         }
         
-        if (senderLocation && senderLocation.currentLocation && senderLocation.currentLocation.coordinates) {
+        if (senderLocation?.location?.coordinates?.length === 2) {
             responseData.senderCurrentLocation = {
-                latitude: senderLocation.currentLocation.coordinates[1],
-                longitude: senderLocation.currentLocation.coordinates[0]
+                latitude: senderLocation.location.coordinates[1],
+                longitude: senderLocation.location.coordinates[0]
             };
             console.log('📍 [SENDER LOCATION] Added sender location to response:', responseData.senderCurrentLocation);
         } else {
@@ -629,16 +692,18 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
         tripReqId: tripRequest.tripReqId,
         responderId: userId,
         responderName: req.user.userName,
-        responderPhoto: req.user.userImage || req.user.profilePhoto,
+        responderPhoto: receiverPhotoData?.url || req.user.profilePhoto?.url || "default.jpg",
+        receiverLocation: responseData.receiverLocation, // Include receiver's location
         response: response,
         message: response === "accepted" 
             ? `🎉 ${req.user.userName} accepted your companion request!`
             : `❌ ${req.user.userName} declined your request`,
         detailedMessage: response === "accepted"
-            ? `Great! ${req.user.userName} will join you on your trip to ${tripRequest.destination}. Check Active Trips for coordination.`
+            ? `Great! ${req.user.userName} will join you on your trip to ${tripRequest.destination}. Check the photo to verify their identity at the meeting point.`
             : `${req.user.userName} declined to join your trip to ${tripRequest.destination}. Your request is still active for other nearby users.`,
         tripMatch: response === "accepted" ? tripRequest.matchedTripId : null,
         destination: tripRequest.destination,
+        transportMode: tripRequest.transportMode || tripRequest.destinationType,
         tripDate: tripRequest.date,
         tripTime: tripRequest.time,
         timestamp: new Date().toISOString()
@@ -755,16 +820,54 @@ exports.getTripHistory = catchAsync(async (req, res, next) => {
 exports.getActiveMatches = catchAsync(async (req, res, next) => {
     const userId = req.user._id.toString();
 
-    console.log("🔍 [BACKEND] Getting active matches for user:", userId);
+    // Only log once every 30 seconds
+    const now = Date.now();
+    if (!global.lastMatchesLogTime || now - global.lastMatchesLogTime > 30000) {
+        console.log("🔍 [BACKEND] Getting active matches for user:", userId);
+        global.lastMatchesLogTime = now;
+    }
 
     const activeMatches = await TripMatch.findUserActiveMatches(userId);
 
-    console.log("📋 [BACKEND] Found active matches:", activeMatches.length);
+    // Fix stringified photo objects in matches
+    const fixedMatches = activeMatches.map(match => {
+        const matchObj = match.toObject();
+        
+        // Fix organizer photo
+        if (matchObj.organizer?.userImage && typeof matchObj.organizer.userImage === 'string' && matchObj.organizer.userImage.includes('url:')) {
+            try {
+                const photoMatch = matchObj.organizer.userImage.match(/url:\s*'([^']+)'/);
+                if (photoMatch) {
+                    matchObj.organizer.userImage = photoMatch[1];
+                }
+            } catch (e) {
+                console.error('Error parsing organizer photo:', e);
+            }
+        }
+        
+        // Fix companion photo
+        if (matchObj.companion?.userImage && typeof matchObj.companion.userImage === 'string' && matchObj.companion.userImage.includes('url:')) {
+            try {
+                const photoMatch = matchObj.companion.userImage.match(/url:\s*'([^']+)'/);
+                if (photoMatch) {
+                    matchObj.companion.userImage = photoMatch[1];
+                }
+            } catch (e) {
+                console.error('Error parsing companion photo:', e);
+            }
+        }
+        
+        return matchObj;
+    });
+
+    if (!global.lastMatchesLogTime || now - global.lastMatchesLogTime > 30000) {
+        console.log("📋 [BACKEND] Found active matches:", fixedMatches.length);
+    }
 
     res.status(200).json({
         status: "success",
-        results: activeMatches.length,
-        data: { matches: activeMatches }
+        results: fixedMatches.length,
+        data: { matches: fixedMatches }
     });
 });
 
@@ -1058,6 +1161,49 @@ exports.sendTripNotification = catchAsync(async (req, res, next) => {
             recipient: otherUser.userName,
             type,
             message
+        }
+    });
+});
+
+// Cleanup user data on logout
+exports.cleanupUserData = catchAsync(async (req, res, next) => {
+    const userId = req.user._id.toString();
+
+    console.log("🧹 [LOGOUT CLEANUP] Cleaning up data for user:", userId);
+
+    // Cancel all pending active matches (not in-progress)
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    
+    const cancelledMatches = await TripMatch.updateMany({
+        $or: [
+            { 'organizer.userId': userId },
+            { 'companion.userId': userId }
+        ],
+        status: 'active',
+        'progression.matched': { $lt: tenMinutesAgo }
+    }, {
+        $set: { 
+            status: 'cancelled',
+            'progression.cancelled': new Date()
+        }
+    });
+
+    // Delete expired trip requests (older than 10 minutes, not accepted)
+    const deletedRequests = await TripRequest.deleteMany({
+        'user.userId': userId,
+        status: { $in: ['pending', 'rejected'] },
+        createdAt: { $lt: tenMinutesAgo }
+    });
+
+    console.log("✅ [LOGOUT CLEANUP] Cancelled matches:", cancelledMatches.modifiedCount);
+    console.log("✅ [LOGOUT CLEANUP] Deleted requests:", deletedRequests.deletedCount);
+
+    res.status(200).json({
+        status: "success",
+        message: "User data cleaned up successfully",
+        data: {
+            cancelledMatches: cancelledMatches.modifiedCount,
+            deletedRequests: deletedRequests.deletedCount
         }
     });
 });

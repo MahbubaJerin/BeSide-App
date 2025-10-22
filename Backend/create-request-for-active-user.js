@@ -40,7 +40,7 @@ async function createRequestForExistingUser() {
                 userName: `${sender.firstName} ${sender.lastName}`,
                 userImage: sender.profilePhoto || sender.userImage || ""
             },
-            startingLocation: {
+            startLocation: {
                 address: "Test Start Location - City Center",
                 latitude: -33.8688,
                 longitude: 151.2093

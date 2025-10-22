@@ -332,8 +332,8 @@ export default function LiveTripModal({
               provider={PROVIDER_GOOGLE}
               style={styles.map}
               initialRegion={{
-                latitude: myLocation?.latitude || match.tripDetails?.startCoordinates?.latitude || 37.7749,
-                longitude: myLocation?.longitude || match.tripDetails?.startCoordinates?.longitude || -122.4194,
+                latitude: myLocation?.latitude || match.tripDetails?.startLocation?.latitude || 37.7749,
+                longitude: myLocation?.longitude || match.tripDetails?.startLocation?.longitude || -122.4194,
                 latitudeDelta: 0.01,
                 longitudeDelta: 0.01,
               }}

@@ -15,9 +15,14 @@ import { ThemedButton } from "@/components/ThemedButton";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { BASE_URL } from "../config";
+<<<<<<< HEAD
+=======
+import { useRequestPolling } from "../hooks/useRequestPolling";
+import ReceiverPhotoConsentModal from "./ReceiverPhotoConsentModal";
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
 
 // Simple request card component with sender photo
-function RequestCard({ request, onResponse, respondingTo }) {
+function RequestCard({ request, onResponse, respondingTo, onAcceptClick }) {
   return (
     <View style={styles.requestCard}>
       {/* Header with curved background */}
@@ -55,18 +60,68 @@ function RequestCard({ request, onResponse, respondingTo }) {
 
         <View style={styles.messageSection}>
           <Text style={styles.messageLabel}>Trip Details</Text>
+<<<<<<< HEAD
           <Text style={styles.messageText}>
             Destination: {request.destination}
             {'\n'}Transport: {request.destinationType}
             {request.genderPreference !== "any" ? `\nPrefers: ${request.genderPreference} companions` : ''}
           </Text>
+=======
+          <View style={styles.tripDetailsContainer}>
+            <View style={styles.tripDetailRow}>
+              <Text style={styles.tripDetailIcon}>📍</Text>
+              <View style={styles.tripDetailContent}>
+                <Text style={styles.tripDetailLabel}>Destination</Text>
+                <Text style={styles.tripDetailValue}>{request.destination}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.tripDetailRow}>
+              <Text style={styles.tripDetailIcon}>🚌</Text>
+              <View style={styles.tripDetailContent}>
+                <Text style={styles.tripDetailLabel}>Transport</Text>
+                <Text style={styles.tripDetailValue}>{request.destinationType}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.tripDetailRow}>
+              <Text style={styles.tripDetailIcon}>📅</Text>
+              <View style={styles.tripDetailContent}>
+                <Text style={styles.tripDetailLabel}>Date & Time</Text>
+                <Text style={styles.tripDetailValue}>
+                  {new Date(request.date).toLocaleDateString()} at {request.time}
+                </Text>
+              </View>
+            </View>
+            
+            {request.startLocation?.address && (
+              <View style={styles.tripDetailRow}>
+                <Text style={styles.tripDetailIcon}>🚩</Text>
+                <View style={styles.tripDetailContent}>
+                  <Text style={styles.tripDetailLabel}>Starting From</Text>
+                  <Text style={styles.tripDetailValue}>{request.startLocation.address}</Text>
+                </View>
+              </View>
+            )}
+            
+            {request.genderPreference !== "any" && (
+              <View style={styles.tripDetailRow}>
+                <Text style={styles.tripDetailIcon}>👥</Text>
+                <View style={styles.tripDetailContent}>
+                  <Text style={styles.tripDetailLabel}>Preference</Text>
+                  <Text style={styles.tripDetailValue}>{request.genderPreference} companions</Text>
+                </View>
+              </View>
+            )}
+          </View>
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
         </View>
 
         {/* Action buttons */}
         <View style={styles.actionButtonsCard}>
           <TouchableOpacity
             style={[styles.actionButtonCard, styles.acceptButtonCard, respondingTo === request.tripReqId && styles.disabledButton]}
-            onPress={() => onResponse(request.tripReqId, "accepted")}
+            onPress={() => onAcceptClick(request)}
             disabled={respondingTo === request.tripReqId}
           >
             <Text style={styles.acceptButtonText}>
@@ -93,13 +148,20 @@ export default function RequestNotificationModal({
   visible, 
   onClose, 
   onRequestAccepted,
-  currentLocation
+  currentLocation,
+  onRouteUpdate,
+  requests: externalRequests,
+  isPolling: externalIsPolling,
+  onRefetch: externalRefetch
 }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [respondingTo, setRespondingTo] = useState(null);
+  const [showReceiverPhotoModal, setShowReceiverPhotoModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
+<<<<<<< HEAD
   const fetchPendingRequests = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
@@ -110,6 +172,29 @@ export default function RequestNotificationModal({
       const response = await fetch(`${API_URL}/api/v1/trip/pending-requests`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+=======
+  // Use external requests if provided (from parent's polling), otherwise use own polling
+  const hasExternalData = externalRequests !== undefined;
+  
+  // Only use internal polling if no external data provided
+  const internalPolling = useRequestPolling(20000, visible && !hasExternalData);
+  
+  // Use external data if available, otherwise fallback to internal polling
+  const requests = hasExternalData ? externalRequests : internalPolling.pendingRequests;
+  const isPolling = hasExternalData ? externalIsPolling : internalPolling.isPolling;
+  const refetch = hasExternalData ? externalRefetch : internalPolling.refetch;
+  const hasNewRequests = hasExternalData ? requests.length > 0 : internalPolling.hasNewRequests;
+  const networkError = hasExternalData ? null : internalPolling.networkError;
+  const markAsViewed = hasExternalData ? () => {} : internalPolling.markAsViewed;
+  const isRateLimited = hasExternalData ? false : internalPolling.isRateLimited;
+
+  // Log requests for debugging only when count changes
+  useEffect(() => {
+    if (requests.length > 0) {
+      console.log(`� ${requests.length} request(s) pending`);
+    }
+  }, [requests.length]);
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
 
       if (response.ok) {
         const result = await response.json();
@@ -130,7 +215,20 @@ export default function RequestNotificationModal({
     setRefreshing(false);
   };
 
-  const handleResponse = async (tripReqId, response) => {
+  const handleAcceptClick = (request) => {
+    setSelectedRequest(request);
+    setShowReceiverPhotoModal(true);
+  };
+
+  const handleReceiverPhotoConfirm = async (receiverPhotoUri) => {
+    if (!selectedRequest) return;
+
+    setShowReceiverPhotoModal(false);
+    await handleResponse(selectedRequest.tripReqId, "accepted", receiverPhotoUri);
+    setSelectedRequest(null);
+  };
+
+  const handleResponse = async (tripReqId, response, receiverPhotoUri = null) => {
     if (respondingTo === tripReqId) return;
     
     try {
@@ -139,36 +237,68 @@ export default function RequestNotificationModal({
       if (!token) return;
 
       const API_URL = BASE_URL.replace(/\/+$/, "");
+      
+      // For accept with photo, use FormData
+      let requestBody;
+      let headers = {
+        Authorization: `Bearer ${token}`,
+      };
+
+      if (response === "accepted" && receiverPhotoUri) {
+        const formData = new FormData();
+        formData.append("tripReqId", tripReqId);
+        formData.append("response", response);
+        
+        // Add receiver photo
+        const filename = receiverPhotoUri.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        
+        formData.append("receiverPhoto", {
+          uri: receiverPhotoUri,
+          name: filename,
+          type: type,
+        });
+
+        requestBody = formData;
+        // Don't set Content-Type for FormData - let fetch handle it
+      } else {
+        headers["Content-Type"] = "application/json";
+        requestBody = JSON.stringify({ tripReqId, response });
+      }
+
       const apiResponse = await fetch(`${API_URL}/api/v1/trip/respond-request`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ tripReqId, response }),
+        headers,
+        body: requestBody,
       });
 
       const result = await apiResponse.json();
 
       if (result.status === "success") {
         if (response === "accepted") {
+          const payload = result.data || {};
+
+          if (payload.routeData) {
+            onRouteUpdate?.({
+              ...payload.routeData,
+              senderLocation: payload.senderCurrentLocation,
+              receiverLocation: payload.receiverLocation,
+              tripMatch: payload.tripMatch,
+              tripRequest: payload.tripRequest,
+            });
+          }
+
+          // Close modal and call callback
           onClose();
-          Alert.alert(
-            "Request Accepted! 🎉", 
-            "You have successfully accepted the companion request.",
-            [{ 
-              text: "OK",
-              onPress: () => {
-                onRequestAccepted?.(result.data.tripRequest);
-              }
-            }]
-          );
+          onRequestAccepted?.(payload);
         } else {
           Alert.alert("Success", "Request declined successfully");
+          onClose();
         }
         
-        // Remove the request from the list
-        setRequests(prev => prev.filter(req => req.tripReqId !== tripReqId));
+        // Refresh the request list
+        refetch();
       } else {
         throw new Error(result.message || "Failed to respond to request");
       }
@@ -191,8 +321,20 @@ export default function RequestNotificationModal({
       <View style={styles.overlay}>
         <View style={styles.container}>
           <View style={styles.header}>
+<<<<<<< HEAD
             <ThemedText type="subtitle">🔔 Trip Requests</ThemedText>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+=======
+            <ThemedText type="subtitle" style={styles.headerTitle}>🔔 Trip Requests</ThemedText>
+            <TouchableOpacity 
+              onPress={() => {
+                console.log("🚪 [NOTIFICATIONS] Closing modal");
+                setRespondingTo(null);
+                onClose();
+              }} 
+              style={styles.closeButton}
+            >
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
               <ThemedText style={styles.closeText}>✕</ThemedText>
             </TouchableOpacity>
           </View>
@@ -216,6 +358,7 @@ export default function RequestNotificationModal({
                 </ThemedText>
               </View>
             ) : (
+<<<<<<< HEAD
               requests.map((request) => (
                 <RequestCard 
                   key={request.tripReqId}
@@ -224,6 +367,19 @@ export default function RequestNotificationModal({
                   respondingTo={respondingTo}
                 />
               ))
+=======
+              <ScrollView style={styles.requestsList}>
+                {requests.map((request) => (
+                  <RequestCard 
+                    key={request.tripReqId}
+                    request={request}
+                    onResponse={handleResponse}
+                    onAcceptClick={handleAcceptClick}
+                    respondingTo={respondingTo}
+                  />
+                ))}
+              </ScrollView>
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
             )}
           </ScrollView>
 
@@ -234,6 +390,17 @@ export default function RequestNotificationModal({
           />
         </View>
       </View>
+
+      {/* Receiver Photo Consent Modal */}
+      <ReceiverPhotoConsentModal
+        visible={showReceiverPhotoModal}
+        onClose={() => {
+          setShowReceiverPhotoModal(false);
+          setSelectedRequest(null);
+        }}
+        onConfirm={handleReceiverPhotoConfirm}
+        senderName={selectedRequest?.user?.userName || "the sender"}
+      />
     </Modal>
   );
 }
@@ -247,25 +414,43 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: Colors.light.surface,
-    borderRadius: 16,
+    borderRadius: 20,
     width: "90%",
     maxHeight: "80%",
     overflow: "hidden",
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 10,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    padding: 20,
+    backgroundColor: "#8B5CF6",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  headerTitle: {
+    color: "white",
+    fontSize: 20,
+    fontWeight: "600",
   },
   closeButton: {
     padding: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    minWidth: 36,
+    minHeight: 36,
+    alignItems: "center",
+    justifyContent: "center",
   },
   closeText: {
-    fontSize: 18,
-    color: Colors.light.text,
+    fontSize: 20,
+    color: "white",
+    fontWeight: "600",
   },
   requestsList: {
     maxHeight: 400,
@@ -288,23 +473,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.light.textSecondary,
     textAlign: "center",
+<<<<<<< HEAD
   },
   closeButtonBottom: {
     margin: 16,
   },
   
+=======
+    marginBottom: 20,
+  },
+  refreshButton: {
+    backgroundColor: "#8B5CF6",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+    alignSelf: "center",
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  refreshButtonText: {
+    color: "white",
+    fontWeight: "600",
+  },
+  loadingText: {
+    fontSize: 16,
+    color: Colors.light.textSecondary,
+  },
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
   // Request card styles
   requestCard: {
     margin: 16,
     borderRadius: 16,
     backgroundColor: Colors.light.surface,
-    shadowColor: '#000',
+    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
     elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.1)',
   },
   curvedHeader: {
+    backgroundColor: '#8B5CF6',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    position: 'relative',
+  },rvedHeader: {
     backgroundColor: '#4A90E2',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,

@@ -123,7 +123,7 @@ const deleteFromCloudinary = async (publicId) => {
 };
 
 module.exports = {
-  uploadSingle: upload.single('photo'),
+  uploadSingle: (fieldName = 'photo') => upload.single(fieldName),
   uploadToCloudinary,
   deleteFromCloudinary
 };

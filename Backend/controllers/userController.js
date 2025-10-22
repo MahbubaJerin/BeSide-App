@@ -198,7 +198,7 @@ exports.testCloudinaryConnection = catchAsync(async (req, res, next) => {
 });
 
 // Upload middleware for profile photo (should be declared after all imports)
-exports.uploadProfilePhoto = uploadSingle;
+exports.uploadProfilePhoto = uploadSingle('photo');
 
 
 // Emergency Contact Management (NEW)

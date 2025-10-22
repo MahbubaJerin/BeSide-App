@@ -31,7 +31,7 @@ router.get(
 
 router.post(
   "/upload-photo/:tripReqId",
-  uploadSingle,
+  uploadSingle('photo'),
   tripController.uploadTripPhoto
 );
 
@@ -125,6 +125,7 @@ router.post(
 
 router.post(
   "/respond-request",
+  uploadSingle("receiverPhoto"), // Add multer middleware for receiver photo
   notificationController.respondToTripRequest
 );
 
@@ -147,6 +148,11 @@ router.get(
 router.get(
   "/active-matches",
   notificationController.getActiveMatches
+);
+
+router.post(
+  "/cleanup-user-data",
+  notificationController.cleanupUserData
 );
 
 router.get(

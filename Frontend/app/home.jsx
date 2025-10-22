@@ -37,6 +37,11 @@ import EnhancedConsentModal from "@/components/EnhancedConsentModal";
 import TwoStepTripModal from "@/components/TwoStepTripModal";
 import { usePersistentSearch } from "@/hooks/usePersistentSearch";
 import RequestNotificationModal from "@/components/RequestNotificationModal";
+<<<<<<< HEAD
+=======
+import SenderAcceptanceNotificationModal from "@/components/SenderAcceptanceNotificationModal";
+import ActiveMatchModal from "@/components/ActiveMatchModal";
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
 import BeSideLogo from "../assets/images/BeSide.png";
 import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";
@@ -273,6 +278,12 @@ export default function HomeScreen() {
   // Enhanced persistent search hook
   const persistentSearch = usePersistentSearch();
   const [requestNotificationVisible, setRequestNotificationVisible] = useState(false);
+<<<<<<< HEAD
+=======
+  const [activeMatchModalVisible, setActiveMatchModalVisible] = useState(false);
+  const [senderAcceptanceVisible, setSenderAcceptanceVisible] = useState(false);
+  const [acceptanceData, setAcceptanceData] = useState(null);
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
 
   const [consent, setConsent] = useState({ noTouch: false, respectful: false, safety: false });
   const [photoUrl, setPhotoUrl] = useState(null);
@@ -304,8 +315,13 @@ export default function HomeScreen() {
   // hooks
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
+<<<<<<< HEAD
   const requestPolling = useRequestPolling(120000, true); // Poll every 2 minutes to avoid rate limiting
   const activeMatches = useActiveMatches(30000); // Poll for matches every 30 seconds to avoid rate limiting
+=======
+  const requestPolling = useRequestPolling(5000, true); // Poll every 5 seconds for incoming requests
+  const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
   const tripNotifications = useTripNotifications();
   const { 
     openGoogleMapsNavigation, 
@@ -351,6 +367,118 @@ export default function HomeScreen() {
   const forceCloseNotificationModal = useCallback(() => {
     setRequestNotificationVisible(false);
   }, []);
+
+  const handleNotificationRouteUpdate = useCallback(
+    (routeInfo) => {
+      if (!routeInfo) return;
+
+      const normalizePoint = (point) =>
+        point && typeof point.latitude === "number" && typeof point.longitude === "number"
+          ? { latitude: point.latitude, longitude: point.longitude, address: point.address }
+          : null;
+
+      const routePoints = Array.isArray(routeInfo.routeCoordinates)
+        ? routeInfo.routeCoordinates.filter(
+            (coord) =>
+              coord &&
+              typeof coord.latitude === "number" &&
+              typeof coord.longitude === "number"
+          )
+        : [];
+
+      setRouteCoordinates(routePoints);
+
+      const meetingSource =
+        routeInfo.meetingPoint?.location ||
+        routeInfo.meetingPoint ||
+        routeInfo.startLocation;
+      const meetingPoint = normalizePoint(meetingSource);
+
+      if (meetingPoint) {
+        setStartMarker({
+          latitude: meetingPoint.latitude,
+          longitude: meetingPoint.longitude,
+          address:
+            routeInfo.meetingPoint?.address ||
+            routeInfo.startLocation?.address ||
+            meetingPoint.address ||
+            "Meeting Point",
+        });
+      } else {
+        setStartMarker(null);
+      }
+
+      const destinationPoint = normalizePoint(routeInfo.destinationLocation);
+      if (destinationPoint) {
+        setEndMarker({
+          latitude: destinationPoint.latitude,
+          longitude: destinationPoint.longitude,
+          address: destinationPoint.address || "Destination",
+        });
+      } else {
+        setEndMarker(null);
+      }
+
+      const receiverPoint =
+        normalizePoint(routeInfo.receiverLocation) ||
+        normalizePoint(currentLocation);
+
+      const fitTargets = [];
+      if (routePoints.length) {
+        fitTargets.push(...routePoints);
+      }
+      if (meetingPoint) {
+        fitTargets.push({
+          latitude: meetingPoint.latitude,
+          longitude: meetingPoint.longitude,
+        });
+      }
+      if (destinationPoint) {
+        fitTargets.push({
+          latitude: destinationPoint.latitude,
+          longitude: destinationPoint.longitude,
+        });
+      }
+      if (receiverPoint) {
+        fitTargets.push({
+          latitude: receiverPoint.latitude,
+          longitude: receiverPoint.longitude,
+        });
+      }
+
+      if (fitTargets.length >= 2 && mapRef.current?.fitToCoordinates) {
+        mapRef.current.fitToCoordinates(fitTargets, {
+          edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+          animated: true,
+        });
+      }
+
+      setCurrentNavigationRoute({
+        origin: receiverPoint || undefined,
+        destination: destinationPoint
+          ? { latitude: destinationPoint.latitude, longitude: destinationPoint.longitude }
+          : undefined,
+        destinationAddress: destinationPoint?.address || "Destination",
+        meetingPoint: meetingPoint
+          ? { latitude: meetingPoint.latitude, longitude: meetingPoint.longitude }
+          : undefined,
+        meetingPointAddress:
+          routeInfo.meetingPoint?.address ||
+          routeInfo.startLocation?.address ||
+          meetingPoint?.address ||
+          "Meeting Point",
+        routeInfo: {
+          coordinates: routePoints,
+          transportMode: routeInfo.transportMode || "walking",
+        },
+        type: "accepted-route",
+        tripMatchId: routeInfo.tripMatch?.matchId,
+      });
+
+      setShowRadius(true);
+    },
+    [currentLocation]
+  );
 
   // Sender request status polling is now handled in useEffect
 
@@ -420,6 +548,113 @@ export default function HomeScreen() {
     }
   }, [activeMatches?.matches?.length]); // Removed previousMatchCount dependency to prevent loops
 
+<<<<<<< HEAD
+=======
+  // Handle real-time events for active matches
+  useEffect(() => {
+    if (!activeMatches?.handleTripEvent) return;
+
+    // Listen to real-time events
+    const handleRealtimeEvent = (eventType, eventData) => {
+      console.log('🏠 [HOME] Real-time event received:', eventType, eventData);
+      
+      // Pass events to active matches handler
+      activeMatches.handleTripEvent(eventType, eventData);
+      
+      // Handle specific events for UI updates
+      switch (eventType) {
+        case 'request_response':
+          if (eventData.response === 'accepted') {
+            // New match created - show sender acceptance modal
+            console.log("🎉 [HOME] Received acceptance event data:", JSON.stringify(eventData, null, 2));
+            
+            const modalData = {
+              receiverName: eventData.responderName,
+              receiverPhoto: eventData.responderPhoto,
+              receiverLocation: eventData.receiverLocation,
+              destination: eventData.destination,
+              transportMode: eventData.transportMode
+            };
+            
+            console.log("🎉 [HOME] Prepared modal data:", JSON.stringify(modalData, null, 2));
+            setAcceptanceData(modalData);
+            setSenderAcceptanceVisible(true);
+          } else if (eventData.response === 'declined') {
+            // Request declined - show brief notification
+            setTimeout(() => {
+              Alert.alert(
+                "Request Update",
+                eventData.detailedMessage,
+                [{ text: "OK" }]
+              );
+            }, 500);
+          }
+          break;
+          
+        case 'request_status_update':
+          // Show status updates to sender (request sent, awaiting responses, etc.)
+          if (eventData.status === 'request_sent') {
+            setTimeout(() => {
+              Alert.alert(
+                "Request Sent 📤",
+                eventData.detailedMessage,
+                [
+                  { text: "View Status", onPress: () => setSentRequestModalVisible(true) },
+                  { text: "OK" }
+                ]
+              );
+            }, 1000);
+          }
+          break;
+          
+        case 'meeting_point_set':
+          Alert.alert(
+            "Meeting Point Set 📍",
+            `${eventData.setByName} set the meeting point: ${eventData.meetingPoint?.name}`,
+            [{ text: "OK" }]
+          );
+          break;
+          
+        case 'trip_started':
+          Alert.alert(
+            "Trip Started 🚀",
+            eventData.message,
+            [{ text: "OK" }]
+          );
+          break;
+          
+        case 'trip_cancelled':
+          Alert.alert(
+            "Trip Cancelled ❌",
+            eventData.message,
+            [{ text: "OK" }]
+          );
+          break;
+      }
+    };
+
+    // Since real-time updates are handled in the useRealTimeUpdates hook,
+    // we need to find a way to connect them. For now, we'll let the polling handle updates
+    // This is a placeholder for when real-time integration is fully connected
+
+    return () => {
+      // Cleanup if needed
+    };
+  }, [activeMatches?.handleTripEvent]);
+
+  // Clear active matches on logout
+  useEffect(() => {
+    const clearMatchesOnLogout = async () => {
+      const token = await AsyncStorage.getItem('token');
+      if (!token && activeMatches?.clearMatches) {
+        activeMatches.clearMatches();
+      }
+    };
+    
+    clearMatchesOnLogout();
+  }, [activeMatches?.clearMatches]);
+
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
   // Poll sender status when there's an active trip request
   useEffect(() => {
     if (!currentTripRequestId) return;
@@ -533,9 +768,27 @@ export default function HomeScreen() {
   }, [currentLocation, activeRequest?.meetingPointCoordinates]);
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem("user");
-    await AsyncStorage.removeItem("token");
-    router.replace("/login");
+    try {
+      const token = await AsyncStorage.getItem("token");
+      
+      // Call cleanup endpoint before logging out
+      if (token) {
+        await fetch(`${BASE_URL}/api/v1/trip/cleanup-user-data`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Error during logout cleanup:", error);
+    } finally {
+      // Always clear local storage and logout
+      await AsyncStorage.removeItem("user");
+      await AsyncStorage.removeItem("token");
+      router.replace("/login");
+    }
   };
 
   const handleMarkArrived = async () => {
@@ -776,25 +1029,33 @@ export default function HomeScreen() {
   // ⬇️ CHANGED: no search starts here; only createTripReq + open modal
   const handleFindCompanion = async () => {
     try {
+      console.log("🚀 [FIND COMPANION] Starting companion search flow...");
       const storedUser = await AsyncStorage.getItem("user");
       const token = await AsyncStorage.getItem("token");
       if (!storedUser || !token) {
+        console.log("❌ [FIND COMPANION] No user/token found, redirecting to login");
         router.replace("/login");
         return;
       }
       const parsed = JSON.parse(storedUser);
+      console.log("👤 [FIND COMPANION] User:", parsed.userName, "ID:", parsed._id);
 
       if (!parsed.isVerified) {
+        console.log("⚠️ [FIND COMPANION] User not verified");
         setModalVisible(true);
         return;
       }
       if (!currentLocation) {
+        console.log("❌ [FIND COMPANION] No current location");
         Alert.alert("Location Required", "Please enable location services to find companions.");
         return;
       }
 
+      console.log("📍 [FIND COMPANION] Current location:", currentLocation);
+
       // 1) create trip request
       const API_URL = BASE_URL.replace(/\/+$/, "");
+      console.log("📤 [CREATE REQUEST] Calling API:", `${API_URL}/api/v1/trip/createTripReq`);
       const response = await fetch(`${API_URL}/api/v1/trip/createTripReq`, {
         method: "POST",
         headers: {
@@ -818,19 +1079,28 @@ export default function HomeScreen() {
           transportMode: "walking" // Will be updated when preferences are submitted
         }),
       });
+      
+      console.log("📥 [CREATE REQUEST] Response status:", response.status);
       const result = await response.json();
+      console.log("📋 [CREATE REQUEST] Result:", JSON.stringify(result, null, 2));
 
       if (result.status !== "success") {
+        console.log("❌ [CREATE REQUEST] Failed:", result.message);
         throw new Error(result.message || "Failed to create trip request");
       }
-      setCurrentTripRequestId(result.data.tripRequest.tripReqId);
+      
+      const tripReqId = result.data.tripRequest.tripReqId;
+      console.log("✅ [CREATE REQUEST] Success! Trip Request ID:", tripReqId);
+      setCurrentTripRequestId(tripReqId);
 
       // 2) prompt consent -> selfie -> preferences
+      console.log("📝 [FIND COMPANION] Opening consent modal...");
       setConsentVisible(true);
 
       // 3) DO NOT START SEARCH YET
       setShowRadius(false);
     } catch (e) {
+      console.error("❌ [FIND COMPANION] Error:", e);
       Alert.alert("Error", e?.message || "Failed to start companion search.");
     }
   };
@@ -872,10 +1142,12 @@ export default function HomeScreen() {
   // NEW: Send trip request to nearby users
   const sendTripRequestToNearby = async (startCoordinates) => {
     try {
+      console.log("📡 [SEND TO NEARBY] Starting...");
       const token = await AsyncStorage.getItem("token");
       const user = await AsyncStorage.getItem("user");
 
       if (!token || !currentTripRequestId) {
+        console.log("❌ [SEND TO NEARBY] Missing token or trip request ID");
         Alert.alert(
           "Debug Error",
           `Missing: ${!token ? "Token" : ""} ${!currentTripRequestId ? "Trip Request ID" : ""}`
@@ -890,6 +1162,9 @@ export default function HomeScreen() {
         searchRadius: 500,
       };
 
+      console.log("📤 [SEND TO NEARBY] Request body:", JSON.stringify(requestBody, null, 2));
+      console.log("📤 [SEND TO NEARBY] Calling API:", `${API_URL}/api/v1/trip/send-to-nearby`);
+
       const response = await fetch(`${API_URL}/api/v1/trip/send-to-nearby`, {
         method: "POST",
         headers: {
@@ -899,22 +1174,27 @@ export default function HomeScreen() {
         body: JSON.stringify(requestBody),
       });
 
+      console.log("📥 [SEND TO NEARBY] Response status:", response.status);
       const result = await response.json();
+      console.log("📋 [SEND TO NEARBY] Result:", JSON.stringify(result, null, 2));
 
       if (result.status === "success") {
+        console.log(`✅ [SEND TO NEARBY] Success! Sent to ${result.data.recipientCount} users`);
         Alert.alert(
           "Request Sent! 🚀",
-          `Your companion request has been sent to ${result.data.recipientCount} active users within 500m radius.\n\nThe request is valid for 2 minutes. You'll be notified when someone accepts your request.`,
+          `Your companion request has been sent to ${result.data.recipientCount} active users within 500m radius.\n\nThe request is valid for 30 minutes. You'll be notified when someone accepts your request.`,
           [{ text: "OK" }]
         );
         
         // Stop any searching animation since request is sent
         await companionSearch.stopSearch();
       } else {
+        console.log("❌ [SEND TO NEARBY] Failed:", result.message);
         Alert.alert("API Error", result.message || "Failed to send request");
         throw new Error(result.message || "Failed to send request to nearby users");
       }
     } catch (error) {
+      console.error("❌ [SEND TO NEARBY] Error:", error);
       Alert.alert("Debug Error", `Network/Parse Error: ${error.message}`);
     }
   };
@@ -1563,6 +1843,7 @@ export default function HomeScreen() {
         </View>
       )}
 
+<<<<<<< HEAD
       {/* Bottom Navigation Bar (hidden while searching) */}
       {!isSearching && (
         <View style={[styles.navContainer, { paddingBottom: insets.bottom || 10 }]}>
@@ -1599,6 +1880,32 @@ export default function HomeScreen() {
                     <ThemedText style={styles.badgeText}>{activeMatches?.matches?.length || 0}</ThemedText>
                   </View>
                 )}
+=======
+      {/* Modern Bottom Navigation */}
+      <View style={[styles.bottomNavigation, { paddingBottom: insets.bottom || 10 }]}>
+        <TouchableOpacity 
+          style={styles.bottomNavItem} 
+          onPress={() => {
+            console.log("🔔 Opening Notifications Modal");
+            console.log(`📊 Current requests count: ${requestPolling.pendingRequests?.length || 0}`);
+            console.log(`📊 Requests data:`, requestPolling.pendingRequests);
+            try {
+              setRequestNotificationVisible(true);
+              requestPolling.markAsViewed();
+            } catch (error) {
+              console.error("❌ Error opening notifications:", error);
+              Alert.alert("Error", "Could not open notifications. Please try again.");
+            }
+          }}
+        >
+          <View style={styles.navIconWithBadge}>
+            <Ionicons name="notifications-outline" size={24} color="#8B5CF6" />
+            {requestPolling.hasNewRequests && (
+              <View style={styles.modernBadge}>
+                <ThemedText style={styles.modernBadgeText}>
+                  {requestPolling.requestCount || 0}
+                </ThemedText>
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
               </View>
               <ThemedText style={styles.navLabel}>Active Trips</ThemedText>
             </TouchableOpacity>
@@ -1731,101 +2038,84 @@ export default function HomeScreen() {
         visible={requestNotificationVisible}
         onClose={() => safeCloseModal(setRequestNotificationVisible)}
         currentLocation={currentLocation}
-        onRequestAccepted={(tripRequest) => {
-          console.log("Request accepted:", tripRequest);
-          // Refresh active matches to show the new match
-          activeMatches.refresh();
+        requests={requestPolling.pendingRequests}
+        isPolling={requestPolling.isPolling}
+        onRefetch={requestPolling.refetch}
+        onRequestAccepted={(payload) => {
+          console.log("✅ [RECEIVER] Request accepted:", payload);
           
-          // Close notification modal
+          // Close the request modal immediately
           setRequestNotificationVisible(false);
           
-          // Show success message instead of opening modal
-          Alert.alert(
-            "Request Accepted! 🎉",
-            "You've successfully accepted the companion request. Your trip routes are now displayed on the map.",
-            [{ text: "Got it!" }]
-          );
+          // Update route on map if available
+          if (payload?.routeData) {
+            handleNotificationRouteUpdate({
+              ...payload.routeData,
+              senderLocation: payload.senderCurrentLocation,
+              receiverLocation: payload.receiverLocation,
+              tripMatch: payload.tripMatch,
+              tripRequest: payload.tripRequest,
+            });
+          }
+          
+          // Refresh active matches to show the new trip
+          activeMatches.refresh?.();
+          
+          // Automatically show the active match modal after a brief delay
+          setTimeout(() => {
+            setActiveMatchModalVisible(true);
+          }, 300);
         }}
         onRouteUpdate={(routeData) => {
-          console.log("🗺️ [HOME] Updating map with receiver route:", routeData);
-          
-          // Update map markers and route based on route type
-          if (routeData.routeType === 'to-meeting-point') {
-            // CORRECTED: Display route from receiver to meeting point (sender's start)
-            console.log('🎯 [HOME] Displaying route to meeting point');
-            setRouteCoordinates(routeData.receiverRoute.coordinates);
-            
-            // Show meeting point marker (where receiver needs to go)
-            if (routeData.meetingPoint && routeData.meetingPoint.coordinates) {
-              setEndMarker(routeData.meetingPoint.coordinates);
-            }
-            
-            // Show receiver's current location as start
-            setStartMarker(currentLocation);
-            
-            // Store navigation data for the navigation button
-            setCurrentNavigationRoute({
-              destination: routeData.meetingPoint?.coordinates,
-              destinationAddress: routeData.meetingPoint?.address || 'Meeting Point',
-              origin: currentLocation,
-              routeInfo: routeData.receiverRoute,
-              companion: routeData.companion,
-              type: 'to-meeting-point'
-            });
-            
-          } else if (routeData.routeType === 'two-step') {
-            // Display two-step route: receiver → meeting point → destination
-            const allCoords = [
-              ...routeData.receiverRoute.step1.coordinates,
-              ...routeData.receiverRoute.step2.coordinates
-            ];
-            setRouteCoordinates(allCoords);
-            
-            // Set markers for meeting point and destination
-            if (routeData.meetingPoint) {
-              setStartMarker(routeData.meetingPoint);
-            }
-            if (routeData.destination) {
-              setEndMarker(routeData.destination);
-            }
-            
-            // Store navigation data for two-step route
-            setCurrentNavigationRoute({
-              destination: routeData.destination?.coordinates,
-              destinationAddress: routeData.destination?.address || 'Final Destination',
-              meetingPoint: routeData.meetingPoint?.coordinates,
-              meetingPointAddress: routeData.meetingPoint?.address || 'Meeting Point',
-              origin: currentLocation,
-              routeInfo: routeData.receiverRoute,
-              type: 'two-step'
-            });
-            
-          } else {
-            // Display direct route: receiver → destination
-            setRouteCoordinates(routeData.receiverRoute.coordinates);
-            setStartMarker(currentLocation);
-            setEndMarker(routeData.destination);
-            
-            // Store navigation data for direct route
-            setCurrentNavigationRoute({
-              destination: routeData.destination?.coordinates,
-              destinationAddress: routeData.destination?.address || 'Destination',
-              origin: currentLocation,
-              routeInfo: routeData.receiverRoute,
-              type: 'direct'
-            });
-          }
-          
-          // Fit map to show the complete route
-          if (routeData.mapRegion && mapRef.current) {
-            mapRef.current.animateToRegion(routeData.mapRegion, 1000);
-          }
-          
-          // Show route overlay
-          setShowRadius(true);
+          handleNotificationRouteUpdate(routeData);
         }}
       />
 
+<<<<<<< HEAD
+=======
+      {/* Active Match Modal */}
+      <ActiveMatchModal
+        visible={activeMatchModalVisible}
+        onClose={() => setActiveMatchModalVisible(false)}
+        matches={activeMatches?.matches || []}
+        isLoading={activeMatches?.loading}
+        onRefresh={() => activeMatches?.refresh()}
+        onUpdateStatus={async (matchId, status) => {
+          try {
+            await activeMatches.updateMatchStatus(matchId, status);
+            Alert.alert("Success", `Trip ${status === 'in-progress' ? 'started' : status} successfully!`);
+          } catch (error) {
+            Alert.alert("Error", error.message || "Failed to update trip status");
+          }
+        }}
+        onViewDetails={(match) => {
+          // For now, just show an alert. Later we can integrate TripMatchCoordinationModal
+          Alert.alert(
+            "Trip Details",
+            `Match ID: ${match.matchId}\nStatus: ${match.status}\nDestination: ${match.tripDetails?.destination || 'Unknown'}`,
+            [{ text: "OK" }]
+          );
+        }}
+        onSetMeetingPoint={(matchId, meetingPoint) => {
+          return activeMatches.setMeetingPoint(matchId, meetingPoint);
+        }}
+      />
+
+      {/* Sender Acceptance Notification Modal */}
+      <SenderAcceptanceNotificationModal
+        visible={senderAcceptanceVisible}
+        onClose={() => {
+          setSenderAcceptanceVisible(false);
+          setAcceptanceData(null);
+          // Refresh active matches when sender acknowledges
+          activeMatches.refresh?.();
+          // Optionally show active matches modal
+          setActiveMatchModalVisible(true);
+        }}
+        acceptanceData={acceptanceData}
+      />
+
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
       {/* Enhanced Consent Modal for Receivers */}
       <EnhancedConsentModal
         visible={enhancedConsentVisible}
@@ -1900,6 +2190,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+<<<<<<< HEAD
   container: { flex: 1, backgroundColor: Colors.light.surface },
   topBar: {
     flexDirection: "row",
@@ -1911,6 +2202,268 @@ const styles = StyleSheet.create({
     marginTop: 40,
     borderBottomWidth: 1,
     borderColor: "#e0e0e0",
+=======
+  container: { flex: 1, backgroundColor: "#f8fafc" },
+  
+  // Purple Gradient Header
+  gradientHeader: {
+    backgroundColor: "#8B5CF6",
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  userInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  avatarContainer: {
+    marginRight: 12,
+  },
+  userName: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  userSubtext: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
+  },
+  headerActions: {
+    flexDirection: "row",
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 10,
+  },
+  
+  // Service Cards
+  serviceCards: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 15,
+  },
+  serviceCard: {
+    flex: 1,
+    backgroundColor: "white",
+    padding: 15,
+    borderRadius: 15,
+    alignItems: "center",
+    marginHorizontal: 4,
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  primaryCard: {
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.1)",
+  },
+  serviceCardTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1f2937",
+    marginTop: 8,
+  },
+  serviceCardSubtext: {
+    fontSize: 10,
+    color: "#6b7280",
+    marginTop: 2,
+  },
+  
+  // Secondary Services
+  secondaryServices: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+  },
+  secondaryCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.25)",
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  secondaryCardText: {
+    color: "white",
+    fontSize: 12,
+    marginLeft: 6,
+  },
+  
+  // Find Companion Section
+  findCompanionSection: {
+    padding: 20,
+    backgroundColor: "#f8fafc",
+  },
+  companionContainer: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: "rgba(139, 92, 246, 0.1)",
+  },
+  companionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1f2937",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  companionSubtext: {
+    fontSize: 14,
+    color: "#6b7280",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  findCompanionButton: {
+    backgroundColor: "#8B5CF6",
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 0,
+  },
+  findButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  findButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  searchingIndicator: {
+    marginLeft: 12,
+  },
+  statusButton: {
+    marginTop: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 15,
+  },
+  statusButtonText: {
+    color: "#8B5CF6",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  
+  // Compact Map
+  compactMapContainer: {
+    flex: 1,
+    margin: 20,
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: "white",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  compactMap: { 
+    width: "100%", 
+    height: "100%",
+    minHeight: 200,
+  },
+  
+  // Bottom Navigation
+  bottomNavigation: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    alignItems: "center",
+    backgroundColor: "white",
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(139, 92, 246, 0.1)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  bottomNavItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 10,
+    borderRadius: 12,
+    minWidth: 48,
+    minHeight: 48,
+  },
+  navIconWithBadge: {
+    position: "relative",
+  },
+  modernBadge: {
+    position: "absolute",
+    top: -8,
+    right: -8,
+    backgroundColor: "#ef4444",
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "white",
+    shadowColor: "#ef4444",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  modernBadgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  
+  // Loading states
+  loadingMapContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f3f4f6",
+  },
+  loadingMapText: {
+    color: "#6b7280",
+    fontSize: 16,
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
   },
   mapContainer: { flex: 1 },
   map: { width: "100%", height: "100%" },
