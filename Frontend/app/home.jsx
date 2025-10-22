@@ -37,18 +37,15 @@ import EnhancedConsentModal from "@/components/EnhancedConsentModal";
 import TwoStepTripModal from "@/components/TwoStepTripModal";
 import { usePersistentSearch } from "@/hooks/usePersistentSearch";
 import RequestNotificationModal from "@/components/RequestNotificationModal";
-<<<<<<< HEAD
-=======
 import SenderAcceptanceNotificationModal from "@/components/SenderAcceptanceNotificationModal";
 import ActiveMatchModal from "@/components/ActiveMatchModal";
->>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
 import BeSideLogo from "../assets/images/BeSide.png";
 import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";
 import { useActiveMatches } from "../hooks/useActiveMatches";
-import { usePendingTrips } from "../hooks/usePendingTrips";
 import { useTripNotifications } from "../hooks/useTripNotifications";
 import { useRouteCalculation } from "../hooks/useRouteCalculation";
+import { useRealTimeUpdates } from "../hooks/useRealTimeUpdates";
 
 // Enhanced Google Maps functionality
 import { useLocationStore } from "../store/locationStore";
@@ -279,12 +276,9 @@ export default function HomeScreen() {
   // Enhanced persistent search hook
   const persistentSearch = usePersistentSearch();
   const [requestNotificationVisible, setRequestNotificationVisible] = useState(false);
-<<<<<<< HEAD
-=======
   const [activeMatchModalVisible, setActiveMatchModalVisible] = useState(false);
   const [senderAcceptanceVisible, setSenderAcceptanceVisible] = useState(false);
   const [acceptanceData, setAcceptanceData] = useState(null);
->>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
 
   const [consent, setConsent] = useState({ noTouch: false, respectful: false, safety: false });
   const [photoUrl, setPhotoUrl] = useState(null);
@@ -316,14 +310,13 @@ export default function HomeScreen() {
   // hooks
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
-<<<<<<< HEAD
-  const requestPolling = useRequestPolling(120000, true); // Poll every 2 minutes to avoid rate limiting
-  const activeMatches = useActiveMatches(30000); // Poll for matches every 30 seconds to avoid rate limiting
-=======
   const requestPolling = useRequestPolling(5000, true); // Poll every 5 seconds for incoming requests
-  const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds
->>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
+  // Enable match polling only when user opens Active Trips modal or after a real match event
+  const [enableMatchPolling, setEnableMatchPolling] = useState(false);
+  const activeMatches = useActiveMatches(15000, enableMatchPolling); // gated polling
   const tripNotifications = useTripNotifications();
+  // Disable real-time updates for now (backend endpoint not active in RN)
+  const realTimeUpdates = useRealTimeUpdates(false);
   const { 
     openGoogleMapsNavigation, 
     getNavigationInstructions,
@@ -358,6 +351,7 @@ export default function HomeScreen() {
       setEnhancedConsentVisible(false);
       setTwoStepTripVisible(false);
       setRequestNotificationVisible(false);
+      setActiveMatchModalVisible(false);
       setAvailabilityModalVisible(false);
     } catch (error) {
       console.error('Error resetting modals:', error);
@@ -556,8 +550,6 @@ export default function HomeScreen() {
     }
   }, [activeMatches?.matches?.length]); // Removed previousMatchCount dependency to prevent loops
 
-<<<<<<< HEAD
-=======
   // Handle real-time events for active matches
   useEffect(() => {
     if (!activeMatches?.handleTripEvent) return;
@@ -662,7 +654,6 @@ export default function HomeScreen() {
     clearMatchesOnLogout();
   }, [activeMatches?.clearMatches]);
 
->>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
   // Poll sender status when there's an active trip request
   useEffect(() => {
     if (!currentTripRequestId) return;
@@ -721,8 +712,6 @@ export default function HomeScreen() {
             const parsed = JSON.parse(stored);
             setUser(parsed);
             await locationTracking.startTracking(true);
-            // Proactively clean stale matches/requests on entering Home
-            cleanupUserData();
           } else {
             router.replace("/login");
           }
@@ -741,7 +730,7 @@ export default function HomeScreen() {
           console.error('Error during cleanup:', error);
         }
       };
-    }, [resetAllModals, cleanupUserData])
+    }, [resetAllModals])
   );
 
   useEffect(() => {
@@ -794,11 +783,6 @@ export default function HomeScreen() {
     } catch (error) {
       console.error("Error during logout cleanup:", error);
     } finally {
-      // Stop pending/active polling and clear locally
-      try { setEnablePendingPolling(false); } catch (_) {}
-      try { pendingTrips?.clear?.(); } catch (_) {}
-      try { setEnableMatchPolling(false); } catch (_) {}
-      try { activeMatches?.clearMatches?.(); } catch (_) {}
       // Always clear local storage and logout
       await AsyncStorage.removeItem("user");
       await AsyncStorage.removeItem("token");
@@ -1201,12 +1185,8 @@ export default function HomeScreen() {
           [{ text: "OK" }]
         );
         
-  // Stop any searching animation since request is sent
-  await companionSearch.stopSearch();
-  // Start pending trips polling so the sender sees their request as Pending in Active Trips
-  setEnablePendingPolling(true);
-  // Start active matches polling so the sender transitions to Active when accepted
-  setEnableMatchPolling(true);
+        // Stop any searching animation since request is sent
+        await companionSearch.stopSearch();
       } else {
         console.log("❌ [SEND TO NEARBY] Failed:", result.message);
         Alert.alert("API Error", result.message || "Failed to send request");
@@ -1462,32 +1442,6 @@ export default function HomeScreen() {
   const [availability, setAvailability] = useState(true);
   const [availabilityModalVisible, setAvailabilityModalVisible] = useState(false);
 
-  // Helper: proactively clean up stale user data (old active matches, expired requests)
-  const cleanupUserData = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) return;
-      const API_URL = BASE_URL.replace(/\/+$/, "");
-      await fetch(`${API_URL}/api/v1/trip/cleanup-user-data`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-    } catch (_) {
-      // Silent cleanup failure
-    }
-  }, []);
-
-  // Unified opener for Active Trips: cleanup first, then open + enable polling
-  const openActiveTrips = useCallback(async () => {
-    await cleanupUserData();
-    setActiveMatchModalVisible(true);
-    setEnableMatchPolling(true);
-    setEnablePendingPolling(true);
-  }, [cleanupUserData]);
-
   // Component mount tracking to prevent state updates after unmount
   const isMounted = useRef(true);
   
@@ -1513,64 +1467,132 @@ export default function HomeScreen() {
   // UI
   return (
     <View style={styles.container}>
-      {/* Top Bar — Logo + Title + Buttons */}
-      <View style={styles.topBar}>
-        <View style={styles.logoContainer}>
-          <Image source={BeSideLogo} style={styles.logo} resizeMode="contain" accessibilityLabel="BeSide app logo" />
+      {/* Purple Gradient Header */}
+      <View style={styles.gradientHeader}>
+        <View style={styles.headerTop}>
+          <View style={styles.userInfo}>
+            <View style={styles.avatarContainer}>
+              <Ionicons name="person-circle" size={40} color="white" />
+            </View>
+            <View>
+              <ThemedText style={styles.userName}>{user?.userName || 'Your Name'}</ThemedText>
+              <ThemedText style={styles.userSubtext}>12 min (3.4 Km)</ThemedText>
+            </View>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerButton} onPress={handleCurrentLocation}>
+              <Ionicons name="location" size={20} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerButton} onPress={() => setAvailabilityModalVisible(true)}>
+              <Ionicons name={availability ? "toggle" : "toggle-outline"} size={20} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
-
-        <View style={{ flex: 1, alignItems: "center" }}>
-          <ThemedText type="title" style={styles.titleText}>BeSide</ThemedText>
-        </View>
-
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <TouchableOpacity
-            style={[styles.topIconButton, { backgroundColor: "#fceaea" }]}
-            onPress={handleCurrentLocation}
-            accessibilityLabel="Center map on current location"
-          >
-            <Ionicons name="location" size={28} color="#e63946" />
+        
+        {/* Service Cards */}
+        <View style={styles.serviceCards}>
+          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => setTripHistoryVisible(true)}>
+            <Ionicons name="car" size={24} color="#8B5CF6" />
+            <ThemedText style={styles.serviceCardTitle}>Trips</ThemedText>
+            <ThemedText style={styles.serviceCardSubtext}>4.1 Km, 12 min</ThemedText>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.topIconButton, { backgroundColor: availability ? "#e6f8f1" : "#f0f0f0" }]}
-            onPress={() => setAvailabilityModalVisible(true)}
-            accessibilityLabel="Change availability status"
-          >
-            <Ionicons name={availability ? "toggle" : "toggle-outline"} size={28} color={availability ? "#2ca07b" : "#999"} />
+          
+          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => setActiveMatchModalVisible(true)}>
+            <Ionicons name="people" size={24} color="#8B5CF6" />
+            <ThemedText style={styles.serviceCardTitle}>Active</ThemedText>
+            <ThemedText style={styles.serviceCardSubtext}>2.3 Km, 15 min</ThemedText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => handleSOS("000")}>
+            <Ionicons name="shield-checkmark" size={24} color="#8B5CF6" />
+            <ThemedText style={styles.serviceCardTitle}>SOS Station</ThemedText>
+            <ThemedText style={styles.serviceCardSubtext}>4.5 Km, 18 min</ThemedText>
+          </TouchableOpacity>
+        </View>
+        
+        {/* Secondary Service Row */}
+        <View style={styles.secondaryServices}>
+          <TouchableOpacity style={styles.secondaryCard} onPress={() => router.push('/profile')}>
+            <Ionicons name="wallet" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.secondaryCardText}>Profile</ThemedText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.secondaryCard} onPress={() => setTripHistoryVisible(true)}>
+            <Ionicons name="restaurant" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.secondaryCardText}>History</ThemedText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.secondaryCard} onPress={() => router.push('/emergencyContacts')}>
+            <Ionicons name="medical" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.secondaryCardText}>Emergency</ThemedText>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Map */}
-      <View style={styles.mapContainer}>
+      {/* Central Find Companion Section */}
+      <View style={styles.findCompanionSection}>
+        <View style={styles.companionContainer}>
+          <ThemedText style={styles.companionTitle}>Find Your Travel Companion</ThemedText>
+          <ThemedText style={styles.companionSubtext}>Connect with nearby travelers for safer journeys</ThemedText>
+          
+          <TouchableOpacity 
+            style={styles.findCompanionButton}
+            onPress={handleFindCompanion}
+            disabled={isSearching}
+          >
+            <View style={styles.findButtonContent}>
+              <Ionicons name="people" size={24} color="white" />
+              <ThemedText style={styles.findButtonText}>
+                {isSearching ? 'Searching...' : 'Find Companion'}
+              </ThemedText>
+            </View>
+            {isSearching && (
+              <View style={styles.searchingIndicator}>
+                <Ionicons name="radio-button-on" size={12} color="white" />
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          {senderRequestStatus?.status === 'pending' && (
+            <TouchableOpacity 
+              style={styles.statusButton}
+              onPress={() => setSentRequestStatusVisible(true)}
+            >
+              <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Compact Map */}
+      <View style={styles.compactMapContainer}>
         {currentLocation && currentLocation.latitude && currentLocation.longitude ? (
           <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
             customMapStyle={customMapStyle}
-            style={styles.map}
+            style={styles.compactMap}
             showsUserLocation
             followsUserLocation
             region={{
               latitude: currentLocation.latitude,
               longitude: currentLocation.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
+              latitudeDelta: 0.02,
+              longitudeDelta: 0.02,
             }}
-            showsCompass
-            showsScale
-            showsTraffic
-            showsBuildings
-            showsIndoors
+            showsCompass={false}
+            showsScale={false}
+            showsTraffic={false}
+            showsBuildings={true}
+            showsIndoors={false}
             showsMyLocationButton={false}
-            showsPointsOfInterest
-            zoomEnabled
-            zoomControlEnabled
-            rotateEnabled
-            scrollEnabled
-            pitchEnabled
-            toolbarEnabled
+            showsPointsOfInterest={true}
+            zoomEnabled={true}
+            zoomControlEnabled={false}
+            rotateEnabled={false}
+            scrollEnabled={true}
+            pitchEnabled={false}
+            toolbarEnabled={false}
           >
             <Marker coordinate={currentLocation}>
               <Callout>
@@ -1685,48 +1707,14 @@ export default function HomeScreen() {
             })}
           </MapView>
         ) : (
-          <ThemedText type="default">Loading map...</ThemedText>
+          <View style={styles.loadingMapContainer}>
+            <ThemedText type="default" style={styles.loadingMapText}>Loading map...</ThemedText>
+          </View>
         )}
       </View>
 
-      {/* Destination Search Input */}
-      {!isSearching && (
-        <View style={styles.destinationSearchContainer}>
-          <GooglePlacesInput
-            placeholder="Where are you going? 🎯"
-            onLocationSelected={(location) => {
-              console.log("📍 Destination selected:", location);
-              // Store destination in location store
-              const { setDestinationLocation } = useLocationStore.getState();
-              setDestinationLocation(location);
-              
-              // Show confirmation
-              Alert.alert(
-                "Destination Set! 🎯",
-                `You'll travel to: ${location.address}`,
-                [{ text: "OK" }]
-              );
-            }}
-            icon="navigate-circle"
-            containerStyle={styles.destinationInputContainer}
-            currentLocationButton={false}
-          />
-        </View>
-      )}
-
-      {/* Find/CANCEL */}
-      {!isSearching ? (
-        <TouchableOpacity
-          style={[styles.actionButton, styles.connectButton]}
-          onPress={handleFindCompanion}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="people" size={22} color="#fff" style={{ marginRight: 8 }} />
-          <ThemedText type="buttonText" style={{ color: "#fff", fontSize: 16 }}>
-            Find Companion
-          </ThemedText>
-        </TouchableOpacity>
-      ) : (
+      {/* Show searching status when active */}
+      {isSearching && (
         <View style={styles.searchingContainer}>
           {/* Persistent Search Status */}
           {persistentSearch.isSearchActive && (
@@ -1888,44 +1876,6 @@ export default function HomeScreen() {
         </View>
       )}
 
-<<<<<<< HEAD
-      {/* Bottom Navigation Bar (hidden while searching) */}
-      {!isSearching && (
-        <View style={[styles.navContainer, { paddingBottom: insets.bottom || 10 }]}>
-          <View style={styles.navBar}>
-            <TouchableOpacity style={styles.navButton} onPress={() => router.push("/profile")}>
-              <Ionicons name="person-circle-outline" size={24} color="#fff" />
-              <ThemedText style={styles.navLabel}>Profile</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navButton} onPress={() => router.push("/emergencyContacts")}>
-              <Ionicons name="people-outline" size={24} color="#fff" />
-              <ThemedText style={styles.navLabel}>Contacts</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navButton} onPress={() => setTripHistoryVisible(true)}>
-              <Ionicons name="time-outline" size={24} color="#fff" />
-              <ThemedText style={styles.navLabel}>Trip History</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.navButton} 
-              onPress={() => {
-                const matchCount = activeMatches?.matches?.length || 0;
-                Alert.alert(
-                  "Active Trips", 
-                  matchCount > 0 
-                    ? `You have ${matchCount} active trip${matchCount > 1 ? 's' : ''}. Trip details and routes are displayed on the map above.`
-                    : "No active trips at the moment. Accept a companion request to start a trip!",
-                  [{ text: "OK" }]
-                );
-              }}
-            >
-              <View style={styles.notificationIconContainer}>
-                <Ionicons name="people" size={24} color="#fff" />
-                {(activeMatches?.matches?.length || 0) > 0 && (
-                  <View style={styles.notificationBadge}>
-                    <ThemedText style={styles.badgeText}>{activeMatches?.matches?.length || 0}</ThemedText>
-                  </View>
-                )}
-=======
       {/* Modern Bottom Navigation */}
       <View style={[styles.bottomNavigation, { paddingBottom: insets.bottom || 10 }]}>
         <TouchableOpacity 
@@ -1950,48 +1900,52 @@ export default function HomeScreen() {
                 <ThemedText style={styles.modernBadgeText}>
                   {requestPolling.requestCount || 0}
                 </ThemedText>
->>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
               </View>
-              <ThemedText style={styles.navLabel}>Active Trips</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.navButton}
-              onPress={() => {
-                setRequestNotificationVisible(true);
-                requestPolling.markAsViewed();
-              }}
-            >
-              <View style={styles.notificationIconContainer}>
-                <Ionicons name="notifications-outline" size={24} color="#fff" />
-                {requestPolling.hasNewRequests && (
-                  <View style={styles.notificationBadge}>
-                    <ThemedText style={styles.badgeText}>{requestPolling.requestCount}</ThemedText>
-                  </View>
-                )}
-                {requestPolling.networkError && (
-                  <View style={styles.errorIndicator}>
-                    <Ionicons name="warning-outline" size={12} color="#ff4444" />
-                  </View>
-                )}
-              </View>
-              <ThemedText style={styles.navLabel}>
-                Notifications
-                {requestPolling.isRateLimited && (
-                  <ThemedText style={styles.rateLimitText}> (Limited)</ThemedText>
-                )}
-              </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navButton} onPress={() => handleSOS("000")}>
-              <Ionicons name="alert" size={24} color="#fff" />
-              <ThemedText style={styles.navLabel}>SOS</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navButton} onPress={handleLogout}>
-              <Ionicons name="exit-outline" size={24} color="#fff" />
-              <ThemedText style={styles.navLabel}>Logout</ThemedText>
-            </TouchableOpacity>
+            )}
           </View>
-        </View>
-      )}
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.bottomNavItem}
+          onPress={() => {
+            console.log("🚗 Opening Active Trips Modal");
+            setActiveMatchModalVisible(true);
+            setEnableMatchPolling(true); // start polling only when user opens Active Trips
+          }}
+        >
+          <View style={styles.navIconWithBadge}>
+            <Ionicons name="car-outline" size={24} color="#8B5CF6" />
+            {(activeMatches?.matches?.length || 0) > 0 && (
+              <View style={styles.modernBadge}>
+                <ThemedText style={styles.modernBadgeText}>
+                  {activeMatches?.matches?.length || 0}
+                </ThemedText>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.bottomNavItem}
+          onPress={handleCurrentLocation}
+        >
+          <Ionicons name="location-outline" size={24} color="#8B5CF6" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.bottomNavItem}
+          onPress={() => router.push("/profile")}
+        >
+          <Ionicons name="person-outline" size={24} color="#8B5CF6" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.bottomNavItem}
+          onPress={() => router.push('/emergencyContacts')}
+        >
+          <Ionicons name="shield-outline" size={24} color="#8B5CF6" />
+        </TouchableOpacity>
+      </View>
 
       {/* User Card */}
       <Modal transparent animationType="slide" visible={!!selectedUser} onRequestClose={() => setSelectedUser(null)}>
@@ -2106,11 +2060,9 @@ export default function HomeScreen() {
           // Refresh active matches to show the new trip
           activeMatches.refresh?.();
           
-          // Automatically show the active match modal after a brief delay and start polling
-          setTimeout(async () => {
-            await cleanupUserData();
+          // Automatically show the active match modal after a brief delay
+          setTimeout(() => {
             setActiveMatchModalVisible(true);
-            setEnableMatchPolling(true);
           }, 300);
         }}
         onRouteUpdate={(routeData) => {
@@ -2118,30 +2070,16 @@ export default function HomeScreen() {
         }}
       />
 
-<<<<<<< HEAD
-=======
       {/* Active Match Modal */}
       <ActiveMatchModal
         visible={activeMatchModalVisible}
         onClose={() => {
           setActiveMatchModalVisible(false);
           setEnableMatchPolling(false); // stop polling when user closes modal
-          // Clear matches so badge doesn't persist a stale count after close
-          try { activeMatches?.clearMatches?.(); } catch (_) {}
         }}
         matches={activeMatches?.matches || []}
         isLoading={activeMatches?.loading}
         onRefresh={() => activeMatches?.refresh()}
-        currentUserId={user?._id}
-        pendingRequests={pendingTrips?.pendingRequests || []}
-        onCancelPending={async (tripReqId) => {
-          try{
-            await pendingTrips.cancelRequest(tripReqId);
-            Alert.alert("Cancelled", "Your pending request has been cancelled.");
-          } catch (e) {
-            Alert.alert("Error", e.message || "Failed to cancel pending request");
-          }
-        }}
         onUpdateStatus={async (matchId, status) => {
           try {
             await activeMatches.updateMatchStatus(matchId, status);
@@ -2173,12 +2111,10 @@ export default function HomeScreen() {
           activeMatches.refresh?.();
           // Optionally show active matches modal
           setActiveMatchModalVisible(true);
-          setEnableMatchPolling(true);
         }}
         acceptanceData={acceptanceData}
       />
 
->>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
       {/* Enhanced Consent Modal for Receivers */}
       <EnhancedConsentModal
         visible={enhancedConsentVisible}
@@ -2253,19 +2189,6 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-<<<<<<< HEAD
-  container: { flex: 1, backgroundColor: Colors.light.surface },
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: Colors.light.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginTop: 40,
-    borderBottomWidth: 1,
-    borderColor: "#e0e0e0",
-=======
   container: { flex: 1, backgroundColor: "#f8fafc" },
   
   // Purple Gradient Header
@@ -2526,10 +2449,7 @@ const styles = StyleSheet.create({
   loadingMapText: {
     color: "#6b7280",
     fontSize: 16,
->>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
   },
-  mapContainer: { flex: 1 },
-  map: { width: "100%", height: "100%" },
   actionButton: {
     position: "absolute",
     bottom: 130,
