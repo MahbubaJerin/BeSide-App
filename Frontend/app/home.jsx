@@ -689,9 +689,35 @@ export default function HomeScreen() {
           break;
           
         case 'trip_cancelled':
+          console.log("❌ [REAL-TIME] Trip cancelled event received:", eventData);
+          
+          // Clear current navigation and trip state
+          setCurrentNavigationRoute(null);
+          setRouteCoordinates([]);
+          setStartMarker(null);
+          setEndMarker(null);
+          setActiveRequest(null);
+          setArrivalStatus({
+            isNearMeetingPoint: false,
+            hasArrivedAtMeetingPoint: false,
+            distanceToMeetingPoint: null,
+            canStartFinalJourney: false,
+            bothUsersArrived: false
+          });
+          setTripStatus({
+            userReady: false,
+            bothUsersReady: false,
+            tripStarted: false
+          });
+          
+          // Refresh matches
+          if (activeMatches?.refreshMatches) {
+            activeMatches.refreshMatches();
+          }
+          
           Alert.alert(
             "Trip Cancelled ❌",
-            eventData.message,
+            eventData.message || `${eventData.cancelledBy} cancelled the trip.`,
             [{ text: "OK" }]
           );
           break;

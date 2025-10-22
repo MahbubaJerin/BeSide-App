@@ -89,6 +89,68 @@ export default function ActiveMatchModal({
     }
   };
 
+  const handleCancelMatch = async (matchId) => {
+    Alert.alert(
+      "Cancel Trip",
+      "Are you sure you want to cancel this trip? Your companion will be notified.",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem("token");
+              if (!token) {
+                Alert.alert("Error", "You must be logged in");
+                return;
+              }
+
+              console.log(`🚫 [CANCEL] Cancelling match: ${matchId}`);
+              
+              const response = await fetch(
+                `${BASE_URL}api/v1/trip/match/${matchId}/cancel`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    reason: "User cancelled the trip",
+                  }),
+                }
+              );
+
+              const result = await response.json();
+              
+              if (result.status === "success") {
+                console.log("✅ [CANCEL] Trip cancelled successfully");
+                Alert.alert(
+                  "Trip Cancelled",
+                  "The trip has been cancelled. Your companion has been notified.",
+                  [
+                    {
+                      text: "OK",
+                      onPress: () => {
+                        if (onRefresh) onRefresh();
+                      }
+                    }
+                  ]
+                );
+              } else {
+                throw new Error(result.message || "Failed to cancel trip");
+              }
+            } catch (error) {
+              console.error("❌ [CANCEL] Error:", error);
+              Alert.alert("Error", error.message || "Failed to cancel trip");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const getUserRole = (match) => {
     if (!match || !currentUserId) return "companion";
     return match.organizer.userId === currentUserId ? "organizer" : "companion";
@@ -287,23 +349,7 @@ export default function ActiveMatchModal({
 
                         <TouchableOpacity
                           style={[styles.actionButton, styles.cancelButton]}
-                          onPress={() => {
-                            Alert.alert(
-                              "Cancel Trip",
-                              "Are you sure you want to cancel this trip?",
-                              [
-                                { text: "No", style: "cancel" },
-                                {
-                                  text: "Yes",
-                                  style: "destructive",
-                                  onPress: () => {
-                                    // Handle cancel trip
-                                    Alert.alert("Trip cancelled");
-                                  },
-                                },
-                              ]
-                            );
-                          }}
+                          onPress={() => handleCancelMatch(match.matchId)}
                         >
                           <Ionicons name="close-circle-outline" size={18} color="#fff" />
                           <Text style={styles.actionButtonText}>Cancel</Text>
