@@ -36,7 +36,7 @@ export function useActiveMatches(pollingInterval = 15000, enabled = false) { // 
       setError(null);
 
       const API_URL = BASE_URL.replace(/\/+$/, '');
-      const response = await fetch(`${API_URL}/api/trip/active-matches`, {
+      const response = await fetch(`${API_URL}/api/v1/trip/active-matches`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -174,7 +174,7 @@ export function useActiveMatches(pollingInterval = 15000, enabled = false) { // 
       }
 
       const API_URL = BASE_URL.replace(/\/+$/, '');
-      const response = await fetch(`${API_URL}/api/trip/match/${matchId}/status`, {
+      const response = await fetch(`${API_URL}/api/v1/trip/match/${matchId}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -214,7 +214,7 @@ export function useActiveMatches(pollingInterval = 15000, enabled = false) { // 
       }
 
       const API_URL = BASE_URL.replace(/\/+$/, '');
-      const response = await fetch(`${API_URL}/api/trip/match/${matchId}/details`, {
+      const response = await fetch(`${API_URL}/api/v1/trip/match/${matchId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -243,7 +243,7 @@ export function useActiveMatches(pollingInterval = 15000, enabled = false) { // 
       }
 
       const API_URL = BASE_URL.replace(/\/+$/, '');
-      const response = await fetch(`${API_URL}/api/trip/match/${matchId}/meeting-point`, {
+      const response = await fetch(`${API_URL}/api/v1/trip/match/${matchId}/meeting-point`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -289,7 +289,7 @@ export function useActiveMatches(pollingInterval = 15000, enabled = false) { // 
       }
 
       const API_URL = BASE_URL.replace(/\/+$/, '');
-      const response = await fetch(`${API_URL}/api/trip/match/${matchId}/update-location`, {
+      const response = await fetch(`${API_URL}/api/v1/trip/match/${matchId}/location`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -325,7 +325,7 @@ export function useActiveMatches(pollingInterval = 15000, enabled = false) { // 
       }
 
       const API_URL = BASE_URL.replace(/\/+$/, '');
-      const response = await fetch(`${API_URL}/api/trip/match/${matchId}/locations`, {
+      const response = await fetch(`${API_URL}/api/v1/trip/match/${matchId}/locations`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -455,42 +455,6 @@ export function useActiveMatches(pollingInterval = 15000, enabled = false) { // 
     }
   }, []);
 
-  // Clear matches (for logout)
-  const clearMatches = useCallback(() => {
-    console.log('🧹 [MATCH CLEAR] Clearing active matches');
-    setMatches([]);
-    setMatchCount(0);
-    setHasNewMatches(false);
-    setError(null);
-    lastMatchCountRef.current = 0;
-    stopPolling();
-  }, [stopPolling]);
-
-  // Handle real-time trip coordination events
-  const handleTripEvent = useCallback((eventType, eventData) => {
-    console.log('📱 [MATCH EVENT] Received trip event:', eventType, eventData);
-    
-    switch (eventType) {
-      case 'meeting_point_set':
-      case 'trip_started':
-      case 'location_update':
-      case 'trip_cancelled':
-        // Refresh matches when any trip coordination event occurs
-        refresh();
-        break;
-      
-      case 'request_response':
-        // When a request is accepted, a new match is created
-        if (eventData.response === 'accepted') {
-          refresh();
-        }
-        break;
-        
-      default:
-        console.log('⚠️ [MATCH EVENT] Unknown event type:', eventType);
-    }
-  }, [refresh]);
-
   return {
     // State
     matches,
@@ -509,8 +473,6 @@ export function useActiveMatches(pollingInterval = 15000, enabled = false) { // 
     getLiveLocations,
     startPolling,
     stopPolling,
-    clearMatches,
-    handleTripEvent,
     getActiveRequest,
     updateTripRequest,
     completeReceiverConsent,

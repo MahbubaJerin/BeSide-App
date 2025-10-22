@@ -15,8 +15,11 @@ import { ThemedButton } from "@/components/ThemedButton";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { BASE_URL } from "../config";
+<<<<<<< HEAD
+=======
 import { useRequestPolling } from "../hooks/useRequestPolling";
 import ReceiverPhotoConsentModal from "./ReceiverPhotoConsentModal";
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
 
 // Simple request card component with sender photo
 function RequestCard({ request, onResponse, respondingTo, onAcceptClick }) {
@@ -33,23 +36,10 @@ function RequestCard({ request, onResponse, respondingTo, onAcceptClick }) {
         
         {/* Sender photo */}
         <View style={styles.photoContainer}>
-          {request.user?.displayPhoto ? (
+          {request.photo?.url ? (
             <Image 
-              source={{ uri: request.user.displayPhoto }}
+              source={{ uri: request.photo.url }}
               style={styles.senderPhotoCard}
-              onError={(error) => {
-                console.log("Image load error for:", request.user.displayPhoto, error);
-              }}
-            />
-          ) : (request.user?.requestPhoto || request.user?.profilePhoto || request.photo?.url) ? (
-            <Image 
-              source={{ 
-                uri: request.user?.requestPhoto || request.user?.profilePhoto || request.photo?.url 
-              }}
-              style={styles.senderPhotoCard}
-              onError={(error) => {
-                console.log("Fallback image load error:", error);
-              }}
             />
           ) : (
             <View style={styles.senderPhotoPlaceholderCard}>
@@ -70,6 +60,13 @@ function RequestCard({ request, onResponse, respondingTo, onAcceptClick }) {
 
         <View style={styles.messageSection}>
           <Text style={styles.messageLabel}>Trip Details</Text>
+<<<<<<< HEAD
+          <Text style={styles.messageText}>
+            Destination: {request.destination}
+            {'\n'}Transport: {request.destinationType}
+            {request.genderPreference !== "any" ? `\nPrefers: ${request.genderPreference} companions` : ''}
+          </Text>
+=======
           <View style={styles.tripDetailsContainer}>
             <View style={styles.tripDetailRow}>
               <Text style={styles.tripDetailIcon}>📍</Text>
@@ -117,6 +114,7 @@ function RequestCard({ request, onResponse, respondingTo, onAcceptClick }) {
               </View>
             )}
           </View>
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
         </View>
 
         {/* Action buttons */}
@@ -156,10 +154,25 @@ export default function RequestNotificationModal({
   isPolling: externalIsPolling,
   onRefetch: externalRefetch
 }) {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [respondingTo, setRespondingTo] = useState(null);
   const [showReceiverPhotoModal, setShowReceiverPhotoModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
+<<<<<<< HEAD
+  const fetchPendingRequests = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) return;
+
+      setLoading(true);
+      const API_URL = BASE_URL.replace(/\/+$/, "");
+      const response = await fetch(`${API_URL}/api/v1/trip/pending-requests`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+=======
   // Use external requests if provided (from parent's polling), otherwise use own polling
   const hasExternalData = externalRequests !== undefined;
   
@@ -181,13 +194,26 @@ export default function RequestNotificationModal({
       console.log(`� ${requests.length} request(s) pending`);
     }
   }, [requests.length]);
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
 
-  // Mark as viewed when modal opens
-  useEffect(() => {
-    if (visible && hasNewRequests) {
-      markAsViewed();
+      if (response.ok) {
+        const result = await response.json();
+        if (result.status === "success") {
+          setRequests(result.data.requests || []);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching requests:", error);
+    } finally {
+      setLoading(false);
     }
-  }, [visible, hasNewRequests, markAsViewed]);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchPendingRequests();
+    setRefreshing(false);
+  };
 
   const handleAcceptClick = (request) => {
     setSelectedRequest(request);
@@ -286,19 +312,19 @@ export default function RequestNotificationModal({
   useEffect(() => {
     if (visible) {
       setRespondingTo(null);
-      // Polling will automatically start when visible becomes true
-      refetch(); // Manual refresh when modal opens
-    } else {
-      // Reset state when modal closes
-      setRespondingTo(null);
+      fetchPendingRequests();
     }
-  }, [visible, refetch]);
+  }, [visible]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
         <View style={styles.container}>
           <View style={styles.header}>
+<<<<<<< HEAD
+            <ThemedText type="subtitle">🔔 Trip Requests</ThemedText>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+=======
             <ThemedText type="subtitle" style={styles.headerTitle}>🔔 Trip Requests</ThemedText>
             <TouchableOpacity 
               onPress={() => {
@@ -308,33 +334,40 @@ export default function RequestNotificationModal({
               }} 
               style={styles.closeButton}
             >
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
               <ThemedText style={styles.closeText}>✕</ThemedText>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.contentContainer}>
-            {requests.length === 0 ? (
+          <ScrollView
+            style={styles.requestsList}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
+          >
+            {loading && requests.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <ThemedText>Loading requests...</ThemedText>
+              </View>
+            ) : requests.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <ThemedText style={styles.emptyIcon}>📭</ThemedText>
-                <ThemedText style={styles.emptyText}>
-                  {isPolling ? "Searching for requests..." : "No trip requests"}
-                </ThemedText>
+                <ThemedText style={styles.emptyText}>No trip requests</ThemedText>
                 <ThemedText style={styles.emptySubtext}>
-                  {networkError ? `Network issue: ${networkError}` :
-                   isRateLimited ? "Rate limited - polling slower" :
-                   "New companion requests from nearby users will appear here."}
+                  New companion requests from nearby users will appear here.
                 </ThemedText>
-                <TouchableOpacity 
-                  style={styles.refreshButton}
-                  onPress={refetch}
-                  disabled={isRateLimited}
-                >
-                  <ThemedText style={[styles.refreshButtonText, isRateLimited && { opacity: 0.5 }]}>
-                    🔄 {isRateLimited ? "Rate Limited" : "Refresh"}
-                  </ThemedText>
-                </TouchableOpacity>
               </View>
             ) : (
+<<<<<<< HEAD
+              requests.map((request) => (
+                <RequestCard 
+                  key={request.tripReqId}
+                  request={request}
+                  onResponse={handleResponse}
+                  respondingTo={respondingTo}
+                />
+              ))
+=======
               <ScrollView style={styles.requestsList}>
                 {requests.map((request) => (
                   <RequestCard 
@@ -346,16 +379,13 @@ export default function RequestNotificationModal({
                   />
                 ))}
               </ScrollView>
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
             )}
-          </View>
+          </ScrollView>
 
           <ThemedButton
             title="Close"
-            onPress={() => {
-              console.log("🚪 [NOTIFICATIONS] Closing modal");
-              setRespondingTo(null);
-              onClose();
-            }}
+            onPress={onClose}
             style={styles.closeButtonBottom}
           />
         </View>
@@ -443,6 +473,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.light.textSecondary,
     textAlign: "center",
+<<<<<<< HEAD
+  },
+  closeButtonBottom: {
+    margin: 16,
+  },
+  
+=======
     marginBottom: 20,
   },
   refreshButton: {
@@ -465,6 +502,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.light.textSecondary,
   },
+>>>>>>> f3191634a9fca11f28341f6e31357a04e7cdd861
   // Request card styles
   requestCard: {
     margin: 16,
@@ -556,34 +594,6 @@ const styles = StyleSheet.create({
   },
   messageSection: {
     marginBottom: 20,
-  },
-  tripDetailsContainer: {
-    marginTop: 8,
-  },
-  tripDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  tripDetailIcon: {
-    fontSize: 16,
-    marginRight: 8,
-    marginTop: 2,
-    width: 20,
-  },
-  tripDetailContent: {
-    flex: 1,
-  },
-  tripDetailLabel: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  tripDetailValue: {
-    fontSize: 14,
-    color: '#333',
-    fontWeight: '600',
   },
   messageLabel: {
     fontSize: 14,
