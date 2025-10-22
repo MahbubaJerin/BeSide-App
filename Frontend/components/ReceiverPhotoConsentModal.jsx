@@ -180,13 +180,20 @@ export default function ReceiverPhotoConsentModal({
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
 
+            {/* ✅ Updated logic for Take Photo First */}
             <TouchableOpacity
               style={[
                 styles.confirmButton,
-                (!receiverPhoto || isUploading) && styles.confirmButtonDisabled
+                isUploading && styles.confirmButtonDisabled
               ]}
-              onPress={handleConfirm}
-              disabled={!receiverPhoto || isUploading}
+              onPress={() => {
+                if (!receiverPhoto) {
+                  handleTakePhoto(); // Open camera if photo not yet taken
+                } else {
+                  handleConfirm(); // Proceed to upload & accept
+                }
+              }}
+              disabled={isUploading}
             >
               {isUploading ? (
                 <ActivityIndicator color="#fff" />
@@ -253,9 +260,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContentContainer: {
-    padding: 20,
-  },
-  content: {
     padding: 20,
   },
   infoBox: {

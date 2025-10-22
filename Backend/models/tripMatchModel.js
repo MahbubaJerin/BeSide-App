@@ -163,28 +163,47 @@ tripMatchSchema.statics.generateMatchId = function() {
 
 // Static method to find active matches for a user
 tripMatchSchema.statics.findUserActiveMatches = async function(userId) {
-  // Clean up old matches (older than 10 minutes) that are still marked as 'active' but not 'in-progress'
+  // Clean up old matches that should no longer be active
   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   
+  // Cancel matches that have been 'active' for more than 10 minutes without progressing
   await this.updateMany({
     $or: [
       { 'organizer.userId': userId },
       { 'companion.userId': userId }
     ],
     status: 'active',
-    'progression.matched': { $lt: tenMinutesAgo }
+    'progression.matched': { $lt: tenMinutesAgo },
+    'progression.started': { $exists: false } // Not started yet
   }, {
-    $set: { status: 'cancelled' }
+    $set: { 
+      status: 'cancelled',
+      'progression.cancelled': new Date()
+    }
   });
 
-  // Return only truly active matches
+  // Delete very old completed/cancelled matches (older than 24 hours)
+  await this.deleteMany({
+    $or: [
+      { 'organizer.userId': userId },
+      { 'companion.userId': userId }
+    ],
+    status: { $in: ['completed', 'cancelled'] },
+    $or: [
+      { 'progression.completed': { $lt: oneDayAgo } },
+      { 'progression.cancelled': { $lt: oneDayAgo } }
+    ]
+  });
+
+  // Return only truly active or in-progress matches
   return this.find({
     $or: [
       { 'organizer.userId': userId },
       { 'companion.userId': userId }
     ],
     status: { $in: ['active', 'in-progress'] }
-  }).sort({ createdAt: -1 });
+  }).sort({ 'progression.matched': -1 }); // Newest first
 };
 
 // Static method to find match history for a user

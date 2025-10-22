@@ -31,6 +31,8 @@ export default function ActiveMatchModal({
   onSetMeetingPoint,
   currentLocation,
   currentUserId,
+  pendingRequests = [],
+  onCancelPending,
 }) {
   const [liveTripModalVisible, setLiveTripModalVisible] = useState(false);
   const [navigationModalVisible, setNavigationModalVisible] = useState(false);
@@ -175,7 +177,55 @@ export default function ActiveMatchModal({
             }
             showsVerticalScrollIndicator={false}
           >
-            {matches.length === 0 ? (
+            {/* Pending Trips Section */}
+            {pendingRequests && pendingRequests.length > 0 && (
+              <View style={{ paddingBottom: 8 }}>
+                <ThemedText style={{ fontSize: 14, fontWeight: '700', marginBottom: 8 }}>Pending Trips</ThemedText>
+                {pendingRequests.map((req) => (
+                  <View key={req.tripReqId || req._id} style={styles.matchCard}>
+                    <View style={styles.matchHeader}>
+                      <View style={styles.matchInfo}>
+                        <ThemedText style={styles.matchTitle}>
+                          Pending: {req.destination || req.destinationType || 'Companion Request'}
+                        </ThemedText>
+                        <View style={styles.statusContainer}>
+                          <Ionicons name="time-outline" size={16} color={Colors.light.tabIconDefault} />
+                          <ThemedText style={[styles.statusText, { color: Colors.light.tabIconDefault }]}>PENDING</ThemedText>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.matchDetails}>
+                      <View style={styles.detailRow}>
+                        <Ionicons name="location-outline" size={16} color={Colors.light.tabIconDefault} />
+                        <ThemedText style={styles.detailText}>
+                          {req.destination || 'Destination not set'} • {req.transportMode || req.destinationType || '—'}
+                        </ThemedText>
+                      </View>
+                      {req.createdAt && (
+                        <View style={styles.detailRow}>
+                          <Ionicons name="calendar-outline" size={16} color={Colors.light.tabIconDefault} />
+                          <ThemedText style={styles.detailText}>
+                            Created: {new Date(req.createdAt).toLocaleString()}
+                          </ThemedText>
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={styles.actionButtons}>
+                      <ThemedButton
+                        title="❌ Cancel Request"
+                        onPress={() => onCancelPending && onCancelPending(req.tripReqId || req._id)}
+                        style={[styles.actionButton, styles.cancelButton]}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Active/In-Progress Matches Section */}
+            {matches.length === 0 && (!pendingRequests || pendingRequests.length === 0) ? (
               <View style={styles.emptyContainer}>
                 <ThemedText style={styles.emptyIcon}>🗺️</ThemedText>
                 <ThemedText style={styles.emptyText}>

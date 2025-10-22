@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../config';
 
-export const useRealTimeUpdates = (enabled = true) => {
+export const useRealTimeUpdates = (enabled = false) => { // Disabled by default since backend endpoint is commented out
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   const [lastEvent, setLastEvent] = useState(null);

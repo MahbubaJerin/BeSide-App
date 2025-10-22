@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../config';
 
-export function useActiveMatches(pollingInterval = 15000) { // Reduced to 15s for better responsiveness
+export function useActiveMatches(pollingInterval = 15000, enabled = false) { // Start disabled; enable when user takes action
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -15,6 +15,7 @@ export function useActiveMatches(pollingInterval = 15000) { // Reduced to 15s fo
   const isActiveRef = useRef(true);
   const rateLimitRef = useRef(false);
   const errorCountRef = useRef(0);
+  const isFirstLoadRef = useRef(true); // Track if this is the first load
 
   // Fetch active matches from API
   const fetchActiveMatches = useCallback(async () => {
@@ -83,10 +84,16 @@ export function useActiveMatches(pollingInterval = 15000) { // Reduced to 15s fo
         // Reset error count on success
         errorCountRef.current = 0;
         
-        // Check for new matches
-        if (newMatches.length > lastMatchCountRef.current) {
+        // Only check for new matches after first load (ignore existing matches on login)
+        if (!isFirstLoadRef.current && newMatches.length > lastMatchCountRef.current) {
           setHasNewMatches(true);
           console.log('🎉 [MATCH POLLING] New match detected!');
+        }
+        
+        // Mark first load as complete
+        if (isFirstLoadRef.current) {
+          console.log('📥 [MATCH POLLING] Initial load complete, found', newMatches.length, 'existing match(es)');
+          isFirstLoadRef.current = false;
         }
         
         setMatches(newMatches);
@@ -342,16 +349,22 @@ export function useActiveMatches(pollingInterval = 15000) { // Reduced to 15s fo
     }
   }, []);
 
-  // Setup and cleanup effects
+  // Setup and cleanup effects (only when enabled)
   useEffect(() => {
+    if (!enabled) {
+      // Ensure polling is stopped when not enabled
+      stopPolling();
+      return;
+    }
+
     isActiveRef.current = true;
     startPolling();
-    
+
     return () => {
       isActiveRef.current = false;
       stopPolling();
     };
-  }, [startPolling, stopPolling]);
+  }, [enabled, startPolling, stopPolling]);
 
   // Get active request for persistent search
   const getActiveRequest = useCallback(async () => {

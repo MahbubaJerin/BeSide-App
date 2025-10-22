@@ -43,6 +43,7 @@ import BeSideLogo from "../assets/images/BeSide.png";
 import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";
 import { useActiveMatches } from "../hooks/useActiveMatches";
+import { usePendingTrips } from "../hooks/usePendingTrips";
 import { useTripNotifications } from "../hooks/useTripNotifications";
 import { useRouteCalculation } from "../hooks/useRouteCalculation";
 import { useRealTimeUpdates } from "../hooks/useRealTimeUpdates";
@@ -311,9 +312,15 @@ export default function HomeScreen() {
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
   const requestPolling = useRequestPolling(5000, true); // Poll every 5 seconds for incoming requests
-  const activeMatches = useActiveMatches(15000); // Poll for matches every 15 seconds
+  // Enable match polling only when user opens Active Trips modal or after a real match event
+  const [enableMatchPolling, setEnableMatchPolling] = useState(false);
+  const activeMatches = useActiveMatches(15000, enableMatchPolling); // gated polling
+  // Pending trips (sender side) - enable after sending a request or when opening Active Trips
+  const [enablePendingPolling, setEnablePendingPolling] = useState(false);
+  const pendingTrips = usePendingTrips(10000, enablePendingPolling);
   const tripNotifications = useTripNotifications();
-  const realTimeUpdates = useRealTimeUpdates();
+  // Disable real-time updates for now (backend endpoint not active in RN)
+  const realTimeUpdates = useRealTimeUpdates(false);
   const { 
     openGoogleMapsNavigation, 
     getNavigationInstructions,
@@ -519,12 +526,13 @@ export default function HomeScreen() {
 
   // Auto-open active match modal when new matches are detected (for sender when request is accepted)
   const [previousMatchCount, setPreviousMatchCount] = useState(0);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   
   useEffect(() => {
     const currentMatchCount = activeMatches?.matches?.length || 0;
     
-    // Show success when new matches are detected
-    if (currentMatchCount > previousMatchCount && currentMatchCount > 0 && isMounted.current) {
+    // Show success when new matches are detected (but NOT on initial load)
+    if (currentMatchCount > previousMatchCount && currentMatchCount > 0 && isMounted.current && !isInitialLoad) {
       setRequestNotificationVisible(false);
       setSentRequestStatusVisible(false);
       
@@ -533,6 +541,12 @@ export default function HomeScreen() {
         "You've successfully matched with a companion! Your trip routes and meeting point are now displayed on the map.",
         [{ text: "Great!" }]
       );
+    }
+    
+    // Mark initial load as complete after first check
+    if (isInitialLoad && currentMatchCount >= 0) {
+      console.log('📥 [HOME] Initial load complete, existing matches:', currentMatchCount);
+      setIsInitialLoad(false);
     }
     
     if (isMounted.current) {
@@ -702,6 +716,8 @@ export default function HomeScreen() {
             const parsed = JSON.parse(stored);
             setUser(parsed);
             await locationTracking.startTracking(true);
+            // Proactively clean stale matches/requests on entering Home
+            cleanupUserData();
           } else {
             router.replace("/login");
           }
@@ -720,7 +736,7 @@ export default function HomeScreen() {
           console.error('Error during cleanup:', error);
         }
       };
-    }, [resetAllModals])
+    }, [resetAllModals, cleanupUserData])
   );
 
   useEffect(() => {
@@ -773,6 +789,11 @@ export default function HomeScreen() {
     } catch (error) {
       console.error("Error during logout cleanup:", error);
     } finally {
+      // Stop pending/active polling and clear locally
+      try { setEnablePendingPolling(false); } catch (_) {}
+      try { pendingTrips?.clear?.(); } catch (_) {}
+      try { setEnableMatchPolling(false); } catch (_) {}
+      try { activeMatches?.clearMatches?.(); } catch (_) {}
       // Always clear local storage and logout
       await AsyncStorage.removeItem("user");
       await AsyncStorage.removeItem("token");
@@ -1175,8 +1196,12 @@ export default function HomeScreen() {
           [{ text: "OK" }]
         );
         
-        // Stop any searching animation since request is sent
-        await companionSearch.stopSearch();
+  // Stop any searching animation since request is sent
+  await companionSearch.stopSearch();
+  // Start pending trips polling so the sender sees their request as Pending in Active Trips
+  setEnablePendingPolling(true);
+  // Start active matches polling so the sender transitions to Active when accepted
+  setEnableMatchPolling(true);
       } else {
         console.log("❌ [SEND TO NEARBY] Failed:", result.message);
         Alert.alert("API Error", result.message || "Failed to send request");
@@ -1432,6 +1457,32 @@ export default function HomeScreen() {
   const [availability, setAvailability] = useState(true);
   const [availabilityModalVisible, setAvailabilityModalVisible] = useState(false);
 
+  // Helper: proactively clean up stale user data (old active matches, expired requests)
+  const cleanupUserData = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) return;
+      const API_URL = BASE_URL.replace(/\/+$/, "");
+      await fetch(`${API_URL}/api/v1/trip/cleanup-user-data`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } catch (_) {
+      // Silent cleanup failure
+    }
+  }, []);
+
+  // Unified opener for Active Trips: cleanup first, then open + enable polling
+  const openActiveTrips = useCallback(async () => {
+    await cleanupUserData();
+    setActiveMatchModalVisible(true);
+    setEnableMatchPolling(true);
+    setEnablePendingPolling(true);
+  }, [cleanupUserData]);
+
   // Component mount tracking to prevent state updates after unmount
   const isMounted = useRef(true);
   
@@ -1487,7 +1538,7 @@ export default function HomeScreen() {
             <ThemedText style={styles.serviceCardSubtext}>4.1 Km, 12 min</ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => setActiveMatchModalVisible(true)}>
+          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={openActiveTrips}>
             <Ionicons name="people" size={24} color="#8B5CF6" />
             <ThemedText style={styles.serviceCardTitle}>Active</ThemedText>
             <ThemedText style={styles.serviceCardSubtext}>2.3 Km, 15 min</ThemedText>
@@ -1897,14 +1948,11 @@ export default function HomeScreen() {
         
         <TouchableOpacity 
           style={styles.bottomNavItem}
-          onPress={() => {
-            console.log("🚗 Opening Active Trips Modal");
-            setActiveMatchModalVisible(true);
-          }}
+          onPress={openActiveTrips}
         >
           <View style={styles.navIconWithBadge}>
             <Ionicons name="car-outline" size={24} color="#8B5CF6" />
-            {(activeMatches?.matches?.length || 0) > 0 && (
+            {enableMatchPolling && (activeMatches?.matches?.length || 0) > 0 && (
               <View style={styles.modernBadge}>
                 <ThemedText style={styles.modernBadgeText}>
                   {activeMatches?.matches?.length || 0}
@@ -2049,9 +2097,11 @@ export default function HomeScreen() {
           // Refresh active matches to show the new trip
           activeMatches.refresh?.();
           
-          // Automatically show the active match modal after a brief delay
-          setTimeout(() => {
+          // Automatically show the active match modal after a brief delay and start polling
+          setTimeout(async () => {
+            await cleanupUserData();
             setActiveMatchModalVisible(true);
+            setEnableMatchPolling(true);
           }, 300);
         }}
         onRouteUpdate={(routeData) => {
@@ -2062,10 +2112,25 @@ export default function HomeScreen() {
       {/* Active Match Modal */}
       <ActiveMatchModal
         visible={activeMatchModalVisible}
-        onClose={() => setActiveMatchModalVisible(false)}
+        onClose={() => {
+          setActiveMatchModalVisible(false);
+          setEnableMatchPolling(false); // stop polling when user closes modal
+          // Clear matches so badge doesn't persist a stale count after close
+          try { activeMatches?.clearMatches?.(); } catch (_) {}
+        }}
         matches={activeMatches?.matches || []}
         isLoading={activeMatches?.loading}
         onRefresh={() => activeMatches?.refresh()}
+        currentUserId={user?._id}
+        pendingRequests={pendingTrips?.pendingRequests || []}
+        onCancelPending={async (tripReqId) => {
+          try{
+            await pendingTrips.cancelRequest(tripReqId);
+            Alert.alert("Cancelled", "Your pending request has been cancelled.");
+          } catch (e) {
+            Alert.alert("Error", e.message || "Failed to cancel pending request");
+          }
+        }}
         onUpdateStatus={async (matchId, status) => {
           try {
             await activeMatches.updateMatchStatus(matchId, status);
@@ -2097,6 +2162,7 @@ export default function HomeScreen() {
           activeMatches.refresh?.();
           // Optionally show active matches modal
           setActiveMatchModalVisible(true);
+          setEnableMatchPolling(true);
         }}
         acceptanceData={acceptanceData}
       />
