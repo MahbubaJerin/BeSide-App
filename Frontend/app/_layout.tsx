@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    SpaceMono: require("@/assets/fonts/SpaceMono-Regular.ttf"),
+    Arial: require("@/assets/fonts/arial.ttf"),
   });
 
   useEffect(() => {
