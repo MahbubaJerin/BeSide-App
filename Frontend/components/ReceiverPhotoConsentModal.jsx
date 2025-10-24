@@ -65,7 +65,7 @@ export default function ReceiverPhotoConsentModal({
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType.Images,
         allowsEditing: true,
         aspect: [3, 4],
         quality: 0.8,
