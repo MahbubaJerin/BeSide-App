@@ -1,4 +1,8 @@
-const { uploadToCloudinary, deleteFromCloudinary, uploadSingle } = require("../utils/fileUpload");
+const {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+  uploadSingle,
+} = require("../utils/fileUpload");
 const User = require("../models/userModel");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
@@ -6,7 +10,8 @@ const generateUserId = require("../utils/generateUserId");
 
 // Update user profile and generate userId if missing
 exports.updateUserProfile = catchAsync(async (req, res, next) => {
-  const { userName, email, mobileNo, firstName, lastName, bio, address } = req.body;
+  const { userName, email, mobileNo, firstName, lastName, bio, address, dob } =
+    req.body;
 
   const updateData = {};
   if (userName) updateData.userName = userName;
@@ -15,6 +20,7 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
   if (firstName) updateData.firstName = firstName;
   if (lastName) updateData.lastName = lastName;
   if (bio !== undefined) updateData.bio = bio;
+  if (dob) updateData.dob = dob;
 
   const user = await User.findById(req.user._id);
   if (!user) return next(new AppError("User not found", 404));
@@ -31,13 +37,13 @@ exports.updateUserProfile = catchAsync(async (req, res, next) => {
 
   const updatedUser = await User.findByIdAndUpdate(req.user._id, updateData, {
     new: true,
-    runValidators: true
+    runValidators: true,
   }).select("-password -__v");
 
   res.status(200).json({
     status: "success",
     message: "Profile updated successfully",
-    data: { user: updatedUser }
+    data: { user: updatedUser },
   });
 });
 
@@ -52,7 +58,11 @@ exports.saveProfilePhoto = catchAsync(async (req, res, next) => {
     await deleteFromCloudinary(user.profilePhoto.publicId);
   }
 
-  const uploadResult = await uploadToCloudinary(req.file, "profile-photos", user._id.toString());
+  const uploadResult = await uploadToCloudinary(
+    req.file,
+    "profile-photos",
+    user._id.toString()
+  );
 
   const updatedUser = await User.findByIdAndUpdate(
     req.user._id,
@@ -72,8 +82,10 @@ exports.updateProfileSettings = catchAsync(async (req, res, next) => {
   const { public: isPublic, sharedInfo } = req.body;
   const update = {};
 
-  if (typeof isPublic === "boolean") update["profileSettings.public"] = isPublic;
-  if (Array.isArray(sharedInfo)) update["profileSettings.sharedInfo"] = sharedInfo;
+  if (typeof isPublic === "boolean")
+    update["profileSettings.public"] = isPublic;
+  if (Array.isArray(sharedInfo))
+    update["profileSettings.sharedInfo"] = sharedInfo;
 
   if (Object.keys(update).length === 0) {
     return next(new AppError("No profile settings to update", 400));
@@ -117,11 +129,25 @@ exports.updateAvailability = catchAsync(async (req, res, next) => {
 });
 
 // View current user profile
+const Trip = require("../models/tripModel");
+
 exports.getUserProfile = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.user._id).select("-password -__v");
   if (!user) return next(new AppError("User not found", 404));
 
-  res.status(200).json({ status: "success", data: { user } });
+  // Count completed trips
+  const tripCount = await Trip.countDocuments({
+    $or: [
+      { "user.userId": user._id.toString() },
+      { "companion.userId": user._id.toString() },
+    ],
+    status: "completed",
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: { user: { ...user.toObject(), tripCount } },
+  });
 });
 
 // Delete user profile and remove image from Cloudinary
@@ -138,7 +164,13 @@ exports.deleteUserProfile = catchAsync(async (req, res, next) => {
   }
 
   await User.findByIdAndDelete(req.user._id);
-  res.status(204).json({ status: "success", message: "User deleted successfully", data: null });
+  res
+    .status(204)
+    .json({
+      status: "success",
+      message: "User deleted successfully",
+      data: null,
+    });
 });
 
 // Update user consent
@@ -182,30 +214,37 @@ exports.getUserById = catchAsync(async (req, res, next) => {
 
 // Test Cloudinary config
 exports.testCloudinaryConnection = catchAsync(async (req, res, next) => {
-  const { cloudinary, isConfigured } = require('../config/cloudinary');
+  const { cloudinary, isConfigured } = require("../config/cloudinary");
 
   if (!isConfigured) {
-    return res.status(500).json({ status: 'error', message: 'Cloudinary misconfigured' });
+    return res
+      .status(500)
+      .json({ status: "error", message: "Cloudinary misconfigured" });
   }
 
   try {
     const result = await cloudinary.api.ping();
-    res.status(200).json({ status: 'success', message: 'Cloudinary is OK', details: { status: result.status } });
+    res
+      .status(200)
+      .json({
+        status: "success",
+        message: "Cloudinary is OK",
+        details: { status: result.status },
+      });
   } catch (error) {
     console.error("Cloudinary test error:", error);
-    res.status(500).json({ status: 'error', message: error.message });
+    res.status(500).json({ status: "error", message: error.message });
   }
 });
 
 // Upload middleware for profile photo (should be declared after all imports)
-exports.uploadProfilePhoto = uploadSingle('photo');
-
+exports.uploadProfilePhoto = uploadSingle("photo");
 
 // Emergency Contact Management (NEW)
 
 exports.getEmergencyContacts = catchAsync(async (req, res, next) => {
-  const user = await User.findById(req.user._id).select('emergencyContacts');
-  res.status(200).json({ status: 'success', data: user.emergencyContacts });
+  const user = await User.findById(req.user._id).select("emergencyContacts");
+  res.status(200).json({ status: "success", data: user.emergencyContacts });
 });
 
 exports.addEmergencyContact = catchAsync(async (req, res, next) => {
@@ -219,13 +258,27 @@ exports.addEmergencyContact = catchAsync(async (req, res, next) => {
   if (!user) return next(new AppError("User not found", 404));
 
   if (isPrimary) {
-    user.emergencyContacts.forEach(contact => { contact.isPrimary = false; });
+    user.emergencyContacts.forEach((contact) => {
+      contact.isPrimary = false;
+    });
   }
 
-  user.emergencyContacts.push({ name, phone, relation, email, isPrimary: !!isPrimary });
+  user.emergencyContacts.push({
+    name,
+    phone,
+    relation,
+    email,
+    isPrimary: !!isPrimary,
+  });
   await user.save();
 
-  res.status(201).json({ status: 'success', message: 'Contact added', data: user.emergencyContacts });
+  res
+    .status(201)
+    .json({
+      status: "success",
+      message: "Contact added",
+      data: user.emergencyContacts,
+    });
 });
 
 exports.updateEmergencyContact = catchAsync(async (req, res, next) => {
@@ -239,7 +292,9 @@ exports.updateEmergencyContact = catchAsync(async (req, res, next) => {
   if (!contact) return next(new AppError("Contact not found", 404));
 
   if (isPrimary) {
-    user.emergencyContacts.forEach(c => { c.isPrimary = false; });
+    user.emergencyContacts.forEach((c) => {
+      c.isPrimary = false;
+    });
     contact.isPrimary = true;
   }
   if (name !== undefined) contact.name = name;
@@ -249,7 +304,13 @@ exports.updateEmergencyContact = catchAsync(async (req, res, next) => {
   if (isPrimary === false) contact.isPrimary = false;
 
   await user.save();
-  res.status(200).json({ status: 'success', message: 'Contact updated', data: user.emergencyContacts });
+  res
+    .status(200)
+    .json({
+      status: "success",
+      message: "Contact updated",
+      data: user.emergencyContacts,
+    });
 });
 
 exports.deleteEmergencyContact = catchAsync(async (req, res, next) => {
@@ -264,5 +325,5 @@ exports.deleteEmergencyContact = catchAsync(async (req, res, next) => {
   contact.deleteOne();
   await user.save();
 
-  res.status(204).json({ status: 'success', message: 'Contact deleted' });
+  res.status(204).json({ status: "success", message: "Contact deleted" });
 });

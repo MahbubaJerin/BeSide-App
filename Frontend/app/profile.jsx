@@ -19,13 +19,13 @@ import {
 import { Picker } from "@react-native-picker/picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { BASE_URL } from "../config";
 import { useThemeColor } from "@/hooks/useThemeColor";
 import PlacesAutocomplete from "./PlacesAutocomplete";
-import { formatDateYMD, formatDatePretty } from '../utils/dateUtils';
+import { formatDateYMD, formatDatePretty } from "../utils/dateUtils";
 
 const API_BASE_URL = `${BASE_URL}api/v1/user`;
 const { width, height } = Dimensions.get("window");
@@ -44,7 +44,7 @@ const ProfileHeader = ({ onSettingsPress, text, border }) => {
   };
 
   return (
-    <View style={styles.header}>
+    <View style={styles.headerStyle}>
       <TouchableOpacity
         activeOpacity={0.7}
         style={[styles.goBackButton, { borderColor: border, zIndex: 10 }]}
@@ -69,8 +69,10 @@ const ProfileHeader = ({ onSettingsPress, text, border }) => {
 };
 
 const ProfileInfoFields = ({ fields, setters, editMode, colors }) => {
-  const { firstName, lastName, email, mobileNo, address, gender, dateOfBirth } = fields;
-  const { setEmail, setMobileNo, setAddress, setGender, setDateOfBirth } = setters;
+  const { firstName, lastName, email, mobileNo, address, gender, dateOfBirth } =
+    fields;
+  const { setEmail, setMobileNo, setAddress, setGender, setDateOfBirth } =
+    setters;
   const { text } = colors;
 
   return (
@@ -159,7 +161,9 @@ const ProfileInfoFields = ({ fields, setters, editMode, colors }) => {
           <PlacesAutocomplete
             placeholder="Enter your location"
             value={address?.addressString || ""}
-            onChangeText={(t) => setAddress((prev) => ({ ...prev, addressString: t }))}
+            onChangeText={(t) =>
+              setAddress((prev) => ({ ...prev, addressString: t }))
+            }
             onSelect={(place) =>
               setAddress((prev) => ({
                 ...prev,
@@ -179,22 +183,56 @@ const ProfileInfoFields = ({ fields, setters, editMode, colors }) => {
   );
 };
 
-const ProfileCard = ({ profile, fields, setters, editMode, colors, onSave, onCancel, saving, onPickImage }) => {
-  const { photo, userName, email, gender, availability, dateOfBirth, address, firstName, lastName, mobileNo } = fields;
-  const { setUserName, setMobileNo, setAddress, setDateOfBirth, setShowDatePicker } = setters;
+const ProfileCard = ({
+  profile,
+  fields,
+  setters,
+  editMode,
+  colors,
+  onSave,
+  onCancel,
+  saving,
+  onPickImage,
+}) => {
+  const {
+    photo,
+    userName,
+    email,
+    gender,
+    availability,
+    dateOfBirth,
+    address,
+    firstName,
+    lastName,
+    mobileNo,
+  } = fields;
+  const {
+    setUserName,
+    setMobileNo,
+    setAddress,
+    setDateOfBirth,
+    setShowDatePicker,
+  } = setters;
   const { text } = colors;
-  const fullName = `${firstName || ""} ${lastName || ""}`.trim() || "Not specified";
+  const fullName =
+    `${firstName || ""} ${lastName || ""}`.trim() || "Not specified";
 
   return (
     <View style={styles.profileCardContainer}>
       <View style={styles.headerBanner}>
-        <TouchableOpacity onPress={onPickImage} accessibilityLabel="Change profile photo" accessibilityRole="button">
-          <Image
-            source={{ uri: photo || "https://via.placeholder.com/150" }}
-            style={styles.avatar}
-          />
-        </TouchableOpacity>
+        <View style={styles.headerInner}>
+          <TouchableOpacity
+            onPress={onPickImage}
+            accessibilityLabel="Change profile photo"
+          >
+            <Image
+              source={{ uri: photo || "https://via.placeholder.com/150" }}
+              style={styles.profileImageCard}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
+
       <View style={styles.topSection}>
         <Text style={[styles.name, { color: text }]}>
           {userName || "Unknown User"}
@@ -213,7 +251,7 @@ const ProfileCard = ({ profile, fields, setters, editMode, colors, onSave, onCan
           label="Username"
           value={userName}
           editMode={editMode}
-          type="input"
+          type="inputCard"
           onChange={setUserName}
           placeholder="Enter your username"
         />
@@ -228,7 +266,7 @@ const ProfileCard = ({ profile, fields, setters, editMode, colors, onSave, onCan
           label="Mobile Number"
           value={mobileNo}
           editMode={editMode}
-          type="input"
+          type="inputCard"
           onChange={setMobileNo}
           placeholder="Enter your mobile number"
         />
@@ -253,7 +291,9 @@ const ProfileCard = ({ profile, fields, setters, editMode, colors, onSave, onCan
           value={address?.addressString || null}
           editMode={editMode}
           type="places"
-          onChange={(text) => setAddress((prev) => ({ ...prev, addressString: text }))}
+          onChange={(text) =>
+            setAddress((prev) => ({ ...prev, addressString: text }))
+          }
           onSelect={(place) =>
             setAddress((prev) => ({
               ...prev,
@@ -283,7 +323,9 @@ const ProfileCard = ({ profile, fields, setters, editMode, colors, onSave, onCan
               style={[styles.button, styles.cancelButton]}
               onPress={onCancel}
             >
-              <Text style={[styles.buttonText, { color: "#111827" }]}>Cancel</Text>
+              <Text style={[styles.buttonText, { color: "#111827" }]}>
+                Cancel
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -292,16 +334,25 @@ const ProfileCard = ({ profile, fields, setters, editMode, colors, onSave, onCan
   );
 };
 
-const InfoRow = ({ label, value, editMode, onChange, onSelect, type, placeholder, valueComponent }) => {
+const InfoRow = ({
+  label,
+  value,
+  editMode,
+  onChange,
+  onSelect,
+  type,
+  placeholder,
+  valueComponent,
+}) => {
   return (
     <View style={styles.row}>
       <Text style={styles.label}>{label}</Text>
       <View style={styles.valueWrap}>
         {valueComponent ? (
           valueComponent
-        ) : type === "input" && editMode ? (
+        ) : (type === "input" || type === "inputCard") && editMode ? (
           <TextInput
-            style={styles.input}
+            style={styles.inputCard}
             placeholder={placeholder}
             value={value}
             onChangeText={onChange}
@@ -321,7 +372,15 @@ const InfoRow = ({ label, value, editMode, onChange, onSelect, type, placeholder
   );
 };
 
-const ProfileSettingsSidebar = ({ visible, onClose, onEdit, onVisibility, onDelete, onLogout, text }) => {
+const ProfileSettingsSidebar = ({
+  visible,
+  onClose,
+  onEdit,
+  onVisibility,
+  onDelete,
+  onLogout,
+  text,
+}) => {
   return (
     <Modal
       animationType="fade"
@@ -332,8 +391,8 @@ const ProfileSettingsSidebar = ({ visible, onClose, onEdit, onVisibility, onDele
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.overlayTouchable} onPress={onClose} />
         <View style={styles.sidebar}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Settings</Text>
+          <View style={styles.headerSettings}>
+            <Text style={styles.headerTitleSettings}>Settings</Text>
             <TouchableOpacity onPress={onClose}>
               <MaterialIcons name="close" size={26} color="#111827" />
             </TouchableOpacity>
@@ -363,11 +422,7 @@ const ProfileSettingsSidebar = ({ visible, onClose, onEdit, onVisibility, onDele
               danger
               onPress={onDelete}
             />
-            <SidebarItem
-              icon="logout"
-              label="Logout"
-              onPress={onLogout}
-            />
+            <SidebarItem icon="logout" label="Logout" onPress={onLogout} />
           </ScrollView>
         </View>
       </View>
@@ -388,7 +443,12 @@ const SidebarItem = ({ icon, label, onPress, danger }) => {
           size={22}
           color={danger ? "#B91C1C" : "#111827"}
         />
-        <Text style={[styles.itemText, danger && { color: "#B91C1C", fontWeight: "600" }]}>
+        <Text
+          style={[
+            styles.itemText,
+            danger && { color: "#B91C1C", fontWeight: "600" },
+          ]}
+        >
           {label}
         </Text>
       </View>
@@ -396,7 +456,17 @@ const SidebarItem = ({ icon, label, onPress, danger }) => {
   );
 };
 
-const ProfileVisibilityModal = ({ visible, onClose, onSave, onPreview, onCancel, visibility, onToggleVisibility, text, surface }) => {
+const ProfileVisibilityModal = ({
+  visible,
+  onClose,
+  onSave,
+  onPreview,
+  onCancel,
+  visibility,
+  onToggleVisibility,
+  text,
+  surface,
+}) => {
   const [showPreview, setShowPreview] = useState(false);
 
   const handlePreviewPress = () => {
@@ -414,7 +484,9 @@ const ProfileVisibilityModal = ({ visible, onClose, onSave, onPreview, onCancel,
       await onSave();
     } catch (error) {
       console.error("ProfileVisibilityModal save error:", error);
-      Alert.alert("Error", "Could not save visibility settings", [{ text: "OK" }]);
+      Alert.alert("Error", "Could not save visibility settings", [
+        { text: "OK" },
+      ]);
     }
   };
 
@@ -439,14 +511,20 @@ const ProfileVisibilityModal = ({ visible, onClose, onSave, onPreview, onCancel,
       visible={visible}
       onRequestClose={handleClose}
     >
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={handleClose}>
+      <TouchableOpacity
+        style={styles.modalOverlay1}
+        activeOpacity={1}
+        onPress={handleClose}
+      >
         <TouchableOpacity
           activeOpacity={1}
           style={[styles.modalView, { backgroundColor: surface }]}
           onPress={(e) => e.stopPropagation()}
         >
-          <View style={styles.header}>
-            <Text style={[styles.modalTitle, { color: text }]}>Profile Visibility</Text>
+          <View style={styles.headerVisibility}>
+            <Text style={[styles.modalTitle, { color: text }]}>
+              Profile Visibility
+            </Text>
             <TouchableOpacity
               onPress={onClose}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -457,15 +535,24 @@ const ProfileVisibilityModal = ({ visible, onClose, onSave, onPreview, onCancel,
           </View>
           <ScrollView>
             <TouchableOpacity
-              style={[styles.previewButton, showPreview && styles.previewButtonActive]}
+              style={[
+                styles.previewButton,
+                showPreview && styles.previewButtonActive,
+              ]}
               onPress={handlePreviewPress}
             >
               <MaterialIcons
-                name={showPreview ? "visibility" : "visibility_off"}
+                name={showPreview ? "visibility" : "visibility-off"}
                 size={20}
                 color={showPreview ? "#1DA1F2" : text}
               />
-              <Text style={[styles.previewText, { color: showPreview ? "#1DA1F2" : text }]}>
+
+              <Text
+                style={[
+                  styles.previewText,
+                  { color: showPreview ? "#1DA1F2" : text },
+                ]}
+              >
                 Preview Profile
               </Text>
             </TouchableOpacity>
@@ -477,10 +564,16 @@ const ProfileVisibilityModal = ({ visible, onClose, onSave, onPreview, onCancel,
             </View>
           </ScrollView>
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSave}>
+            <TouchableOpacity
+              style={[styles.button, styles.saveButton]}
+              onPress={handleSave}
+            >
               <Text style={styles.saveButtonText}>Save Changes</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onCancel}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={onCancel}
+            >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -490,7 +583,22 @@ const ProfileVisibilityModal = ({ visible, onClose, onSave, onPreview, onCancel,
   );
 };
 
-const ProfilePreviewModal = ({ visible, onClose, profile, photo, text, surface, visibility, email, mobileNo, gender, address, firstName, lastName, userName }) => {
+const ProfilePreviewModal = ({
+  visible,
+  onClose,
+  profile,
+  photo,
+  text,
+  surface,
+  visibility,
+  email,
+  mobileNo,
+  gender,
+  address,
+  firstName,
+  lastName,
+  userName,
+}) => {
   return (
     <Modal
       animationType="fade"
@@ -498,20 +606,26 @@ const ProfilePreviewModal = ({ visible, onClose, profile, photo, text, surface, 
       visible={visible}
       onRequestClose={onClose}
     >
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
         <TouchableOpacity
           activeOpacity={1}
-          style={[styles.modalView, { backgroundColor: surface }]}
+          style={[styles.modalPreview, { backgroundColor: surface }]}
           onPress={(e) => e.stopPropagation()}
         >
           <TouchableOpacity
-            style={styles.closeButton}
+            style={styles.closeButtonPreview}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={onClose}
           >
             <MaterialIcons name="close" size={24} color={text} />
           </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: text }]}>Profile Preview</Text>
+          <Text style={[styles.modalTitle, { color: text }]}>
+            Profile Preview
+          </Text>
           <ScrollView>
             <View style={styles.profileSection}>
               <Image
@@ -528,8 +642,11 @@ const ProfilePreviewModal = ({ visible, onClose, profile, photo, text, surface, 
                 <Text style={[styles.subtext, { color: text }]}>
                   {profile?.tripCount || "0"} Trips Completed
                 </Text>
+
                 {profile?.isVerified && (
-                  <Text style={[styles.subtext, { color: "green" }]}>Verified</Text>
+                  <Text style={[styles.subtext, { color: "green" }]}>
+                    Verified
+                  </Text>
                 )}
                 <Text style={[styles.subtext, { color: text }]}>
                   Status: {profile?.accountStatus || "Active"}
@@ -538,23 +655,32 @@ const ProfilePreviewModal = ({ visible, onClose, profile, photo, text, surface, 
             </View>
             <View style={styles.infoContainer}>
               {visibility?.email && email ? (
-                <Text style={[styles.label, { color: text }]}>Email: {email}</Text>
+                <Text style={[styles.labelPreview, { color: text }]}>
+                  Email: {email}
+                </Text>
               ) : null}
               {visibility?.mobileNo && mobileNo ? (
-                <Text style={[styles.label, { color: text }]}>Mobile: {mobileNo}</Text>
+                <Text style={[styles.labelPreview, { color: text }]}>
+                  Mobile: {mobileNo}
+                </Text>
               ) : null}
               {visibility?.gender && gender ? (
-                <Text style={[styles.label, { color: text }]}>Gender: {gender}</Text>
+                <Text style={[styles.labelPreview, { color: text }]}>
+                  Gender: {gender}
+                </Text>
               ) : null}
               {visibility?.address && address ? (
-                <Text style={[styles.label, { color: text }]}>
-                  Address: {[
-                    address.street,
+                <Text style={[styles.labelPreview, { color: text }]}>
+                  Address:{" "}
+                  {[
+                    address.addressString,
                     address.city,
                     address.state,
                     address.country,
                     address.postalCode,
-                  ].filter(Boolean).join(", ")}
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
                 </Text>
               ) : null}
             </View>
@@ -641,6 +767,7 @@ export default function ProfileScreen() {
         throw new Error(`HTTP error ${res.status}: ${errorText}`);
       }
       const data = await res.json();
+      console.log("Fetched profile data:", data);
       if (data.status === "success") {
         const user = data.data.user;
         setProfile(user);
@@ -797,11 +924,15 @@ export default function ProfileScreen() {
         postalCode: address.postalCode,
         country: address.country,
         countryCode: address.countryCode,
+        dob: dateOfBirth ? dateOfBirth.toISOString() : null,
       },
-      geo: address.lat && address.lng ? {
-        lat: Number(address.lat),
-        lng: Number(address.lng),
-      } : null,
+      geo:
+        address.lat && address.lng
+          ? {
+              lat: Number(address.lat),
+              lng: Number(address.lng),
+            }
+          : null,
       availability,
     };
     setSaving(true);
@@ -815,6 +946,7 @@ export default function ProfileScreen() {
         },
         body: JSON.stringify(payload),
       });
+      console.log("Profile update payload:", payload);
       const data = await res.json();
       if (res.ok) {
         Alert.alert("Success", "Profile updated successfully");
@@ -841,7 +973,7 @@ export default function ProfileScreen() {
         .filter(([_, value]) => value)
         .map(([key]) => key);
       const payload = { public: isPublic, sharedInfo };
-      const response = await fetch(`${API_BASE_URL}/profile/visibility`, {
+      const response = await fetch(`${API_BASE_URL}/profile-settings`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -860,7 +992,10 @@ export default function ProfileScreen() {
       await fetchProfile();
     } catch (error) {
       console.error("Visibility update error:", error);
-      Alert.alert("Error", "Failed to update visibility settings: " + error.message);
+      Alert.alert(
+        "Error",
+        "Failed to update visibility settings: " + error.message
+      );
     }
   };
 
@@ -899,30 +1034,29 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
-      "Logout",
-      "Are you sure you want to logout?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Logout",
-          onPress: async () => {
-            try {
-              await AsyncStorage.removeItem("token");
-              Alert.alert("Success", "Logged out");
-              router.replace("/login");
-            } catch (e) {
-              console.error("Logout error:", e);
-              Alert.alert("Error", "Failed to logout: " + e.message);
-            }
-          },
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        onPress: async () => {
+          try {
+            await AsyncStorage.removeItem("token");
+            Alert.alert("Success", "Logged out");
+            router.replace("/login");
+          } catch (e) {
+            console.error("Logout error:", e);
+            Alert.alert("Error", "Failed to logout: " + e.message);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleToggleVisibility = (field) => {
-    const newVisibility = { ...tempVisibility, [field]: !tempVisibility[field] };
+    const newVisibility = {
+      ...tempVisibility,
+      [field]: !tempVisibility[field],
+    };
     setTempVisibility(newVisibility);
     setPreviewVisibility(newVisibility);
   };
@@ -948,7 +1082,9 @@ export default function ProfileScreen() {
   if (!profile) {
     return (
       <View style={styles.loading}>
-        <Text style={[styles.label, { color: text }]}>Failed to load profile</Text>
+        <Text style={[styles.label, { color: text }]}>
+          Failed to load profile
+        </Text>
         <TouchableOpacity onPress={fetchProfile}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
@@ -961,8 +1097,15 @@ export default function ProfileScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <ProfileHeader onSettingsPress={() => setSettingsModalVisible(true)} text={text} border={border} />
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ProfileHeader
+        onSettingsPress={() => setSettingsModalVisible(true)}
+        text={text}
+        border={border}
+      />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
         <Animated.View style={{ opacity: fadeAnim }}>
           <ProfileCard
             profile={profile}
@@ -1072,12 +1215,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 16,
   },
-  label: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
+
   // ProfileHeader Styles
-  header: {
+  headerStyle: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1114,44 +1254,53 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 20,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
     marginBottom: 25,
+  },
+
+  infoList: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 24,
+    paddingTop: 10,
   },
   row: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "flex-start",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
     paddingVertical: 8,
   },
   label: {
-    fontSize: 15,
+    width: 120,
+    textAlign: "right",
+    paddingRight: 12,
     color: "#6B7280",
+    fontSize: 15,
     fontFamily: "Arial",
-    flex: 1.3,
   },
   value: {
+    flex: 1,
     fontSize: 15,
     color: "#111827",
     fontFamily: "Arial",
     fontWeight: "500",
-    flex: 2,
-    textAlign: "right",
+    textAlign: "left",
   },
   input: {
-    flex: 2,
+    flex: 1,
     height: 40,
     borderColor: "#E5E7EB",
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     fontSize: 15,
     color: "#111827",
     backgroundColor: "#F9FAFB",
-    textAlign: "right",
+    textAlign: "left",
   },
+
   picker: {
     flex: 2,
     height: 40,
@@ -1169,9 +1318,41 @@ const styles = StyleSheet.create({
   },
   headerBanner: {
     backgroundColor: "#953DED",
-    height: 120,
+    height: 130,
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  headerInner: {
+    position: "absolute",
+    bottom: -45, // profile image overlaps the banner
+    alignItems: "center",
+    width: "100%",
+  },
+
+  profileImageCard: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 3,
+    borderColor: "#fff",
+    backgroundColor: "#e5e5e5",
+  },
+  topSection: {
+    marginTop: 60, // gives space below the banner overlap
+    alignItems: "center",
+  },
+
+  inputCard: {
+    height: 40,
+    borderColor: "#E5E7EB",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    fontSize: 15,
+    color: "#111827",
+    backgroundColor: "#F9FAFB",
+    textAlign: "left",
   },
   avatar: {
     width: 90,
@@ -1182,36 +1363,29 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "#fff",
   },
-  topSection: {
-    alignItems: "center",
-    marginTop: 60,
-    marginBottom: 16,
-  },
   name: {
     fontSize: 20,
     fontWeight: "700",
-    fontFamily: "Arial",
+    marginTop: 8,
+    color: "#111827",
   },
   email: {
-    color: "#6B7280",
     fontSize: 14,
-    marginTop: 4,
+    color: "#6B7280",
   },
+
   verifiedRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 3,
   },
   verifiedText: {
-    fontSize: 13,
     color: "#1DA1F2",
+    fontSize: 13,
+    fontFamily: "Arial",
     marginLeft: 4,
   },
-  infoList: {
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    backgroundColor: "#fff",
-  },
+
   valueWrap: {
     flex: 1,
     justifyContent: "center",
@@ -1222,12 +1396,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 10,
     overflow: "hidden",
+    backgroundColor: "#DCFCE7",
+    color: "#166534",
     fontWeight: "600",
   },
   editButtons: {
     flexDirection: "row",
     justifyContent: "space-evenly",
-    marginTop: 25,
+    marginTop: 28,
     marginBottom: 40,
   },
   button: {
@@ -1250,6 +1426,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     textAlign: "center",
   },
+
   // ProfileSettingsSidebar Styles
   overlay: {
     flex: 1,
@@ -1270,7 +1447,7 @@ const styles = StyleSheet.create({
     elevation: 6,
     paddingVertical: 20,
   },
-  header: {
+  headerSettings: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1279,7 +1456,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
   },
-  headerTitle: {
+  headerTitleSettings: {
     fontSize: 20,
     fontWeight: "700",
     color: "#111827",
@@ -1304,7 +1481,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     backgroundColor: "#fff",
     shadowColor: "#000",
-    shadowOpacity: 0.05,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
   },
@@ -1316,7 +1492,7 @@ const styles = StyleSheet.create({
     fontFamily: "Arial",
   },
   // ProfileVisibilityModal Styles
-  modalOverlay: {
+  modalOverlay1: {
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -1329,13 +1505,17 @@ const styles = StyleSheet.create({
     maxHeight: "80%",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
   },
+  headerVisibility: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
   closeButton: {
     position: "absolute",
-    top: 15,
     right: 15,
     zIndex: 1,
     padding: 8,
@@ -1403,6 +1583,23 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 15,
   },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalPreview: {
+    width: "100%",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    maxHeight: "80%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   profileImage: {
     width: width * 0.2,
     height: width * 0.2,
@@ -1417,6 +1614,15 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontFamily: "Arial",
   },
+  closeButtonPreview: {
+    position: "absolute",
+    top: 15,
+    right: 15,
+    zIndex: 1,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
   subtext: {
     fontSize: 15,
     fontFamily: "Arial",
@@ -1425,5 +1631,10 @@ const styles = StyleSheet.create({
   infoContainer: {
     padding: 10,
     marginTop: 10,
+  },
+  labelPreview: {
+    fontSize: 16,
+    fontFamily: "Arial",
+    marginBottom: 8,
   },
 });
