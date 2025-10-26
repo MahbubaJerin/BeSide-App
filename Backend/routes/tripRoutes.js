@@ -223,4 +223,10 @@ router.post(
   tripController.cancelTripMatch
 );
 
+// Mark user as arrived at meeting point
+router.post(
+  "/match/:matchId/arrived",
+  tripController.markUserArrived
+);
+
 module.exports = router;

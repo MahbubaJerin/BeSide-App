@@ -22,14 +22,75 @@ const NavigationModal = ({
 }) => {
   const [isNavigating, setIsNavigating] = useState(false);
   const [tripStatus, setTripStatus] = useState('active');
+  const [hasArrived, setHasArrived] = useState(false);
+  const [bothArrived, setBothArrived] = useState(false);
 
   const handleNavigationStart = () => {
     setIsNavigating(true);
     Alert.alert(
       '🚀 Navigation Started!',
-      'You will now be redirected to Google Maps for turn-by-turn directions. The app will track your progress.',
+      'In-app navigation is now active. Follow the route on the map to reach your destination.',
       [{ text: 'Got it!', style: 'default' }]
     );
+  };
+
+  // Handle "Almost There" button press
+  const handleAlmostThere = async () => {
+    if (!tripMatch?.matchId) {
+      Alert.alert('Error', 'Trip match not found');
+      return;
+    }
+
+    try {
+      console.log('📍 [ALMOST THERE] User pressed Almost There button');
+      
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('Error', 'Please log in again');
+        return;
+      }
+
+      const API_URL = BASE_URL.replace(/\/+$/, '');
+      const response = await fetch(`${API_URL}/api/v1/trip/match/${tripMatch.matchId}/arrived`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          distance: 50 // Placeholder distance
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to mark arrival');
+      }
+
+      if (result.data.bothArrived) {
+        setBothArrived(true);
+        setHasArrived(true);
+        Alert.alert(
+          '🎉 Both Users Have Arrived!',
+          'Great! Both you and your companion have arrived at the meeting point. You can now start your trip together.',
+          [{ text: 'Let\'s Go!', style: 'default' }]
+        );
+      } else {
+        setHasArrived(true);
+        Alert.alert(
+          '✅ Arrival Confirmed!',
+          'You have been marked as arrived at the meeting point. Waiting for your companion to arrive as well.',
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+
+      console.log('✅ [ALMOST THERE] Arrival marked successfully:', result.data);
+
+    } catch (error) {
+      console.error('❌ [ALMOST THERE] Error marking arrival:', error);
+      Alert.alert('Error', 'Failed to mark arrival. Please try again.');
+    }
   };
 
   const handleArrivalDetected = async () => {
@@ -179,7 +240,71 @@ const NavigationModal = ({
             userRole={userRole}
             onNavigationStart={handleNavigationStart}
             onArrivalDetected={handleArrivalDetected}
+            hideOverlays={true} // Hide the overlays so we can show them outside the map
           />
+        </View>
+
+        {/* Route Information Card */}
+        <View style={styles.routeInfoCard}>
+          <Text style={styles.routeTitle}>
+            {userRole === 'organizer' ? '📍 Your Route (Sender)' : '🚶 Your Journey (Receiver)'}
+          </Text>
+          <Text style={styles.routeDescription}>
+            {userRole === 'organizer' 
+              ? 'From Starting Point → Final Destination'
+              : 'Current Location → Meeting Point → Destination'
+            }
+          </Text>
+          <Text style={styles.meetingPointText}>
+            📍 {tripMatch?.meetingPoint?.address || tripMatch?.meetingPoint?.name || 'Meeting Point'}
+          </Text>
+        </View>
+
+        {/* Navigation Controls */}
+        <View style={styles.navigationControls}>
+          <TouchableOpacity
+            style={[styles.navigationButton, { backgroundColor: isNavigating ? '#FF5722' : '#4CAF50' }]}
+            onPress={isNavigating ? () => setIsNavigating(false) : handleNavigationStart}
+          >
+            <Ionicons 
+              name={isNavigating ? "stop" : "navigate"} 
+              size={24} 
+              color="white" 
+            />
+            <Text style={styles.navigationButtonText}>
+              {isNavigating ? 'Stop Navigation' : 'Start Navigation'}
+            </Text>
+          </TouchableOpacity>
+          
+          {!hasArrived && (
+            <TouchableOpacity
+              style={[styles.navigationButton, { backgroundColor: '#2196F3' }]}
+              onPress={handleAlmostThere}
+            >
+              <Ionicons name="checkmark-circle" size={24} color="white" />
+              <Text style={styles.navigationButtonText}>Almost There!</Text>
+            </TouchableOpacity>
+          )}
+          
+          {hasArrived && !bothArrived && (
+            <TouchableOpacity
+              style={[styles.navigationButton, { backgroundColor: '#FFC107' }]}
+              disabled={true}
+            >
+              <Ionicons name="time" size={24} color="white" />
+              <Text style={styles.navigationButtonText}>Waiting for Companion</Text>
+            </TouchableOpacity>
+          )}
+          
+          {bothArrived && (
+            <TouchableOpacity
+              style={[styles.navigationButton, { backgroundColor: '#4CAF50' }]}
+              onPress={() => Alert.alert('Ready to Start!', 'Both users have arrived. You can now start your trip together!')}
+            >
+              <Ionicons name="rocket" size={24} color="white" />
+              <Text style={styles.navigationButtonText}>Ready to Start Trip!</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Status Footer */}
@@ -280,6 +405,55 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  routeInfoCard: {
+    backgroundColor: 'white',
+    margin: 15,
+    marginTop: 0,
+    padding: 15,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  routeTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  routeDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  meetingPointText: {
+    fontSize: 14,
+    color: '#1c52c8',
+    fontWeight: '600',
+  },
+  navigationControls: {
+    flexDirection: 'row',
+    padding: 15,
+    paddingTop: 0,
+    gap: 10,
+  },
+  navigationButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    gap: 8,
+  },
+  navigationButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   statusFooter: {
     flexDirection: 'row',

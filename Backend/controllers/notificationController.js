@@ -572,7 +572,7 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             },
             // Auto-set meeting point to sender's start location
             meetingPoint: {
-                name: 'Meeting Point (Sender\'s Start Location)',
+                name: tripRequest.startLocation?.address || 'Meeting Point',
                 description: 'Starting location of the trip organizer',
                 location: {
                     latitude: tripRequest.startLocation?.latitude || 0,

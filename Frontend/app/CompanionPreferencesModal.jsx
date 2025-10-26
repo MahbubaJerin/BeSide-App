@@ -13,7 +13,6 @@ import {
   SafeAreaView,
   StatusBar
 } from "react-native";
-import * as Location from "expo-location";
 import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -29,7 +28,6 @@ export default function CompanionPreferencesModal({
   prefillDestination = null,
 }) {
   const [talk, setTalk] = useState(false);
-  const [useCurrent, setUseCurrent] = useState(false);
 
   const [startText, setStartText] = useState("");
   const [destText, setDestText] = useState("");
@@ -57,7 +55,6 @@ export default function CompanionPreferencesModal({
   // Prefills coming from map/home.jsx (optional)
   useEffect(() => {
     if (prefillStart) {
-      setUseCurrent(false);
       setStartCoordinates(prefillStart);
       setStartText(`Pinned (${prefillStart.latitude.toFixed(5)}, ${prefillStart.longitude.toFixed(5)})`);
     }
@@ -69,42 +66,9 @@ export default function CompanionPreferencesModal({
     }
   }, [prefillDestination]);
 
-  // Use current location
-  useEffect(() => {
-    if (!useCurrent) return;
-    (async () => {
-      try {
-        setLoading(true);
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") { 
-          Alert.alert("Permission required", "Location permission is needed."); 
-          setUseCurrent(false); 
-          return; 
-        }
-        const pos = await Location.getCurrentPositionAsync({});
-        const currentPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-        setStartCoordinates(currentPos);
-        setStartText("Current location");
-        
-        // Update map region to show current location
-        setRegion({
-          ...currentPos,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-      } catch (e) {
-        console.log("Use current location error:", e);
-        setUseCurrent(false);
-      } finally { 
-        setLoading(false); 
-      }
-    })();
-  }, [useCurrent]);
-
   // Selection handlers from PlacesAutocomplete
   const handleStartSelected = (item) => {
     if (!item) return;
-    setUseCurrent(false);
     setStartText(item.description);
     setStartCoordinates({ latitude: item.lat, longitude: item.lng });
   };
@@ -138,7 +102,6 @@ export default function CompanionPreferencesModal({
       transport,
       gender,
       talk,
-      useCurrentLocation: useCurrent,
     });
     onClose?.();
   };
@@ -246,25 +209,6 @@ export default function CompanionPreferencesModal({
                   <Ionicons name="arrow-back" size={24} color="#333" />
                 </TouchableOpacity>
                 <ThemedText style={styles.searchTitle}>Choose Meeting Point</ThemedText>
-              </View>
-              
-              {/* Option to use current location */}
-              <TouchableOpacity 
-                style={styles.currentLocationOption}
-                onPress={() => {
-                  setUseCurrent(true);
-                  setShowMeetingPointSearch(false);
-                }}
-              >
-                <Ionicons name="locate" size={24} color="#10b981" />
-                <View style={styles.currentLocationText}>
-                  <ThemedText style={styles.currentLocationLabel}>Use Current Location</ThemedText>
-                  <ThemedText style={styles.currentLocationSubtext}>As meeting point</ThemedText>
-                </View>
-              </TouchableOpacity>
-              
-              <View style={styles.divider}>
-                <ThemedText style={styles.dividerText}>OR</ThemedText>
               </View>
               
               <PlacesAutocomplete
@@ -557,30 +501,6 @@ const styles = StyleSheet.create({
   },
   
   // Current Location Option in Search
-  currentLocationOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0fdf4',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#10b981',
-  },
-  currentLocationText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  currentLocationLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-  },
-  currentLocationSubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 2,
-  },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',

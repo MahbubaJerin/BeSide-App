@@ -55,7 +55,7 @@ const tripMatchSchema = new mongoose.Schema({
   // Match status
   status: {
     type: String,
-    enum: ['active', 'in-progress', 'completed', 'cancelled'],
+    enum: ['active', 'ready-to-start', 'in-progress', 'completed', 'cancelled'],
     default: 'active'
   },
   
@@ -98,6 +98,35 @@ const tripMatchSchema = new mongoose.Schema({
     },
     setBy: { type: String },
     setAt: { type: Date }
+  },
+
+  // Arrival tracking for meeting point
+  arrivedUsers: [{
+    type: String // User IDs of users who have arrived
+  }],
+  
+  arrivalTimes: {
+    type: Map,
+    of: Date // Map user ID to arrival time
+  },
+
+  canStartFinalJourney: {
+    type: Boolean,
+    default: false
+  },
+
+  // Trip start coordination
+  startedUsers: [{
+    type: String // User IDs of users who are ready to start the trip
+  }],
+
+  tripStarted: {
+    type: Boolean,
+    default: false
+  },
+
+  tripStartedAt: {
+    type: Date
   },
 
   // Location sharing
