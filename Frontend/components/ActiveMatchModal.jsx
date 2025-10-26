@@ -27,6 +27,7 @@ export default function ActiveMatchModal({
   onRefresh,
   onUpdateStatus,
   currentUserId,
+  arrivalStatus, // Add arrival status prop
 }) {
   const [navigationModalVisible, setNavigationModalVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
@@ -382,6 +383,7 @@ export default function ActiveMatchModal({
               onClose={() => setNavigationModalVisible(false)}
               tripMatch={selectedMatch}
               userRole={getUserRole(selectedMatch)}
+              arrivalStatus={arrivalStatus} // Pass arrival status
             />
           )}
         </View>

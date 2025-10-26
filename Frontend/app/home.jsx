@@ -2274,6 +2274,7 @@ export default function HomeScreen() {
         isLoading={activeMatches?.loading}
         onRefresh={() => activeMatches?.refresh()}
         currentUserId={user?._id} // Pass current user ID to identify organizer vs companion
+        arrivalStatus={arrivalStatus} // Pass real-time arrival status
         onUpdateStatus={async (matchId, status) => {
           try {
             await activeMatches.updateMatchStatus(matchId, status);

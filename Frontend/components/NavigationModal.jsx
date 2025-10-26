@@ -18,7 +18,8 @@ const NavigationModal = ({
   visible, 
   onClose, 
   tripMatch,
-  userRole = 'companion' // 'organizer' or 'companion'
+  userRole = 'companion', // 'organizer' or 'companion'
+  arrivalStatus // Real-time arrival status from parent
 }) => {
   const [isNavigating, setIsNavigating] = useState(false);
   const [tripStatus, setTripStatus] = useState('active');
@@ -27,31 +28,29 @@ const NavigationModal = ({
 
   // Listen to real-time events for arrival updates
   useEffect(() => {
-    // Check initial state from tripMatch
-    if (tripMatch?.arrivedUsers && tripMatch.arrivedUsers.length >= 2) {
-      setBothArrived(true);
-    }
-    
-    // Set up real-time event listeners for arrival updates
-    const handleUserArrived = (eventData) => {
-      console.log('📍 [NAVIGATION MODAL] Received user_arrived event:', eventData);
-      if (eventData.bothArrived) {
-        setBothArrived(true);
+    // Update local state when arrivalStatus changes from parent
+    if (arrivalStatus) {
+      setBothArrived(arrivalStatus.bothUsersArrived || false);
+      
+      // Show alert if both users have arrived and this is the first time we're seeing it
+      if (arrivalStatus.bothUsersArrived && !bothArrived) {
         Alert.alert(
           '🎉 Both Users Have Arrived!',
           'Great! Both you and your companion have arrived at the meeting point. You can now start your trip together.',
           [{ text: 'Let\'s Go!', style: 'default' }]
         );
       }
-    };
-
-    // Add event listener (this would need to be connected to your real-time system)
-    // For now, we'll rely on the parent component to pass updates via props
+    }
+    
+    // Also check initial state from tripMatch
+    if (tripMatch?.arrivedUsers && tripMatch.arrivedUsers.length >= 2) {
+      setBothArrived(true);
+    }
     
     return () => {
-      // Cleanup listeners
+      // Cleanup if needed
     };
-  }, [tripMatch]);
+  }, [arrivalStatus, tripMatch, bothArrived]);
 
   const handleNavigationStart = () => {
     setIsNavigating(true);

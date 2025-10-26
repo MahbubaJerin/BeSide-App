@@ -1003,7 +1003,7 @@ exports.markUserArrived = catchAsync(async (req, res, next) => {
 
   await tripMatch.save();
 
-  // Send real-time notification to the other user
+  // Send real-time notification to both users
   const { sendEventToUser } = require('./realtimeController');
   const otherUserId = tripMatch.organizer.userId === userId ? 
     tripMatch.companion.userId : tripMatch.organizer.userId;
@@ -1019,7 +1019,11 @@ exports.markUserArrived = catchAsync(async (req, res, next) => {
     timestamp: new Date().toISOString()
   };
 
+  // Send to the other user
   sendEventToUser(otherUserId, 'user_arrived', eventData);
+  
+  // Also send to current user so both get the update
+  sendEventToUser(userId, 'user_arrived', eventData);
 
   console.log(`✅ [ARRIVAL] User arrival recorded for match ${matchId}. Both arrived: ${bothArrived}`);
 
