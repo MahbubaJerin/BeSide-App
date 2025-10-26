@@ -1,45 +1,55 @@
 {
   "expo": {
-    "name": "Frontend",
-    "slug": "Frontend",
+    "name": "BeSide",
+    "slug": "BeSide",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/BeSide.png",
+
     "scheme": "myapp",
     "deepLinks": ["myapp://"],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
+    "splash": {
+      "image": "./assets/images/BeSide.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Frontend",
+      "bundleIdentifier": "com.anonymous.BeSide",
       "config": {
         "googleMapsApiKey": "AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw"
       }
     },
+
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/BeSide.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.Frontend",
+      "package": "com.anonymous.BeSide",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw"
         }
       }
     },
+
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/BeSide.png"
     },
+
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
+          "image": "./assets/images/BeSide.png",
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
@@ -57,9 +67,9 @@
         }
       ]
     ],
+
     "experiments": {
       "typedRoutes": true
     }
-    
   }
 }
