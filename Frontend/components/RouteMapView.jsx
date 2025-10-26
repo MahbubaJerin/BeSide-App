@@ -26,6 +26,7 @@ const RouteMapView = ({
   userRole, // 'organizer' or 'companion'
   onNavigationStart,
   onArrivalDetected,
+  onClose, // Function to close/dismiss the modal
   hideOverlays = false // New prop to hide overlays
 }) => {
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -186,12 +187,31 @@ const RouteMapView = ({
 
     console.log('🗺️ [ROUTE MAP] Generating route for:', {
       userRole,
+      tripStatus: tripMatch?.status,
+      tripStarted: tripMatch?.tripStarted,
       hasMeetingPoint: !!meetingPoint,
       hasDestination: !!destination,
       meetingPoint: {lat: meetingPoint.latitude, lng: meetingPoint.longitude},
       destination: destination ? {lat: destination.latitude, lng: destination.longitude} : 'not available'
     });
 
+    // FINAL JOURNEY PHASE: Both users show Meeting Point → Destination
+    if (tripMatch?.tripStarted || tripMatch?.status === 'final-journey') {
+      if (!destination?.latitude || !destination?.longitude) {
+        console.log('🗺️ [ROUTE MAP] No destination for final journey route');
+        return [];
+      }
+      
+      const finalJourneyRoute = [
+        {latitude: meetingPoint.latitude, longitude: meetingPoint.longitude}, // Meeting point
+        {latitude: destination.latitude, longitude: destination.longitude}    // Destination
+      ];
+      
+      console.log('🗺️ [ROUTE MAP] Final journey route: Meeting Point → Destination', finalJourneyRoute);
+      return finalJourneyRoute;
+    }
+
+    // INITIAL PHASE: Different routes based on user role
     // SENDER (organizer): Route from Meeting Point (starting location) → Destination
     if (userRole === 'organizer') {
       if (!destination?.latitude || !destination?.longitude) {
@@ -252,8 +272,18 @@ const RouteMapView = ({
 
     let targetLocation, navType;
 
+    // FINAL JOURNEY PHASE: Both users navigate from Meeting Point to Destination
+    if (tripMatch?.tripStarted || tripMatch?.status === 'final-journey') {
+      if (!destination?.latitude || !destination?.longitude) {
+        Alert.alert('Error', 'Destination not available for final journey');
+        return;
+      }
+      targetLocation = destination;
+      navType = 'Meeting Point → Destination (Final Journey)';
+    }
+    // INITIAL PHASE: Different navigation based on user role
     // SENDER: Navigate from Meeting Point to Final Destination
-    if (userRole === 'organizer') {
+    else if (userRole === 'organizer') {
       if (!destination?.latitude || !destination?.longitude) {
         Alert.alert('Error', 'Destination not available');
         return;
@@ -277,9 +307,14 @@ const RouteMapView = ({
     setIsNavigating(true);
     onNavigationStart && onNavigationStart();
     
+    const isDestinationNav = targetLocation === destination;
+    const navigationMessage = isDestinationNav 
+      ? 'In-app navigation is now active. Follow the route on the map to reach your destination.'
+      : 'In-app navigation is now active. Follow the route on the map to reach the meeting point.';
+    
     Alert.alert(
       '🚀 Navigation Started!',
-      `In-app navigation is now active. Follow the route on the map to reach your ${userRole === 'organizer' ? 'destination' : 'meeting point'}.`,
+      navigationMessage,
       [{ text: 'Got it!', style: 'default' }]
     );
   };
@@ -341,6 +376,72 @@ const RouteMapView = ({
       console.error('❌ [ALMOST THERE] Error marking arrival:', error);
       Alert.alert('Error', 'Failed to mark arrival. Please try again.');
     }
+  };
+
+  // Handle end trip button press
+  const handleEndTrip = async () => {
+    if (!tripMatch?.matchId) {
+      Alert.alert('Error', 'Trip match not found');
+      return;
+    }
+
+    Alert.alert(
+      '🏁 End Trip?',
+      'Have you safely reached your destination? This will complete the trip for both users.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, End Trip',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('🏁 [END TRIP] User confirmed ending trip');
+              
+              const token = await AsyncStorage.getItem('token');
+              if (!token) {
+                Alert.alert('Error', 'Please log in again');
+                return;
+              }
+
+              const API_URL = BASE_URL.replace(/\/+$/, '');
+              const response = await fetch(`${API_URL}/api/v1/trip/match/${tripMatch.matchId}/end-trip`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+
+              const result = await response.json();
+
+              if (!response.ok) {
+                throw new Error(result.message || 'Failed to end trip');
+              }
+
+              Alert.alert(
+                '🎉 Trip Completed!',
+                'Thank you for using BeSide! We hope you had a safe and pleasant journey.',
+                [
+                  {
+                    text: 'Close',
+                    onPress: () => {
+                      // Call onClose to dismiss the modal and return to home
+                      onClose && onClose();
+                    }
+                  }
+                ]
+              );
+
+              console.log('✅ [END TRIP] Trip ended successfully:', result.data);
+
+            } catch (error) {
+              console.error('❌ [END TRIP] Error ending trip:', error);
+              Alert.alert('Error', 'Failed to end trip. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Get markers for map based on new workflow
@@ -563,13 +664,24 @@ const RouteMapView = ({
             </TouchableOpacity>
           )}
           
-          {bothArrived && (
+          {bothArrived && !tripMatch?.tripStarted && (
             <TouchableOpacity
               style={[styles.navigationButton, { backgroundColor: '#4CAF50' }]}
               onPress={() => Alert.alert('Ready to Start!', 'Both users have arrived. You can now start your trip together!')}
             >
               <Ionicons name="rocket" size={24} color="white" />
               <Text style={styles.navigationButtonText}>Ready to Start Trip!</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* End Trip Button - Shows during final journey */}
+          {(tripMatch?.tripStarted || tripMatch?.status === 'final-journey') && (
+            <TouchableOpacity
+              style={[styles.navigationButton, { backgroundColor: '#FF5722' }]}
+              onPress={handleEndTrip}
+            >
+              <Ionicons name="flag" size={24} color="white" />
+              <Text style={styles.navigationButtonText}>End Trip</Text>
             </TouchableOpacity>
           )}
         </View>

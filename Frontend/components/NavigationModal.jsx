@@ -157,6 +157,68 @@ const NavigationModal = ({
     );
   };
 
+  const handleStartFinalJourney = async () => {
+    if (!tripMatch?.matchId) {
+      Alert.alert('Error', 'Trip match not found');
+      return;
+    }
+
+    try {
+      console.log('🚀 [FINAL JOURNEY] User pressed Start Trip button');
+      
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('Error', 'Please log in again');
+        return;
+      }
+
+      const API_URL = BASE_URL.replace(/\/+$/, '');
+      const response = await fetch(`${API_URL}/api/v1/trip/match/${tripMatch.matchId}/start-final-journey`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to start final journey');
+      }
+
+      if (result.data.bothReady && result.data.tripStarted) {
+        Alert.alert(
+          '🚀 Final Journey Started!',
+          'Both companions are ready! You can now navigate together from the meeting point to your destination.',
+          [
+            {
+              text: 'Navigate to Destination',
+              onPress: () => {
+                // Update trip status to indicate final journey has started
+                setTripStatus('final-journey');
+                // Close this modal and let the parent handle navigation
+                onClose();
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          '✅ Ready to Start!',
+          'You\'re ready to begin the final journey. Waiting for your companion to also press "Start Trip".',
+          [{ text: 'OK' }]
+        );
+      }
+
+      console.log('✅ [FINAL JOURNEY] Final journey status updated:', result.data);
+
+    } catch (error) {
+      console.error('❌ [FINAL JOURNEY] Error starting final journey:', error);
+      Alert.alert('Error', 'Failed to start final journey. Please try again.');
+    }
+  };
+
   const getTripInstructions = () => {
     const hasMeetingPoint = tripMatch?.meetingPoint?.location;
     
@@ -240,6 +302,7 @@ const NavigationModal = ({
             userRole={userRole}
             onNavigationStart={handleNavigationStart}
             onArrivalDetected={handleArrivalDetected}
+            onClose={onClose}
             hideOverlays={true} // Hide the overlays so we can show them outside the map
           />
         </View>
@@ -299,7 +362,7 @@ const NavigationModal = ({
           {bothArrived && (
             <TouchableOpacity
               style={[styles.navigationButton, { backgroundColor: '#4CAF50' }]}
-              onPress={() => Alert.alert('Ready to Start!', 'Both users have arrived. You can now start your trip together!')}
+              onPress={handleStartFinalJourney}
             >
               <Ionicons name="rocket" size={24} color="white" />
               <Text style={styles.navigationButtonText}>Ready to Start Trip!</Text>

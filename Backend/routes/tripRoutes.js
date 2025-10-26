@@ -3,8 +3,8 @@ const router = express.Router();
 
 const tripController = require("../controllers/tripController");
 const notificationController = require("../controllers/notificationController");
-// const realtimeController = require("../controllers/realtimeController");
-// console.log("Realtime controller functions:", Object.keys(realtimeController));
+const realtimeController = require("../controllers/realtimeController");
+console.log("Realtime controller functions:", Object.keys(realtimeController));
 const { model } = require("mongoose");
 const { uploadSingle } = require("../utils/fileUpload");
 const authController = require("../controllers/authController");
@@ -101,17 +101,16 @@ router.post(
 
 // 🚀 REAL-TIME ROUTES
 // Server-Sent Events endpoint for real-time updates
-// TEMPORARILY DISABLED - DEBUGGING
-// router.get(
-//   "/realtime",
-//   realtimeController.connectRealtime
-// );
+router.get(
+  "/realtime",
+  realtimeController.connectRealtime
+);
 
 // Debug endpoint to see connected users
-// router.get(
-//   "/connected-users",
-//   realtimeController.getConnectedUsers
-// );
+router.get(
+  "/connected-users",
+  realtimeController.getConnectedUsers
+);
 
 // Admin/debug endpoint to manually cleanup expired requests
 router.post(
@@ -227,6 +226,18 @@ router.post(
 router.post(
   "/match/:matchId/arrived",
   tripController.markUserArrived
+);
+
+// Start final journey from meeting point to destination
+router.post(
+  "/match/:matchId/start-final-journey", 
+  tripController.startFinalJourney
+);
+
+// End trip match journey
+router.post(
+  "/match/:matchId/end-trip",
+  tripController.endTripMatch
 );
 
 module.exports = router;

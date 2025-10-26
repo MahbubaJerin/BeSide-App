@@ -726,6 +726,99 @@ export default function HomeScreen() {
             [{ text: "OK" }]
           );
           break;
+
+        case 'user_arrived':
+          console.log("📍 [REAL-TIME] User arrived event received:", eventData);
+          
+          // Update arrival status for both users
+          setArrivalStatus(prev => ({
+            ...prev,
+            bothUsersArrived: eventData.bothArrived || false,
+            canStartFinalJourney: eventData.canStartTrip || false
+          }));
+          
+          // Show appropriate alert based on whether both users have arrived
+          if (eventData.bothArrived) {
+            Alert.alert(
+              "Both Users Arrived! 🎉",
+              "Great! Both companions have arrived at the meeting point. You can now start your trip together.",
+              [{ text: "Ready to Start!" }]
+            );
+          } else {
+            Alert.alert(
+              "Companion Update 📍",
+              eventData.message,
+              [{ text: "OK" }]
+            );
+          }
+          break;
+
+        case 'final_journey_status':
+          console.log("🚀 [REAL-TIME] Final journey status event received:", eventData);
+          
+          // Update trip status for both users
+          setTripStatus(prev => ({
+            ...prev,
+            userReady: prev.userReady, // Keep current user's ready status
+            bothUsersReady: eventData.bothReady || false,
+            tripStarted: eventData.tripStarted || false
+          }));
+          
+          // Show appropriate alert based on journey status
+          if (eventData.bothReady && eventData.tripStarted) {
+            Alert.alert(
+              "Final Journey Started! 🚀",
+              "Both companions are ready! You can now navigate together from the meeting point to your destination.",
+              [
+                {
+                  text: "Navigate to Destination",
+                  onPress: () => handleStartFinalJourney()
+                },
+                { text: "OK" }
+              ]
+            );
+          } else {
+            Alert.alert(
+              "Trip Status Update",
+              eventData.message,
+              [{ text: "OK" }]
+            );
+          }
+          break;
+
+        case 'trip_ended':
+          console.log("🏁 [REAL-TIME] Trip ended event received:", eventData);
+          
+          // Clear all trip-related state
+          setCurrentNavigationRoute(null);
+          setRouteCoordinates([]);
+          setStartMarker(null);
+          setEndMarker(null);
+          setActiveRequest(null);
+          setArrivalStatus({
+            isNearMeetingPoint: false,
+            hasArrivedAtMeetingPoint: false,
+            distanceToMeetingPoint: null,
+            canStartFinalJourney: false,
+            bothUsersArrived: false
+          });
+          setTripStatus({
+            userReady: false,
+            bothUsersReady: false,
+            tripStarted: false
+          });
+          
+          // Refresh matches to remove completed match
+          if (activeMatches?.refreshMatches) {
+            activeMatches.refreshMatches();
+          }
+          
+          Alert.alert(
+            "Trip Completed! 🎉",
+            eventData.message || "Your companion has completed the trip. Thank you for using BeSide!",
+            [{ text: "Great!" }]
+          );
+          break;
       }
     };
 

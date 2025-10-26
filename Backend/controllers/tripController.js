@@ -1034,3 +1034,132 @@ exports.markUserArrived = catchAsync(async (req, res, next) => {
     }
   });
 });
+
+// Start final journey from meeting point to destination
+exports.startFinalJourney = catchAsync(async (req, res, next) => {
+  const { matchId } = req.params;
+  const userId = req.user._id.toString();
+
+  console.log(`🚀 [FINAL JOURNEY] User ${req.user.userName} starting final journey for match ${matchId}`);
+
+  // Find the trip match
+  const tripMatch = await TripMatch.findOne({ matchId });
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  if (tripMatch.organizer.userId !== userId && tripMatch.companion.userId !== userId) {
+    return next(new AppError("You are not part of this trip match", 403));
+  }
+
+  // Check if both users have arrived
+  if (!tripMatch.canStartFinalJourney) {
+    return next(new AppError("Both users must arrive at meeting point before starting the final journey", 400));
+  }
+
+  // Initialize startedUsers array if it doesn't exist
+  if (!tripMatch.startedUsers) {
+    tripMatch.startedUsers = [];
+  }
+
+  // Add user to started list if not already there
+  if (!tripMatch.startedUsers.includes(userId)) {
+    tripMatch.startedUsers.push(userId);
+    console.log(`📍 [FINAL JOURNEY] User ${req.user.userName} marked as ready to start final journey`);
+  }
+
+  // Check if both users are ready to start
+  const bothReady = tripMatch.startedUsers.length >= 2;
+  
+  if (bothReady && !tripMatch.tripStarted) {
+    tripMatch.tripStarted = true;
+    tripMatch.tripStartedAt = new Date();
+    tripMatch.status = 'final-journey';
+    console.log(`🎉 [FINAL JOURNEY] Both users ready! Starting final journey for match ${matchId}`);
+  }
+
+  await tripMatch.save();
+
+  // Send real-time notification to the other user
+  const { sendEventToUser } = require('./realtimeController');
+  const otherUserId = tripMatch.organizer.userId === userId ? 
+    tripMatch.companion.userId : tripMatch.organizer.userId;
+  
+  const eventData = {
+    matchId: matchId,
+    startedUser: req.user.userName,
+    bothReady: bothReady,
+    tripStarted: tripMatch.tripStarted,
+    message: bothReady 
+      ? `🚀 Both users are ready! The final journey has begun. Navigate together to your destination.`
+      : `✅ ${req.user.userName} is ready to start the final journey. Waiting for you to press "Start Trip".`,
+    timestamp: new Date().toISOString()
+  };
+
+  sendEventToUser(otherUserId, 'final_journey_status', eventData);
+
+  console.log(`✅ [FINAL JOURNEY] Final journey status updated for match ${matchId}. Both ready: ${bothReady}`);
+
+  res.status(200).json({
+    status: "success",
+    message: bothReady ? "Final journey started! Navigate together to your destination." : "Ready to start. Waiting for your companion.",
+    data: {
+      tripMatch,
+      bothReady: bothReady,
+      tripStarted: tripMatch.tripStarted,
+      startedUsers: tripMatch.startedUsers
+    }
+  });
+});
+
+// End trip match journey 
+exports.endTripMatch = catchAsync(async (req, res, next) => {
+  const { matchId } = req.params;
+  const userId = req.user._id.toString();
+
+  console.log(`🏁 [END TRIP] User ${req.user.userName} ending trip match ${matchId}`);
+
+  // Find the trip match
+  const tripMatch = await TripMatch.findOne({ matchId });
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  if (tripMatch.organizer.userId !== userId && tripMatch.companion.userId !== userId) {
+    return next(new AppError("You are not part of this trip match", 403));
+  }
+
+  // Update trip status to completed
+  tripMatch.status = 'completed';
+  tripMatch.completedAt = new Date();
+  tripMatch.completedBy = userId;
+
+  await tripMatch.save();
+
+  // Send real-time notification to the other user
+  const { sendEventToUser } = require('./realtimeController');
+  const otherUserId = tripMatch.organizer.userId === userId ? 
+    tripMatch.companion.userId : tripMatch.organizer.userId;
+  
+  const eventData = {
+    matchId: matchId,
+    completedBy: req.user.userName,
+    message: `🏁 ${req.user.userName} has ended the trip. Thank you for using BeSide for your safe journey!`,
+    timestamp: new Date().toISOString()
+  };
+
+  sendEventToUser(otherUserId, 'trip_ended', eventData);
+
+  console.log(`✅ [END TRIP] Trip match ${matchId} completed successfully by ${req.user.userName}`);
+
+  res.status(200).json({
+    status: "success",
+    message: "Trip completed successfully! Thank you for using BeSide.",
+    data: {
+      tripMatch,
+      completedAt: tripMatch.completedAt
+    }
+  });
+});
