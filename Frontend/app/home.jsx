@@ -768,11 +768,14 @@ export default function HomeScreen() {
           if (eventData.bothReady && eventData.tripStarted) {
             Alert.alert(
               "Final Journey Started! 🚀",
-              "Both companions are ready! You can now navigate together from the meeting point to your destination.",
+              "Both companions are ready! The route from meeting point to destination is now displayed on your map. Use the navigation controls below to reach your destination.",
               [
                 {
-                  text: "Navigate to Destination",
-                  onPress: () => handleStartFinalJourney()
+                  text: "View Route",
+                  onPress: () => {
+                    // Close any open navigation modal to show the route on home screen
+                    setNavigationVisible(false);
+                  }
                 },
                 { text: "OK" }
               ]
@@ -1174,45 +1177,76 @@ export default function HomeScreen() {
           onPress: async () => {
             try {
               const token = await AsyncStorage.getItem("token");
-              if (!token || !activeRequest) return;
+              if (!token) return;
 
-              const response = await fetch(`${BASE_URL}/api/v1/trip/endTrip`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                  requestId: activeRequest._id,
-                }),
-              });
+              // Check if this is a trip match (new system) or legacy trip request
+              const activeTripMatch = activeMatches?.matches?.find(match => 
+                match.status === 'final-journey' || match.tripStarted
+              );
 
-              if (response.ok) {
-                Alert.alert(
-                  "Trip Completed! 🎉",
-                  "Thank you for using our companion service! We hope you had a safe journey.",
-                  [{ text: "OK" }]
-                );
-                
-                // Reset all states
-                setCurrentNavigationRoute(null);
-                setRouteCoordinates([]);
-                setStartMarker(null);
-                setEndMarker(null);
-                setActiveRequest(null);
-                setArrivalStatus({
-                  isNearMeetingPoint: false,
-                  hasArrivedAtMeetingPoint: false,
-                  distanceToMeetingPoint: null,
-                  canStartFinalJourney: false,
-                  bothUsersArrived: false
+              if (activeTripMatch) {
+                // Handle trip match ending
+                const response = await fetch(`${BASE_URL}/api/v1/trip/match/${activeTripMatch.matchId}/end-trip`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
                 });
-                setTripStatus({
-                  userReady: false,
-                  bothUsersReady: false,
-                  tripStarted: false
+
+                if (response.ok) {
+                  Alert.alert(
+                    "Trip Completed! 🎉",
+                    "Thank you for using BeSide! We hope you had a safe journey together.",
+                    [{ text: "Great!" }]
+                  );
+                }
+              } else if (activeRequest) {
+                // Handle legacy trip request ending
+                const response = await fetch(`${BASE_URL}/api/v1/trip/endTrip`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    requestId: activeRequest._id,
+                  }),
                 });
+
+                if (response.ok) {
+                  Alert.alert(
+                    "Trip Completed! 🎉",
+                    "Thank you for using our companion service! We hope you had a safe journey.",
+                    [{ text: "OK" }]
+                  );
+                }
               }
+                
+              // Reset all states regardless of which system was used
+              setCurrentNavigationRoute(null);
+              setRouteCoordinates([]);
+              setStartMarker(null);
+              setEndMarker(null);
+              setActiveRequest(null);
+              setArrivalStatus({
+                isNearMeetingPoint: false,
+                hasArrivedAtMeetingPoint: false,
+                distanceToMeetingPoint: null,
+                canStartFinalJourney: false,
+                bothUsersArrived: false
+              });
+              setTripStatus({
+                userReady: false,
+                bothUsersReady: false,
+                tripStarted: false
+              });
+              
+              // Refresh matches to remove completed match
+              if (activeMatches?.refreshMatches) {
+                activeMatches.refreshMatches();
+              }
+
             } catch (error) {
               console.error("Error ending trip:", error);
               Alert.alert("Error", "Failed to end trip. Please try again.");

@@ -25,6 +25,34 @@ const NavigationModal = ({
   const [hasArrived, setHasArrived] = useState(false);
   const [bothArrived, setBothArrived] = useState(false);
 
+  // Listen to real-time events for arrival updates
+  useEffect(() => {
+    // Check initial state from tripMatch
+    if (tripMatch?.arrivedUsers && tripMatch.arrivedUsers.length >= 2) {
+      setBothArrived(true);
+    }
+    
+    // Set up real-time event listeners for arrival updates
+    const handleUserArrived = (eventData) => {
+      console.log('📍 [NAVIGATION MODAL] Received user_arrived event:', eventData);
+      if (eventData.bothArrived) {
+        setBothArrived(true);
+        Alert.alert(
+          '🎉 Both Users Have Arrived!',
+          'Great! Both you and your companion have arrived at the meeting point. You can now start your trip together.',
+          [{ text: 'Let\'s Go!', style: 'default' }]
+        );
+      }
+    };
+
+    // Add event listener (this would need to be connected to your real-time system)
+    // For now, we'll rely on the parent component to pass updates via props
+    
+    return () => {
+      // Cleanup listeners
+    };
+  }, [tripMatch]);
+
   const handleNavigationStart = () => {
     setIsNavigating(true);
     Alert.alert(
@@ -69,7 +97,7 @@ const NavigationModal = ({
       }
 
       if (result.data.bothArrived) {
-        setBothArrived(true);
+        // Don't set bothArrived here - let the real-time event handle it
         setHasArrived(true);
         Alert.alert(
           '🎉 Both Users Have Arrived!',
@@ -190,14 +218,12 @@ const NavigationModal = ({
       if (result.data.bothReady && result.data.tripStarted) {
         Alert.alert(
           '🚀 Final Journey Started!',
-          'Both companions are ready! You can now navigate together from the meeting point to your destination.',
+          'Both companions are ready! The route from meeting point to destination is now displayed on your home screen.',
           [
             {
-              text: 'Navigate to Destination',
+              text: 'View Route',
               onPress: () => {
-                // Update trip status to indicate final journey has started
-                setTripStatus('final-journey');
-                // Close this modal and let the parent handle navigation
+                // Close this modal and return to home page where route is displayed
                 onClose();
               }
             }
