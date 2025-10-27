@@ -28,8 +28,16 @@ const FinalJourneyModal = ({
   const [tripStatus, setTripStatus] = useState('in-progress');
 
   useEffect(() => {
-    if (visible && tripMatch && tripMatch.meetingPoint && tripMatch.destination) {
+    console.log("🗺️ [FINAL JOURNEY MODAL] Modal state - visible:", visible, "tripMatch:", tripMatch ? "EXISTS" : "NULL");
+    if (visible && tripMatch && tripMatch.meetingPoint && tripMatch.tripDetails?.destinationLocation) {
+      console.log("🗺️ [FINAL JOURNEY MODAL] Calculating route from meeting point to destination");
       calculateRoute();
+    } else {
+      console.log("🗺️ [FINAL JOURNEY MODAL] Not calculating route - missing data");
+      console.log("- visible:", visible);
+      console.log("- tripMatch:", tripMatch ? "EXISTS" : "NULL"); 
+      console.log("- meetingPoint:", tripMatch?.meetingPoint ? "EXISTS" : "NULL");
+      console.log("- destinationLocation:", tripMatch?.tripDetails?.destinationLocation ? "EXISTS" : "NULL");
     }
   }, [visible, tripMatch]);
 
@@ -38,8 +46,8 @@ const FinalJourneyModal = ({
       setLoading(true);
       
       // Get route from meeting point to destination
-      const origin = tripMatch?.meetingPoint;
-      const destination = tripMatch?.destination;
+      const origin = tripMatch?.meetingPoint?.location;
+      const destination = tripMatch?.tripDetails?.destinationLocation;
       
       if (!origin || !destination) {
         console.log('Missing route information:', { origin, destination });
