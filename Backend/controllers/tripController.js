@@ -996,9 +996,28 @@ exports.markUserArrived = catchAsync(async (req, res, next) => {
   const bothArrived = tripMatch.arrivedUsers.length >= 2;
   
   if (bothArrived) {
+    // Automatically start the final journey when both users arrive
     tripMatch.canStartFinalJourney = true;
-    tripMatch.status = 'ready-to-start';
-    console.log(`🎉 [BOTH ARRIVED] Both users have arrived! Trip can now start for match ${matchId}`);
+    tripMatch.status = 'final-journey'; // Change from 'ready-to-start' to 'final-journey'
+    tripMatch.finalJourneyStartedAt = new Date();
+    
+    // Initialize startedUsers array if it doesn't exist
+    if (!tripMatch.startedUsers) {
+      tripMatch.startedUsers = [];
+    }
+    
+    // Add both users to startedUsers since trip starts automatically
+    const organizerUserId = tripMatch.organizer.userId;
+    const companionUserId = tripMatch.companion.userId;
+    
+    if (!tripMatch.startedUsers.includes(organizerUserId)) {
+      tripMatch.startedUsers.push(organizerUserId);
+    }
+    if (!tripMatch.startedUsers.includes(companionUserId)) {
+      tripMatch.startedUsers.push(companionUserId);
+    }
+    
+    console.log(`🚀 [TRIP STARTED] Final journey automatically started for match ${matchId}`);
   }
 
   await tripMatch.save();
@@ -1013,8 +1032,10 @@ exports.markUserArrived = catchAsync(async (req, res, next) => {
     arrivedUser: req.user.userName,
     bothArrived: bothArrived,
     canStartTrip: tripMatch.canStartFinalJourney,
+    tripStarted: bothArrived, // Add this flag
+    status: tripMatch.status,
     message: bothArrived 
-      ? `🎉 Both users have arrived! You can now start the trip together.`
+      ? `🚀 Both users have arrived! Final journey has started automatically.`
       : `📍 ${req.user.userName} has arrived at the meeting point. Waiting for you to arrive.`,
     timestamp: new Date().toISOString()
   };
@@ -1029,11 +1050,12 @@ exports.markUserArrived = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     status: "success",
-    message: bothArrived ? "Both users have arrived! Trip can now start." : "Arrival recorded. Waiting for other user.",
+    message: bothArrived ? "Both users have arrived! Final journey started automatically." : "Arrival recorded. Waiting for other user.",
     data: {
       tripMatch,
       bothArrived: bothArrived,
       canStartTrip: tripMatch.canStartFinalJourney,
+      tripStarted: bothArrived,
       arrivedUsers: tripMatch.arrivedUsers
     }
   });
