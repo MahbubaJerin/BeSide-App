@@ -1030,14 +1030,22 @@ export default function HomeScreen() {
           // If both users have arrived, start final journey automatically
           // If both users have arrived, start final journey automatically
           if (eventData.bothArrived) {
+            console.log("🚀 [DEBUG] Both users arrived! Starting transition to final journey...");
             // Store the current trip match for the final journey modal
             if (eventData.matchId) {
+              console.log("🔍 [DEBUG] Looking for match with ID:", eventData.matchId);
               const tripMatch = activeMatches?.matches?.find(m => m.matchId === eventData.matchId);
+              console.log("🔍 [DEBUG] Found trip match:", tripMatch ? "YES" : "NO");
               if (tripMatch) {
+                console.log("🎯 [DEBUG] Setting active trip match and opening final journey modal");
                 setActiveTripMatch(tripMatch); // Set for FinalJourneyModal
                 setActiveMatchModalVisible(false); // Close navigation modal
                 setFinalJourneyModalVisible(true); // Open final journey modal
+              } else {
+                console.log("❌ [DEBUG] Trip match not found in active matches");
               }
+            } else {
+              console.log("❌ [DEBUG] No matchId in event data");
             }
             
             Alert.alert(
@@ -2954,11 +2962,11 @@ export default function HomeScreen() {
         visible={finalJourneyModalVisible}
         onClose={() => {
           setFinalJourneyModalVisible(false);
-          setCurrentTripMatch(null);
+          setActiveTripMatch(null);
         }}
-        tripMatch={currentTripMatch}
-        userRole={currentTripMatch ? 
-          (currentTripMatch.organizer?.userId === user?._id ? 'organizer' : 'companion') 
+        tripMatch={activeTripMatch}
+        userRole={activeTripMatch ? 
+          (activeTripMatch.organizer?.userId === user?._id ? 'organizer' : 'companion') 
           : 'companion'
         }
       />
