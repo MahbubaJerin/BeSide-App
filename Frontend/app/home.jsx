@@ -1031,18 +1031,40 @@ export default function HomeScreen() {
           // If both users have arrived, start final journey automatically
           if (eventData.bothArrived) {
             console.log("🚀 [DEBUG] Both users arrived! Starting transition to final journey...");
+            
+            // First, refresh active matches to get the latest data
+            if (activeMatches?.refresh) {
+              console.log("🔄 [DEBUG] Refreshing active matches...");
+              activeMatches.refresh(); // Remove await since this is not an async function
+            }
+            
             // Store the current trip match for the final journey modal
             if (eventData.matchId) {
               console.log("🔍 [DEBUG] Looking for match with ID:", eventData.matchId);
               const tripMatch = activeMatches?.matches?.find(m => m.matchId === eventData.matchId);
               console.log("🔍 [DEBUG] Found trip match:", tripMatch ? "YES" : "NO");
+              
               if (tripMatch) {
                 console.log("🎯 [DEBUG] Setting active trip match and opening final journey modal");
                 setActiveTripMatch(tripMatch); // Set for FinalJourneyModal
-                setActiveMatchModalVisible(false); // Close navigation modal
+                setActiveMatchModalVisible(false); // Close active match modal
                 setFinalJourneyModalVisible(true); // Open final journey modal
               } else {
-                console.log("❌ [DEBUG] Trip match not found in active matches");
+                console.log("❌ [DEBUG] Trip match not found, trying to refresh and retry...");
+                // Fallback: refresh and retry after a delay
+                setTimeout(() => {
+                  if (activeMatches?.refresh) {
+                    activeMatches.refresh();
+                    setTimeout(() => {
+                      const refreshedMatch = activeMatches?.matches?.find(m => m.matchId === eventData.matchId);
+                      if (refreshedMatch) {
+                        setActiveTripMatch(refreshedMatch);
+                        setActiveMatchModalVisible(false);
+                        setFinalJourneyModalVisible(true);
+                      }
+                    }, 500);
+                  }
+                }, 1000);
               }
             } else {
               console.log("❌ [DEBUG] No matchId in event data");

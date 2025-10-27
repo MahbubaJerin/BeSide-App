@@ -22,6 +22,8 @@ const NavigationModal = ({
   userRole = 'companion', // 'organizer' or 'companion'
   arrivalStatus, // Real-time arrival status from parent
   onBothArrived, // NEW: Callback when both users arrive
+  arrivalStatus, // Real-time arrival status from parent
+  onBothArrived, // NEW: Callback when both users arrive
 }) => {
   const [isNavigating, setIsNavigating] = useState(false);
   const [tripStatus, setTripStatus] = useState('active');
@@ -175,8 +177,13 @@ const NavigationModal = ({
 
       if (result.data.bothArrived) {
         // Both users have arrived - close this modal and trigger final journey
-        // Both users have arrived - close this modal and trigger final journey
         setHasArrived(true);
+        
+        // Immediately trigger the final journey
+        if (onBothArrived) {
+          console.log("🚀 [NAVIGATION MODAL] Both arrived! Triggering final journey callback...");
+          onBothArrived(tripMatch);
+        }
         
         Alert.alert(
           '🎉 Both Users Have Arrived!',
@@ -185,16 +192,7 @@ const NavigationModal = ({
             text: 'Let\'s Go!', 
             style: 'default',
             onPress: () => {
-              // First close the NavigationModal
-              onClose();
-              
-              // Then trigger the final journey callback after a small delay
-              setTimeout(() => {
-                if (onBothArrived) {
-                  console.log("🚀 [NAVIGATION MODAL] Both arrived! Triggering final journey callback...");
-                  onBothArrived(tripMatch);
-                }
-              }, 300); // 300ms delay to ensure modal is fully closed
+              onClose(); // Close NavigationModal
             }
           }]
         );

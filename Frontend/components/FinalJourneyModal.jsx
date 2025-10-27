@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../config';
 
 const { width, height } = Dimensions.get('window');
+const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 const FinalJourneyModal = ({ 
   visible, 
@@ -49,22 +50,55 @@ const FinalJourneyModal = ({
       const origin = tripMatch?.meetingPoint?.location;
       const destination = tripMatch?.tripDetails?.destinationLocation;
       
+      console.log("🗺️ [ROUTE DEBUG] Origin:", origin);
+      console.log("🗺️ [ROUTE DEBUG] Destination:", destination);
+      
       if (!origin || !destination) {
-        console.log('Missing route information:', { origin, destination });
+        console.log('❌ [ROUTE DEBUG] Missing route information:', { origin, destination });
         Alert.alert('Error', 'Missing route information');
         setLoading(false);
         return;
       }
 
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=AIzaSyBNVVy4WSZfYOLnYgBElzg-6KJYtgEsW9E`
-      );
+      if (!origin.latitude || !origin.longitude || !destination.latitude || !destination.longitude) {
+        console.log('❌ [ROUTE DEBUG] Invalid coordinates:', { 
+          originLat: origin.latitude, 
+          originLng: origin.longitude,
+          destLat: destination.latitude,
+          destLng: destination.longitude
+        });
+        Alert.alert('Error', 'Invalid coordinates');
+        setLoading(false);
+        return;
+      }
 
+      if (!GOOGLE_MAPS_KEY) {
+        console.log('❌ [ROUTE DEBUG] Google Maps API key not found');
+        Alert.alert('Error', 'Google Maps API key not configured');
+        setLoading(false);
+        return;
+      }
+
+      const apiUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=${GOOGLE_MAPS_KEY}`;
+      console.log("🗺️ [ROUTE DEBUG] API URL:", apiUrl.replace(GOOGLE_MAPS_KEY, 'API_KEY_HIDDEN'));
+
+      const response = await fetch(apiUrl);
       const data = await response.json();
+      
+      console.log("🗺️ [ROUTE DEBUG] API Response:", data);
+      
+      if (data.status !== 'OK') {
+        console.log('❌ [ROUTE DEBUG] API Error:', data.status, data.error_message);
+        Alert.alert('Error', `Could not calculate route: ${data.status}`);
+        setLoading(false);
+        return;
+      }
       
       if (data.routes && data.routes.length > 0) {
         const route = data.routes[0];
         const points = decode(route.overview_polyline.points);
+        
+        console.log("✅ [ROUTE DEBUG] Route calculated successfully, points:", points.length);
         
         setRouteData({
           coordinates: points,
@@ -74,10 +108,11 @@ const FinalJourneyModal = ({
           destination: destination,
         });
       } else {
-        Alert.alert('Error', 'Could not calculate route');
+        console.log('❌ [ROUTE DEBUG] No routes found in response');
+        Alert.alert('Error', 'Could not calculate route - no routes found');
       }
     } catch (error) {
-      console.error('Route calculation error:', error);
+      console.error('❌ [ROUTE DEBUG] Route calculation error:', error);
       Alert.alert('Error', 'Failed to calculate route');
     } finally {
       setLoading(false);
