@@ -1034,7 +1034,7 @@ export default function HomeScreen() {
             if (eventData.matchId) {
               const tripMatch = activeMatches?.matches?.find(m => m.matchId === eventData.matchId);
               if (tripMatch) {
-                setCurrentTripMatch(tripMatch);
+                setActiveTripMatch(tripMatch); // Set for FinalJourneyModal
                 setActiveMatchModalVisible(false); // Close navigation modal
                 setFinalJourneyModalVisible(true); // Open final journey modal
               }
