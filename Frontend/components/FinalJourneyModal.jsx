@@ -28,7 +28,7 @@ const FinalJourneyModal = ({
   const [tripStatus, setTripStatus] = useState('in-progress');
 
   useEffect(() => {
-    if (visible && tripMatch) {
+    if (visible && tripMatch && tripMatch.meetingPoint && tripMatch.destination) {
       calculateRoute();
     }
   }, [visible, tripMatch]);
@@ -38,11 +38,13 @@ const FinalJourneyModal = ({
       setLoading(true);
       
       // Get route from meeting point to destination
-      const origin = tripMatch.meetingPoint;
-      const destination = tripMatch.destination;
+      const origin = tripMatch?.meetingPoint;
+      const destination = tripMatch?.destination;
       
       if (!origin || !destination) {
+        console.log('Missing route information:', { origin, destination });
         Alert.alert('Error', 'Missing route information');
+        setLoading(false);
         return;
       }
 
@@ -182,7 +184,33 @@ const FinalJourneyModal = ({
     };
   };
 
-  const companionInfo = userRole === 'organizer' ? tripMatch.companion : tripMatch.organizer;
+  const companionInfo = userRole === 'organizer' ? tripMatch?.companion : tripMatch?.organizer;
+
+  // Early return if no tripMatch data
+  if (!tripMatch) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={onClose}
+      >
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <TouchableOpacity style={styles.backButton} onPress={onClose}>
+              <Ionicons name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Loading Trip...</Text>
+            <View style={styles.placeholder} />
+          </View>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text style={styles.loadingText}>Loading trip details...</Text>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -429,6 +457,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
   },
 });
 
