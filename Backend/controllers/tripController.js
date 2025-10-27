@@ -998,8 +998,10 @@ exports.markUserArrived = catchAsync(async (req, res, next) => {
   if (bothArrived) {
     // Automatically start the final journey when both users arrive
     tripMatch.canStartFinalJourney = true;
-    tripMatch.status = 'final-journey'; // Change from 'ready-to-start' to 'final-journey'
-    tripMatch.finalJourneyStartedAt = new Date();
+    tripMatch.status = 'in-progress'; // Change from 'ready-to-start' to 'in-progress'
+    tripMatch.tripStarted = true;
+    tripMatch.tripStartedAt = new Date();
+    tripMatch.progression.started = new Date();
     
     // Initialize startedUsers array if it doesn't exist
     if (!tripMatch.startedUsers) {
@@ -1101,7 +1103,8 @@ exports.startFinalJourney = catchAsync(async (req, res, next) => {
   if (bothReady && !tripMatch.tripStarted) {
     tripMatch.tripStarted = true;
     tripMatch.tripStartedAt = new Date();
-    tripMatch.status = 'final-journey';
+    tripMatch.status = 'in-progress';
+    tripMatch.progression.started = new Date();
     console.log(`🎉 [FINAL JOURNEY] Both users ready! Starting final journey for match ${matchId}`);
   }
 

@@ -196,7 +196,7 @@ const RouteMapView = ({
     });
 
     // FINAL JOURNEY PHASE: Both users show Meeting Point → Destination
-    if (tripMatch?.tripStarted || tripMatch?.status === 'final-journey') {
+    if (tripMatch?.tripStarted || tripMatch?.status === 'in-progress') {
       if (!destination?.latitude || !destination?.longitude) {
         console.log('🗺️ [ROUTE MAP] No destination for final journey route');
         return [];
@@ -273,7 +273,7 @@ const RouteMapView = ({
     let targetLocation, navType;
 
     // FINAL JOURNEY PHASE: Both users navigate from Meeting Point to Destination
-    if (tripMatch?.tripStarted || tripMatch?.status === 'final-journey') {
+    if (tripMatch?.tripStarted || tripMatch?.status === 'in-progress') {
       if (!destination?.latitude || !destination?.longitude) {
         Alert.alert('Error', 'Destination not available for final journey');
         return;
@@ -675,7 +675,7 @@ const RouteMapView = ({
           )}
           
           {/* End Trip Button - Shows during final journey */}
-          {(tripMatch?.tripStarted || tripMatch?.status === 'final-journey') && (
+          {(tripMatch?.tripStarted || tripMatch?.status === 'in-progress') && (
             <TouchableOpacity
               style={[styles.navigationButton, { backgroundColor: '#FF5722' }]}
               onPress={handleEndTrip}
