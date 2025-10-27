@@ -57,6 +57,9 @@ export default function TripHistoryModal({ visible, onClose }) {
         // Use the new combined history if available, otherwise fall back to requests
         setTripHistory(result.data.history || result.data.requests || []);
         console.log("📋 [TRIP HISTORY] Loaded history items:", result.data.history?.length || result.data.requests?.length || 0);
+        // Use the new combined history if available, otherwise fall back to requests
+        setTripHistory(result.data.history || result.data.requests || []);
+        console.log("📋 [TRIP HISTORY] Loaded history items:", result.data.history?.length || result.data.requests?.length || 0);
       } else {
         throw new Error(result.message || "Failed to fetch trip history");
       }
@@ -198,134 +201,54 @@ export default function TripHistoryModal({ visible, onClose }) {
                 </ThemedText>
               </View>
             ) : (
-              <>
-                <View style={styles.statsContainer}>
-                  <View style={styles.statCard}>
-                    <ThemedText style={styles.statNumber}>{tripHistory.length}</ThemedText>
-                    <ThemedText style={styles.statLabel}>Total Trips</ThemedText>
-                  </View>
-                  <View style={styles.statCard}>
-                    <ThemedText style={styles.statNumber}>
-                      {tripHistory.filter(t => t.status === 'completed').length}
-                    </ThemedText>
-                    <ThemedText style={styles.statLabel}>Completed</ThemedText>
-                  </View>
-                  <View style={styles.statCard}>
-                    <ThemedText style={styles.statNumber}>
-                      {tripHistory.filter(t => t.type === 'match').length}
+              tripHistory.map((trip) => (
+                <View key={trip.matchId || trip.tripReqId || trip.id || trip._id} style={styles.historyCard}>
+                  <View style={styles.cardHeader}>
+                    <View style={styles.statusBadge}>
+                      <ThemedText style={styles.statusIcon}>
+                        {getStatusIcon(trip.status)}
+                      </ThemedText>
+                      <ThemedText style={[styles.statusText, { color: getStatusColor(trip.status) }]}>
+                        {trip.status.toUpperCase()}
+                      </ThemedText>
+                    </View>
+                    <ThemedText style={styles.dateText}>
+                      {formatDate(trip.createdAt)}
                     </ThemedText>
                     <ThemedText style={styles.statLabel}>With Companion</ThemedText>
                   </View>
-                </View>
 
-                {tripHistory.map((trip, index) => {
-                  const statusConfig = getStatusConfig(trip.status);
-                  return (
-                    <Animated.View 
-                      key={trip.matchId || trip.tripReqId || trip.id || trip._id} 
-                      style={[
-                        styles.modernCard,
-                        { 
-                          transform: [{ 
-                            translateY: fadeAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [50 * (index + 1), 0]
-                            })
-                          }]
-                        }
-                      ]}
-                    >
-                      {/* Card Header */}
-                      <View style={styles.cardHeader}>
-                        <View style={styles.leftSection}>
-                          <View style={[styles.statusIconContainer, { backgroundColor: statusConfig.bg }]}>
-                            <Ionicons name={statusConfig.icon} size={18} color={statusConfig.color} />
-                          </View>
-                          <View style={styles.headerInfo}>
-                            <ThemedText style={styles.cardTitle} numberOfLines={1}>
-                              {trip.destination || "Destination not available"}
-                            </ThemedText>
-                            <ThemedText style={styles.cardDate}>
-                              {formatDate(trip.createdAt)}
-                            </ThemedText>
-                          </View>
-                        </View>
-                        <View style={[styles.statusChip, { backgroundColor: statusConfig.bg }]}>
-                          <ThemedText style={[styles.statusText, { color: statusConfig.color }]}>
-                            {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
-                          </ThemedText>
-                        </View>
-                      </View>
-
-                      {/* Trip Details */}
-                      <View style={styles.cardContent}>
-                        {trip.plannedDate && trip.plannedTime && (
-                          <View style={styles.detailRow}>
-                            <Ionicons name="calendar-outline" size={16} color="#6b7280" />
-                            <ThemedText style={styles.detailText}>
-                              {formatDateTime(trip.plannedDate, trip.plannedTime)}
-                            </ThemedText>
-                          </View>
-                        )}
-
-                        {trip.startLocation && (
-                          <View style={styles.detailRow}>
-                            <Ionicons name="location-outline" size={16} color="#6b7280" />
-                            <ThemedText style={styles.detailText} numberOfLines={1}>
-                              From: {trip.startLocation.address || "Meeting point"}
-                            </ThemedText>
-                          </View>
-                        )}
-
-                        {trip.destinationType && (
-                          <View style={styles.detailRow}>
-                            <Ionicons name="business-outline" size={16} color="#6b7280" />
-                            <ThemedText style={styles.detailText}>
-                              {trip.destinationType.charAt(0).toUpperCase() + trip.destinationType.slice(1)} destination
-                            </ThemedText>
-                          </View>
-                        )}
-
-                        <View style={styles.statusRow}>
-                          <ThemedText style={styles.statusDescription}>
-                            {getStatusText(trip)}
-                          </ThemedText>
-                        </View>
-
-                        {/* Companion Info */}
-                        {trip.type === 'match' && trip.companionInfo && (
-                          <View style={styles.companionSection}>
-                            <View style={styles.companionRow}>
-                              <View style={styles.companionAvatar}>
-                                <Ionicons name="person" size={16} color="#8B5CF6" />
-                              </View>
-                              <View>
-                                <ThemedText style={styles.companionName}>
-                                  {trip.companionInfo.userName || "Anonymous"}
-                                </ThemedText>
-                                <ThemedText style={styles.companionLabel}>Travel companion</ThemedText>
-                              </View>
-                            </View>
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Success Badge for Completed Matches */}
-                      {trip.type === 'match' && trip.status === 'completed' && (
-                        <View style={styles.successBadge}>
-                          <Ionicons name="trophy" size={16} color="#f59e0b" />
-                          <ThemedText style={styles.successText}>Successful Journey!</ThemedText>
-                        </View>
-                      )}
-                    </Animated.View>
-                  );
-                })}
-
-                {/* Footer hint */}
-                <View style={styles.footerHint}>
-                  <ThemedText style={styles.hintText}>
-                    🗑️ Only your last 10 trips are kept for privacy
+                  <ThemedText style={styles.destination}>
+                    📍 {trip.destination}
                   </ThemedText>
+                  
+                  <ThemedText style={styles.dateTime}>
+                    📅 {trip.plannedDate ? new Date(trip.plannedDate).toLocaleDateString() : new Date(trip.date).toLocaleDateString()} at {trip.plannedTime || trip.time}
+                  </ThemedText>
+
+                  <ThemedText style={styles.statusDescription}>
+                    {getStatusText(trip)}
+                  </ThemedText>
+
+                  {/* Show companion info for completed matches */}
+                  {trip.type === 'match' && trip.companionInfo && (
+                    <ThemedText style={styles.companionInfo}>
+                      👥 Traveled with: {trip.companionInfo.userName || "Anonymous"}
+                    </ThemedText>
+                  )}
+
+                  {/* Show trip type badge */}
+                  {trip.type === 'match' && trip.status === 'completed' && (
+                    <ThemedText style={styles.tripTypeBadge}>
+                      🎉 Completed Journey
+                    </ThemedText>
+                  )}
+
+                  {trip.acceptedBy && trip.type !== 'match' && (
+                    <ThemedText style={styles.companionInfo}>
+                      👥 Companion: {trip.acceptedBy.userName || "Anonymous"}
+                    </ThemedText>
+                  )}
                 </View>
               </>
             )}
