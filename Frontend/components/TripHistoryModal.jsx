@@ -39,7 +39,9 @@ export default function TripHistoryModal({ visible, onClose }) {
 
       const result = await response.json();
       if (result.status === "success") {
-        setTripHistory(result.data.requests);
+        // Use the new combined history if available, otherwise fall back to requests
+        setTripHistory(result.data.history || result.data.requests || []);
+        console.log("📋 [TRIP HISTORY] Loaded history items:", result.data.history?.length || result.data.requests?.length || 0);
       } else {
         throw new Error(result.message || "Failed to fetch trip history");
       }
@@ -144,7 +146,7 @@ export default function TripHistoryModal({ visible, onClose }) {
               </View>
             ) : (
               tripHistory.map((trip) => (
-                <View key={trip.tripReqId || trip._id} style={styles.historyCard}>
+                <View key={trip.matchId || trip.tripReqId || trip.id || trip._id} style={styles.historyCard}>
                   <View style={styles.cardHeader}>
                     <View style={styles.statusBadge}>
                       <ThemedText style={styles.statusIcon}>
@@ -164,14 +166,28 @@ export default function TripHistoryModal({ visible, onClose }) {
                   </ThemedText>
                   
                   <ThemedText style={styles.dateTime}>
-                    📅 {new Date(trip.date).toLocaleDateString()} at {trip.time}
+                    📅 {trip.plannedDate ? new Date(trip.plannedDate).toLocaleDateString() : new Date(trip.date).toLocaleDateString()} at {trip.plannedTime || trip.time}
                   </ThemedText>
 
                   <ThemedText style={styles.statusDescription}>
                     {getStatusText(trip)}
                   </ThemedText>
 
-                  {trip.acceptedBy && (
+                  {/* Show companion info for completed matches */}
+                  {trip.type === 'match' && trip.companionInfo && (
+                    <ThemedText style={styles.companionInfo}>
+                      👥 Traveled with: {trip.companionInfo.userName || "Anonymous"}
+                    </ThemedText>
+                  )}
+
+                  {/* Show trip type badge */}
+                  {trip.type === 'match' && trip.status === 'completed' && (
+                    <ThemedText style={styles.tripTypeBadge}>
+                      🎉 Completed Journey
+                    </ThemedText>
+                  )}
+
+                  {trip.acceptedBy && trip.type !== 'match' && (
                     <ThemedText style={styles.companionInfo}>
                       👥 Companion: {trip.acceptedBy.userName || "Anonymous"}
                     </ThemedText>
