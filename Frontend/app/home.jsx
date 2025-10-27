@@ -39,6 +39,7 @@ import { usePersistentSearch } from "@/hooks/usePersistentSearch";
 import RequestNotificationModal from "@/components/RequestNotificationModal";
 import SenderAcceptanceNotificationModal from "@/components/SenderAcceptanceNotificationModal";
 import ActiveMatchModal from "@/components/ActiveMatchModal";
+import FinalJourneyModal from "@/components/FinalJourneyModal";
 import BeSideLogo from "../assets/images/BeSide.png";
 import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";
@@ -282,6 +283,8 @@ export default function HomeScreen() {
   const persistentSearch = usePersistentSearch();
   const [requestNotificationVisible, setRequestNotificationVisible] = useState(false);
   const [activeMatchModalVisible, setActiveMatchModalVisible] = useState(false);
+  const [finalJourneyModalVisible, setFinalJourneyModalVisible] = useState(false);
+  const [currentTripMatch, setCurrentTripMatch] = useState(null);
   const [senderAcceptanceVisible, setSenderAcceptanceVisible] = useState(false);
   const [acceptanceData, setAcceptanceData] = useState(null);
 
@@ -737,12 +740,22 @@ export default function HomeScreen() {
             canStartFinalJourney: eventData.canStartTrip || false
           }));
           
-          // Show appropriate alert based on whether both users have arrived
+          // If both users have arrived, start final journey automatically
           if (eventData.bothArrived) {
+            // Store the current trip match for the final journey modal
+            if (eventData.matchId) {
+              const tripMatch = activeMatches?.matches?.find(m => m.matchId === eventData.matchId);
+              if (tripMatch) {
+                setCurrentTripMatch(tripMatch);
+                setActiveMatchModalVisible(false); // Close navigation modal
+                setFinalJourneyModalVisible(true); // Open final journey modal
+              }
+            }
+            
             Alert.alert(
-              "Both Users Arrived! 🎉",
-              "Great! Both companions have arrived at the meeting point. You can now start your trip together.",
-              [{ text: "Ready to Start!" }]
+              "Trip Started! 🚀",
+              "Both companions have arrived! Starting your final journey together.",
+              [{ text: "Let's Go!" }]
             );
           } else {
             Alert.alert(
@@ -2294,6 +2307,20 @@ export default function HomeScreen() {
         onSetMeetingPoint={(matchId, meetingPoint) => {
           return activeMatches.setMeetingPoint(matchId, meetingPoint);
         }}
+      />
+
+      {/* Final Journey Modal */}
+      <FinalJourneyModal
+        visible={finalJourneyModalVisible}
+        onClose={() => {
+          setFinalJourneyModalVisible(false);
+          setCurrentTripMatch(null);
+        }}
+        tripMatch={currentTripMatch}
+        userRole={currentTripMatch ? 
+          (currentTripMatch.organizer?.userId === user?._id ? 'organizer' : 'companion') 
+          : 'companion'
+        }
       />
 
       {/* Sender Acceptance Notification Modal */}
