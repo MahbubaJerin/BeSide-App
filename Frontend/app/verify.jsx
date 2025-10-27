@@ -72,7 +72,6 @@ export default function VerifyScreen() {
   };
 
   const handleVerify = async () => {
-  Alert.alert("Tapped", "Verify button pressed"); // 👈 ADD THIS
 
   if (!userName) {
     Alert.alert("Error", "User is not logged in.");
