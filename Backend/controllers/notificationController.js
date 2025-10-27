@@ -790,15 +790,63 @@ exports.getTripHistory = catchAsync(async (req, res, next) => {
 
     console.log("🔍 [BACKEND] Getting trip history for user:", userId);
 
+    // Get historical trip requests
     const historyRequests = await TripRequest.find({
         "user.userId": userId,
         status: { $in: ["completed", "cancelled", "expired", "declined"] }
-    }).sort({ createdAt: -1 }).limit(50); // Limit to last 50 history items
+    }).sort({ createdAt: -1 }).limit(25);
+
+    // Get completed trip matches (these are the actual completed trips)
+    const TripMatch = require('../models/tripMatchModel');
+    const completedMatches = await TripMatch.find({
+        $or: [
+            { 'organizer.userId': userId },
+            { 'companion.userId': userId }
+        ],
+        status: { $in: ['completed', 'cancelled'] }
+    }).sort({ createdAt: -1 }).limit(25);
+
+    // Combine and sort by date (most recent first)
+    const combinedHistory = [
+        ...historyRequests.map(req => ({
+            type: 'request',
+            id: req._id,
+            status: req.status,
+            destination: req.destination,
+            destinationType: req.destinationType,
+            startLocation: req.startLocation,
+            destinationLocation: req.destinationLocation,
+            plannedDate: req.plannedDate,
+            plannedTime: req.plannedTime,
+            createdAt: req.createdAt,
+            completedAt: req.completedAt,
+            companionInfo: null
+        })),
+        ...completedMatches.map(match => ({
+            type: 'match',
+            id: match._id,
+            matchId: match.matchId,
+            status: match.status,
+            destination: match.tripDetails.destination,
+            destinationType: match.tripDetails.destinationType,
+            startLocation: match.tripDetails.startLocation,
+            destinationLocation: match.tripDetails.destinationLocation,
+            plannedDate: match.tripDetails.plannedDate,
+            plannedTime: match.tripDetails.plannedTime,
+            createdAt: match.createdAt,
+            completedAt: match.completedAt || match.progression?.completed,
+            companionInfo: userId === match.organizer.userId ? match.companion : match.organizer,
+            meetingPoint: match.meetingPoint
+        }))
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 30);
 
     res.status(200).json({
         status: "success",
-        results: historyRequests.length,
-        data: { requests: historyRequests }
+        results: combinedHistory.length,
+        data: { 
+            requests: historyRequests, // Keep for backward compatibility
+            history: combinedHistory // New combined history
+        }
     });
 });
 
