@@ -1,4 +1,4 @@
-// Modal for showing navigation route to meeting point
+// Modal for showing navigation route to meeting point - ENHANCED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   Modal,
@@ -31,14 +31,29 @@ const NavigationModal = ({
   useEffect(() => {
     // Update local state when arrivalStatus changes from parent
     if (arrivalStatus) {
+      const wasBothArrived = bothArrived; // Track previous state
       setBothArrived(arrivalStatus.bothUsersArrived || false);
       
-      // Show alert if both users have arrived and this is the first time we're seeing it
-      if (arrivalStatus.bothUsersArrived && !bothArrived) {
+      // Show alert and trigger callback if both users have arrived and this is the first time we're seeing it
+      if (arrivalStatus.bothUsersArrived && !wasBothArrived) {
+        console.log("🚀 [NAVIGATION MODAL] Real-time event - both users arrived!");
+        
+        // Trigger the callback for the first person who already pressed "Almost There"
+        if (onBothArrived) {
+          console.log("🚀 [NAVIGATION MODAL] Triggering final journey callback from real-time event...");
+          onBothArrived(tripMatch);
+        }
+        
         Alert.alert(
           '🎉 Both Users Have Arrived!',
-          'Great! Both you and your companion have arrived at the meeting point. You can now start your trip together.',
-          [{ text: 'Let\'s Go!', style: 'default' }]
+          'Great! Both you and your companion have arrived at the meeting point. Starting your trip together now!',
+          [{ 
+            text: 'Let\'s Go!', 
+            style: 'default',
+            onPress: () => {
+              onClose(); // Close NavigationModal
+            }
+          }]
         );
       }
     }
@@ -51,7 +66,60 @@ const NavigationModal = ({
     return () => {
       // Cleanup if needed
     };
-  }, [arrivalStatus, tripMatch, bothArrived]);
+  }, [arrivalStatus, tripMatch, bothArrived, onBothArrived, onClose]);
+
+  // Add polling to check if both users have arrived (fallback for real-time events)
+  useEffect(() => {
+    if (!visible || !tripMatch || bothArrived) return;
+
+    const checkBothArrived = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        const API_URL = BASE_URL.replace(/\/+$/, '');
+        const response = await fetch(`${API_URL}/api/v1/trip/match/${tripMatch.matchId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const result = await response.json();
+        if (result.status === 'success' && result.data.match) {
+          const match = result.data.match;
+          console.log("🔄 [POLLING] Match status:", match.status, "Arrived users:", match.arrivedUsers?.length);
+          
+          if (match.arrivedUsers?.length >= 2 && !bothArrived) {
+            console.log("🚀 [POLLING] Both users arrived! Triggering final journey...");
+            setBothArrived(true);
+            
+            if (onBothArrived) {
+              onBothArrived(match);
+            }
+            
+            Alert.alert(
+              '🎉 Both Users Have Arrived!',
+              'Great! Both you and your companion have arrived at the meeting point. Starting your trip together now!',
+              [{ 
+                text: 'Let\'s Go!', 
+                style: 'default',
+                onPress: () => {
+                  onClose(); // Close NavigationModal
+                }
+              }]
+            );
+          }
+        }
+      } catch (error) {
+        console.error('❌ [POLLING] Error checking arrival status:', error);
+      }
+    };
+
+    // Poll every 3 seconds to check if both users have arrived
+    console.log("🔄 [POLLING] Starting polling for both users arrival...");
+    const pollInterval = setInterval(checkBothArrived, 3000);
+    
+    return () => {
+      console.log("🔄 [POLLING] Stopping polling...");
+      clearInterval(pollInterval);
+    };
+  }, [visible, tripMatch, bothArrived, onBothArrived, onClose]);
 
   const handleNavigationStart = () => {
     setIsNavigating(true);
