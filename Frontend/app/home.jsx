@@ -439,6 +439,9 @@ export default function HomeScreen() {
       realTimeUpdates.addEventHandler('trip_completed', (data) => {
         console.log('🎉 [REAL-TIME] Trip completed:', data);
         
+        // Clear route display from map
+        clearRouteFromMap();
+        
         // Refresh active matches to remove completed trip
         activeMatches.refresh();
         
@@ -492,6 +495,9 @@ export default function HomeScreen() {
         
         // Check if trip was completed
         if (finalJourneyModalVisible) {
+          // Clear route display from map
+          clearRouteFromMap();
+          
           // Show completion alert for the first user who is still in the modal
           Alert.alert(
             '🎉 Trip Completed!',
@@ -528,54 +534,6 @@ export default function HomeScreen() {
     setCurrentNavigationRoute(null);
     setStartMarker(null);
     setEndMarker(null);
-  }, []);
-
-  // Helper function to completely reset all preferences and state
-  const resetAllPreferencesAndRoute = useCallback(() => {
-    console.log('🧹 [RESET ALL] Clearing all preferences, consent, and route data');
-    
-    // Clear route and map markers
-    setRouteCoordinates([]);
-    setStartMarker(null);
-    setEndMarker(null);
-    setShowRadius(false);
-    
-    // Clear consent form data
-    setConsent({ noTouch: false, respectful: false, safety: false });
-    
-    // Clear photo
-    setPhotoUrl(null);
-    
-    // Clear trip request data
-    setCurrentTripRequestId(null);
-    setSelectedUser(null);
-    
-    // Clear modal states
-    setConsentVisible(false);
-    setPhotoUploadVisible(false);
-    setPreferencesVisible(false);
-    
-    // Clear any navigation routes
-    setCurrentNavigationRoute(null);
-    
-    // Trigger modal reset
-    setShouldResetModal(true);
-    setTimeout(() => setShouldResetModal(false), 100); // Reset flag after modal processes it
-    
-    console.log('✅ [RESET ALL] All preferences and route data cleared');
-  }, []);
-
-  // Helper function to reset just route and visual elements (lighter reset)
-  const resetRouteAndVisuals = useCallback(() => {
-    console.log('🧹 [RESET ROUTE] Clearing route and visual elements only');
-    
-    setRouteCoordinates([]);
-    setStartMarker(null);
-    setEndMarker(null);
-    setShowRadius(false);
-    setCurrentNavigationRoute(null);
-    
-    console.log('✅ [RESET ROUTE] Route and visual elements cleared');
   }, []);
 
   const resetAllModals = useCallback(() => {
@@ -2983,6 +2941,7 @@ export default function HomeScreen() {
         }
         currentUserId={user?._id}
         onTripCompleted={() => {
+          clearRouteFromMap();
           setTripHistoryVisible(true);
         }}
       />
