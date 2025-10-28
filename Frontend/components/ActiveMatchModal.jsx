@@ -28,6 +28,7 @@ export default function ActiveMatchModal({
   onUpdateStatus,
   currentUserId,
   arrivalStatus, // Add arrival status prop
+  onBothArrived, // NEW: Callback when both users arrive
 }) {
   const [navigationModalVisible, setNavigationModalVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
@@ -384,6 +385,7 @@ export default function ActiveMatchModal({
               tripMatch={selectedMatch}
               userRole={getUserRole(selectedMatch)}
               arrivalStatus={arrivalStatus} // Pass arrival status
+              onBothArrived={onBothArrived} // Pass both arrived callback
             />
           )}
         </View>
