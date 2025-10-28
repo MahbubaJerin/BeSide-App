@@ -343,6 +343,9 @@ export default function HomeScreen() {
       realTimeUpdates.addEventHandler('trip_completed', (data) => {
         console.log('🎉 [REAL-TIME] Trip completed:', data);
         
+        // Clear route display from map
+        clearRouteFromMap();
+        
         // Refresh active matches to remove completed trip
         activeMatches.refresh();
         
@@ -396,6 +399,9 @@ export default function HomeScreen() {
         
         // Check if trip was completed
         if (finalJourneyModalVisible) {
+          // Clear route display from map
+          clearRouteFromMap();
+          
           // Show completion alert for the first user who is still in the modal
           Alert.alert(
             '🎉 Trip Completed!',
@@ -423,6 +429,15 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error closing modal:', error);
     }
+  }, []);
+
+  // Clear all route-related data from map
+  const clearRouteFromMap = useCallback(() => {
+    console.log('🗺️ [ROUTE CLEANUP] Clearing all route data from map');
+    setRouteCoordinates([]);
+    setCurrentNavigationRoute(null);
+    setStartMarker(null);
+    setEndMarker(null);
   }, []);
 
   const resetAllModals = useCallback(() => {
@@ -2439,6 +2454,7 @@ export default function HomeScreen() {
         }
         currentUserId={user?._id}
         onTripCompleted={() => {
+          clearRouteFromMap();
           setTripHistoryVisible(true);
         }}
       />
