@@ -367,13 +367,6 @@ export default function HomeScreen() {
         
         // Refresh active matches to update status
         activeMatches.refresh();
-        
-        // Show waiting notification
-        Alert.alert(
-          'Trip Ending',
-          data.message || `${data.endedBy} has ended the trip. Please confirm when you're ready.`,
-          [{ text: 'OK' }]
-        );
       });
     }
 
@@ -385,6 +378,41 @@ export default function HomeScreen() {
       }
     };
   }, [realTimeUpdates, activeMatches]);
+
+  // Update activeTripMatch when activeMatches data changes
+  useEffect(() => {
+    if (activeTripMatch && activeMatches.matches) {
+      // Find the updated match data
+      const updatedMatch = activeMatches.matches.find(
+        match => match.matchId === activeTripMatch.matchId
+      );
+      
+      if (updatedMatch) {
+        console.log('🔄 [ACTIVE TRIP MATCH] Updating active trip match with latest data');
+        setActiveTripMatch(updatedMatch);
+      } else if (activeTripMatch.matchId) {
+        // Match no longer in active list (might be completed)
+        console.log('🏁 [ACTIVE TRIP MATCH] Match no longer active, likely completed');
+        
+        // Check if trip was completed
+        if (finalJourneyModalVisible) {
+          // Show completion alert for the first user who is still in the modal
+          Alert.alert(
+            '🎉 Trip Completed!',
+            'Both users have confirmed the trip has ended. Thank you for traveling with BeSide!',
+            [{ 
+              text: 'View Trip History', 
+              onPress: () => {
+                setFinalJourneyModalVisible(false);
+                setActiveTripMatch(null);
+                setTripHistoryVisible(true);
+              }
+            }]
+          );
+        }
+      }
+    }
+  }, [activeMatches.matches, activeTripMatch, finalJourneyModalVisible]);
 
   // Safe modal management functions
   const safeCloseModal = useCallback((modalSetter) => {
