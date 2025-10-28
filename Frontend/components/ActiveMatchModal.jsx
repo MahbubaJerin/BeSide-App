@@ -417,7 +417,7 @@ export default function ActiveMatchModal({
                       </View>
                     </View>
 
-                    {/* Action Buttons - Three buttons */}
+                    {/* Action Buttons - Simplified */}
                     <View style={styles.actionButtonsContainer}>
                       <View style={styles.buttonRow}>
                         <TouchableOpacity
@@ -430,17 +430,6 @@ export default function ActiveMatchModal({
                         >
                           <Ionicons name="navigate-outline" size={16} color="#fff" />
                           <Text style={styles.actionButtonText}>Navigate</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.messageButton]}
-                          onPress={() => {
-                            setSelectedMatch(match);
-                            setMessagingModalVisible(true);
-                          }}
-                        >
-                          <Ionicons name="chatbubble-outline" size={16} color="#fff" />
-                          <Text style={styles.actionButtonText}>Message</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -730,8 +719,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#8B5CF6",
-    paddingVertical: 14,
+    backgroundColor: "#1c52c8", // Primary blue
+    paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 12,
     gap: 6,
@@ -744,15 +733,11 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: "#fff",
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   navigationButton: {
     backgroundColor: "#10B981",
     shadowColor: "#10B981",
-  },
-  messageButton: {
-    backgroundColor: "#C77DFF",
-    shadowColor: "#C77DFF",
   },
   cancelButton: {
     backgroundColor: "#EF4444",
