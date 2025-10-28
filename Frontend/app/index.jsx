@@ -70,6 +70,7 @@ export default function WelcomeScreen() {
             style={styles.ctaTouch}
           >
             <ThemedButton
+                testID="welcomeLoginButton" //login button testID
               title="Login"
               type="secondary"
               onPress={handleLogin}

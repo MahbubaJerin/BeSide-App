@@ -1,0 +1,13 @@
+appId: com.anonymous.Frontend
+---
+- launchApp
+- tapOn: { id: "welcomeLoginButton" }
+- assertVisible: { id: "loginButton" }
+- tapOn: { id: "usernameInput" }
+- inputText: "lululemom"
+- tapOn: { id: "passwordInput" }
+- inputText: "Lululu3@"
+- tapOn: { id: "loginButton" }
+- assertVisible: "Safe Journey Companion"
+- takeScreenshot:
+    path: /Users/nameranayat/Desktop/auth_login/home_after_login.png

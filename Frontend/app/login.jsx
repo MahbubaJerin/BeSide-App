@@ -164,6 +164,7 @@ if (token) await AsyncStorage.setItem("token", String(token));
           {/* Username */}
           <View style={styles.fieldGroup}>
             <TextInput
+              testID="usernameInput" // username input testID
               style={[
                 styles.input,
                 { borderColor: usernameErr ? danger : border, color: text },
@@ -194,6 +195,7 @@ if (token) await AsyncStorage.setItem("token", String(token));
           <View style={styles.fieldGroup}>
             <View style={styles.passwordRow}>
               <TextInput
+                testID="passwordInput" // password input testID
                 ref={passwordRef}
                 style={[
                   styles.input,
@@ -247,6 +249,7 @@ if (token) await AsyncStorage.setItem("token", String(token));
 
           {/* Submit */}
           <ThemedButton
+              testID="loginButton" // login button testID
             title={loading ? "Signing in…" : "Login"}
             onPress={handleLogin}
             disabled={loading}
