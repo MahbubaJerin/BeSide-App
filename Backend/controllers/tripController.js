@@ -1142,7 +1142,7 @@ exports.startFinalJourney = catchAsync(async (req, res, next) => {
   });
 });
 
-// End trip match journey 
+// End trip match journey - Two-stage ending process
 exports.endTripMatch = catchAsync(async (req, res, next) => {
   const { matchId } = req.params;
   const userId = req.user._id.toString();
@@ -1160,10 +1160,37 @@ exports.endTripMatch = catchAsync(async (req, res, next) => {
     return next(new AppError("You are not part of this trip match", 403));
   }
 
-  // Update trip status to completed
-  tripMatch.status = 'completed';
-  tripMatch.completedAt = new Date();
-  tripMatch.completedBy = userId;
+  // Check if user has already ended the trip
+  if (tripMatch.endedUsers.includes(userId)) {
+    return res.status(200).json({
+      status: "success",
+      message: "You have already ended this trip",
+      data: {
+        tripMatch,
+        userEnded: true,
+        waitingForOther: !tripMatch.tripEnded,
+        bothEnded: tripMatch.tripEnded
+      }
+    });
+  }
+
+  // Add user to endedUsers array
+  tripMatch.endedUsers.push(userId);
+
+  // Check if both users have ended the trip
+  const bothUsersEnded = tripMatch.endedUsers.length === 2;
+
+  if (bothUsersEnded) {
+    // Both users have ended - mark trip as completed
+    tripMatch.status = 'completed';
+    tripMatch.tripEnded = true;
+    tripMatch.tripEndedAt = new Date();
+    tripMatch.progression.completed = new Date();
+
+    console.log(`🎉 [TRIP COMPLETED] Both users have ended trip ${matchId}`);
+  } else {
+    console.log(`⏳ [WAITING] User ${req.user.userName} ended trip, waiting for other user`);
+  }
 
   await tripMatch.save();
 
@@ -1172,23 +1199,41 @@ exports.endTripMatch = catchAsync(async (req, res, next) => {
   const otherUserId = tripMatch.organizer.userId === userId ? 
     tripMatch.companion.userId : tripMatch.organizer.userId;
   
-  const eventData = {
-    matchId: matchId,
-    completedBy: req.user.userName,
-    message: `🏁 ${req.user.userName} has ended the trip. Thank you for using BeSide for your safe journey!`,
-    timestamp: new Date().toISOString()
-  };
+  if (bothUsersEnded) {
+    // Send completion notification to both users
+    const completionEventData = {
+      matchId: matchId,
+      message: `� Trip completed! Both users have confirmed the trip has ended.`,
+      timestamp: new Date().toISOString(),
+      tripCompleted: true
+    };
 
-  sendEventToUser(otherUserId, 'trip_ended', eventData);
+    sendEventToUser(otherUserId, 'trip_completed', completionEventData);
+    sendEventToUser(userId, 'trip_completed', completionEventData);
+  } else {
+    // Send waiting notification to the other user
+    const waitingEventData = {
+      matchId: matchId,
+      endedBy: req.user.userName,
+      message: `${req.user.userName} has ended the trip. Waiting for you to confirm.`,
+      timestamp: new Date().toISOString(),
+      waitingForConfirmation: true
+    };
 
-  console.log(`✅ [END TRIP] Trip match ${matchId} completed successfully by ${req.user.userName}`);
+    sendEventToUser(otherUserId, 'trip_ending_waiting', waitingEventData);
+  }
 
   res.status(200).json({
     status: "success",
-    message: "Trip completed successfully! Thank you for using BeSide.",
+    message: bothUsersEnded 
+      ? "Trip completed successfully! Both users have confirmed the trip has ended." 
+      : "You have ended the trip. Waiting for your companion to confirm.",
     data: {
       tripMatch,
-      completedAt: tripMatch.completedAt
+      userEnded: true,
+      waitingForOther: !bothUsersEnded,
+      bothEnded: bothUsersEnded,
+      tripCompleted: bothUsersEnded
     }
   });
 });

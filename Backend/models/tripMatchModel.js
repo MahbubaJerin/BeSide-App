@@ -129,6 +129,20 @@ const tripMatchSchema = new mongoose.Schema({
     type: Date
   },
 
+  // Trip ending coordination - track which users have ended the trip
+  endedUsers: [{
+    type: String // User IDs of users who have ended the trip
+  }],
+
+  tripEnded: {
+    type: Boolean,
+    default: false
+  },
+
+  tripEndedAt: {
+    type: Date
+  },
+
   // Location sharing
   liveLocationSharing: {
     enabled: { type: Boolean, default: false },
