@@ -39,6 +39,7 @@ import { usePersistentSearch } from "@/hooks/usePersistentSearch";
 import RequestNotificationModal from "@/components/RequestNotificationModal";
 import SenderAcceptanceNotificationModal from "@/components/SenderAcceptanceNotificationModal";
 import ActiveMatchModal from "@/components/ActiveMatchModal";
+import FinalJourneyModal from "@/components/FinalJourneyModal";
 import BeSideLogo from "../assets/images/BeSide.png";
 import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";
@@ -168,13 +169,17 @@ function useCompanionSearch() {
       });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json?.status === "success") {
-        setCompanions(json.data?.companions || []);
+        const foundCompanions = json.data?.companions || [];
+        setCompanions(foundCompanions);
+        console.log(`👥 [COMPANION SEARCH] Found ${foundCompanions.length} nearby companions within ${searchRadius}m`);
         if (typeof json.data?.searchRadius === "number") {
           setSearchRadius(json.data.searchRadius);
         }
+      } else {
+        console.log('⚠️ [COMPANION SEARCH] Search failed:', json?.message || 'Unknown error');
       }
     } catch (e) {
-      console.log("companion fetch error:", e?.message || e);
+      console.log("❌ [COMPANION SEARCH] Error:", e?.message || e);
     } finally {
       setLoading(false);
     }
@@ -259,6 +264,7 @@ const hardcodedUsers = [
 export default function HomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
   const insets = useSafeAreaInsets();
   // modal stack
   const [modalVisible, setModalVisible] = useState(false); // not verified
@@ -277,6 +283,8 @@ export default function HomeScreen() {
   const persistentSearch = usePersistentSearch();
   const [requestNotificationVisible, setRequestNotificationVisible] = useState(false);
   const [activeMatchModalVisible, setActiveMatchModalVisible] = useState(false);
+  const [finalJourneyModalVisible, setFinalJourneyModalVisible] = useState(false);
+  const [currentTripMatch, setCurrentTripMatch] = useState(null);
   const [senderAcceptanceVisible, setSenderAcceptanceVisible] = useState(false);
   const [acceptanceData, setAcceptanceData] = useState(null);
 
@@ -306,14 +314,15 @@ export default function HomeScreen() {
   const mapRef = useRef(null);
   const [currentTripRequestId, setCurrentTripRequestId] = useState(null);
   const [showRadius, setShowRadius] = useState(false);
+  const expirationTimeoutRef = useRef(null); // Store timeout ID to clear it when match is created
 
   // hooks
   const locationTracking = useLocationTracking();
   const companionSearch = useCompanionSearch();
   const requestPolling = useRequestPolling(5000, true); // Poll every 5 seconds for incoming requests
-  // Enable match polling only when user opens Active Trips modal or after a real match event
-  const [enableMatchPolling, setEnableMatchPolling] = useState(false);
-  const activeMatches = useActiveMatches(15000, enableMatchPolling); // gated polling
+  // Enable match polling - always on to show active trip details
+  const [enableMatchPolling, setEnableMatchPolling] = useState(true); // Changed from false to true
+  const activeMatches = useActiveMatches(15000, enableMatchPolling); // polling enabled by default
   const tripNotifications = useTripNotifications();
   // Disable real-time updates for now (backend endpoint not active in RN)
   const realTimeUpdates = useRealTimeUpdates(false);
@@ -364,7 +373,7 @@ export default function HomeScreen() {
   }, []);
 
   const handleNotificationRouteUpdate = useCallback(
-    (routeInfo) => {
+    async (routeInfo) => {
       if (!routeInfo) return;
 
       const normalizePoint = (point) =>
@@ -372,23 +381,95 @@ export default function HomeScreen() {
           ? { latitude: point.latitude, longitude: point.longitude, address: point.address }
           : null;
 
-      const routePoints = Array.isArray(routeInfo.routeCoordinates)
-        ? routeInfo.routeCoordinates.filter(
-            (coord) =>
-              coord &&
-              typeof coord.latitude === "number" &&
-              typeof coord.longitude === "number"
-          )
-        : [];
-
-      setRouteCoordinates(routePoints);
-
       const meetingSource =
         routeInfo.meetingPoint?.location ||
         routeInfo.meetingPoint ||
         routeInfo.startLocation;
       const meetingPoint = normalizePoint(meetingSource);
+      const destinationPoint = normalizePoint(routeInfo.destinationLocation);
+      const receiverPoint = normalizePoint(routeInfo.receiverLocation) || normalizePoint(currentLocation);
 
+      // Calculate receiver's route: Current Location → Meeting Point → Destination
+      if (receiverPoint && meetingPoint && destinationPoint) {
+        try {
+          console.log('🗺️ [RECEIVER ROUTE] Calculating route with waypoint...');
+          console.log('  From:', receiverPoint);
+          console.log('  Via (Meeting Point):', meetingPoint);
+          console.log('  To:', destinationPoint);
+
+          // Use Google Directions API with waypoint
+          const url =
+            "https://maps.googleapis.com/maps/api/directions/json" +
+            `?origin=${receiverPoint.latitude},${receiverPoint.longitude}` +
+            `&destination=${destinationPoint.latitude},${destinationPoint.longitude}` +
+            `&waypoints=${meetingPoint.latitude},${meetingPoint.longitude}` +
+            `&mode=walking` + // Can be made dynamic based on transport preference
+            `&key=${GOOGLE_MAPS_KEY}`;
+
+          const routeResponse = await fetch(url);
+          const routeData = await routeResponse.json();
+
+          if (routeData.routes && routeData.routes[0]) {
+            const points = routeData.routes[0].overview_polyline.points;
+            const coords = decodePolyline(points);
+            const validCoords = coords.filter(
+              (c) =>
+                c.latitude >= -90 &&
+                c.latitude <= 90 &&
+                c.longitude >= -180 &&
+                c.longitude <= 180
+            );
+            
+            console.log('✅ [RECEIVER ROUTE] Route calculated with', validCoords.length, 'points');
+            setRouteCoordinates(validCoords);
+
+            // Fit map to show entire route
+            if (validCoords.length > 0) {
+              mapRef.current?.fitToCoordinates(validCoords, {
+                edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+                animated: true,
+              });
+            }
+          } else {
+            console.log('⚠️ [RECEIVER ROUTE] No route found, using original route');
+            // Fallback to original route if available
+            const routePoints = Array.isArray(routeInfo.routeCoordinates)
+              ? routeInfo.routeCoordinates.filter(
+                  (coord) =>
+                    coord &&
+                    typeof coord.latitude === "number" &&
+                    typeof coord.longitude === "number"
+                )
+              : [];
+            setRouteCoordinates(routePoints);
+          }
+        } catch (error) {
+          console.error('❌ [RECEIVER ROUTE] Error calculating route:', error);
+          // Fallback to original route
+          const routePoints = Array.isArray(routeInfo.routeCoordinates)
+            ? routeInfo.routeCoordinates.filter(
+                (coord) =>
+                  coord &&
+                  typeof coord.latitude === "number" &&
+                  typeof coord.longitude === "number"
+              )
+            : [];
+          setRouteCoordinates(routePoints);
+        }
+      } else {
+        // Fallback: use original sender's route if receiver info not available
+        const routePoints = Array.isArray(routeInfo.routeCoordinates)
+          ? routeInfo.routeCoordinates.filter(
+              (coord) =>
+                coord &&
+                typeof coord.latitude === "number" &&
+                typeof coord.longitude === "number"
+            )
+          : [];
+        setRouteCoordinates(routePoints);
+      }
+
+      // Set markers
       if (meetingPoint) {
         setStartMarker({
           latitude: meetingPoint.latitude,
@@ -403,7 +484,6 @@ export default function HomeScreen() {
         setStartMarker(null);
       }
 
-      const destinationPoint = normalizePoint(routeInfo.destinationLocation);
       if (destinationPoint) {
         setEndMarker({
           latitude: destinationPoint.latitude,
@@ -414,38 +494,24 @@ export default function HomeScreen() {
         setEndMarker(null);
       }
 
-      const receiverPoint =
-        normalizePoint(routeInfo.receiverLocation) ||
-        normalizePoint(currentLocation);
-
       const fitTargets = [];
-      if (routePoints.length) {
-        fitTargets.push(...routePoints);
-      }
-      if (meetingPoint) {
-        fitTargets.push({
-          latitude: meetingPoint.latitude,
-          longitude: meetingPoint.longitude,
-        });
-      }
-      if (destinationPoint) {
-        fitTargets.push({
-          latitude: destinationPoint.latitude,
-          longitude: destinationPoint.longitude,
-        });
-      }
-      if (receiverPoint) {
-        fitTargets.push({
-          latitude: receiverPoint.latitude,
-          longitude: receiverPoint.longitude,
-        });
-      }
-
-      if (fitTargets.length >= 2 && mapRef.current?.fitToCoordinates) {
-        mapRef.current.fitToCoordinates(fitTargets, {
-          edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
-          animated: true,
-        });
+      if (routeCoordinates.length) {
+        // Will be fitted by the route calculation above
+      } else if (meetingPoint && destinationPoint) {
+        fitTargets.push(
+          { latitude: meetingPoint.latitude, longitude: meetingPoint.longitude },
+          { latitude: destinationPoint.latitude, longitude: destinationPoint.longitude }
+        );
+        if (receiverPoint) {
+          fitTargets.push({ latitude: receiverPoint.latitude, longitude: receiverPoint.longitude });
+        }
+        
+        if (fitTargets.length > 0 && mapRef.current) {
+          mapRef.current.fitToCoordinates(fitTargets, {
+            edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+            animated: true,
+          });
+        }
       }
 
       setCurrentNavigationRoute({
@@ -531,6 +597,13 @@ export default function HomeScreen() {
     if (currentMatchCount > previousMatchCount && currentMatchCount > 0 && isMounted.current && !isInitialLoad) {
       setRequestNotificationVisible(false);
       setSentRequestStatusVisible(false);
+      
+      // Clear expiration timeout since match was created
+      if (expirationTimeoutRef.current) {
+        console.log("✅ Match created, clearing expiration timeout");
+        clearTimeout(expirationTimeoutRef.current);
+        expirationTimeoutRef.current = null;
+      }
       
       Alert.alert(
         "Match Created! 🎉",
@@ -624,10 +697,152 @@ export default function HomeScreen() {
           break;
           
         case 'trip_cancelled':
+          console.log("❌ [REAL-TIME] Trip cancelled event received:", eventData);
+          
+          // Clear current navigation and trip state
+          setCurrentNavigationRoute(null);
+          setRouteCoordinates([]);
+          setStartMarker(null);
+          setEndMarker(null);
+          setActiveRequest(null);
+          setArrivalStatus({
+            isNearMeetingPoint: false,
+            hasArrivedAtMeetingPoint: false,
+            distanceToMeetingPoint: null,
+            canStartFinalJourney: false,
+            bothUsersArrived: false
+          });
+          setTripStatus({
+            userReady: false,
+            bothUsersReady: false,
+            tripStarted: false
+          });
+          
+          // Refresh matches
+          if (activeMatches?.refreshMatches) {
+            activeMatches.refreshMatches();
+          }
+          
           Alert.alert(
             "Trip Cancelled ❌",
-            eventData.message,
+            eventData.message || `${eventData.cancelledBy} cancelled the trip.`,
             [{ text: "OK" }]
+          );
+          break;
+
+        case 'user_arrived':
+          console.log("📍 [REAL-TIME] User arrived event received:", eventData);
+          console.log("📍 [DEBUG] Both arrived:", eventData.bothArrived);
+          console.log("📍 [DEBUG] Active matches:", activeMatches?.matches?.length);
+          
+          // Update arrival status for both users
+          setArrivalStatus(prev => ({
+            ...prev,
+            bothUsersArrived: eventData.bothArrived || false,
+            canStartFinalJourney: eventData.canStartTrip || false
+          }));
+          
+          // If both users have arrived, start final journey automatically
+          if (eventData.bothArrived) {
+            console.log("🚀 [DEBUG] Both users arrived! Starting transition to final journey...");
+            // Store the current trip match for the final journey modal
+            if (eventData.matchId) {
+              console.log("🔍 [DEBUG] Looking for match with ID:", eventData.matchId);
+              const tripMatch = activeMatches?.matches?.find(m => m.matchId === eventData.matchId);
+              console.log("🔍 [DEBUG] Found trip match:", tripMatch ? "YES" : "NO");
+              if (tripMatch) {
+                console.log("🎯 [DEBUG] Setting active trip match and opening final journey modal");
+                setActiveTripMatch(tripMatch); // Set for FinalJourneyModal
+                setActiveMatchModalVisible(false); // Close navigation modal
+                setFinalJourneyModalVisible(true); // Open final journey modal
+              } else {
+                console.log("❌ [DEBUG] Trip match not found in active matches");
+              }
+            } else {
+              console.log("❌ [DEBUG] No matchId in event data");
+            }
+            
+            Alert.alert(
+              "Trip Started! 🚀",
+              "Both companions have arrived! Starting your final journey together.",
+              [{ text: "Let's Go!" }]
+            );
+          } else {
+            Alert.alert(
+              "Companion Update 📍",
+              eventData.message,
+              [{ text: "OK" }]
+            );
+          }
+          break;
+
+        case 'final_journey_status':
+          console.log("🚀 [REAL-TIME] Final journey status event received:", eventData);
+          
+          // Update trip status for both users
+          setTripStatus(prev => ({
+            ...prev,
+            userReady: prev.userReady, // Keep current user's ready status
+            bothUsersReady: eventData.bothReady || false,
+            tripStarted: eventData.tripStarted || false
+          }));
+          
+          // Show appropriate alert based on journey status
+          if (eventData.bothReady && eventData.tripStarted) {
+            Alert.alert(
+              "Final Journey Started! 🚀",
+              "Both companions are ready! The route from meeting point to destination is now displayed on your map. Use the navigation controls below to reach your destination.",
+              [
+                {
+                  text: "View Route",
+                  onPress: () => {
+                    // Close any open navigation modal to show the route on home screen
+                    setNavigationVisible(false);
+                  }
+                },
+                { text: "OK" }
+              ]
+            );
+          } else {
+            Alert.alert(
+              "Trip Status Update",
+              eventData.message,
+              [{ text: "OK" }]
+            );
+          }
+          break;
+
+        case 'trip_ended':
+          console.log("🏁 [REAL-TIME] Trip ended event received:", eventData);
+          
+          // Clear all trip-related state
+          setCurrentNavigationRoute(null);
+          setRouteCoordinates([]);
+          setStartMarker(null);
+          setEndMarker(null);
+          setActiveRequest(null);
+          setArrivalStatus({
+            isNearMeetingPoint: false,
+            hasArrivedAtMeetingPoint: false,
+            distanceToMeetingPoint: null,
+            canStartFinalJourney: false,
+            bothUsersArrived: false
+          });
+          setTripStatus({
+            userReady: false,
+            bothUsersReady: false,
+            tripStarted: false
+          });
+          
+          // Refresh matches to remove completed match
+          if (activeMatches?.refreshMatches) {
+            activeMatches.refreshMatches();
+          }
+          
+          Alert.alert(
+            "Trip Completed! 🎉",
+            eventData.message || "Your companion has completed the trip. Thank you for using BeSide!",
+            [{ text: "Great!" }]
           );
           break;
       }
@@ -707,16 +922,19 @@ export default function HomeScreen() {
     useCallback(() => {
       const load = async () => {
         try {
+          setIsLoadingUser(true);
           const stored = await AsyncStorage.getItem("user");
           if (stored) {
             const parsed = JSON.parse(stored);
             setUser(parsed);
+            setIsLoadingUser(false);
             await locationTracking.startTracking(true);
           } else {
             router.replace("/login");
           }
         } catch (error) {
           console.error('Error loading user data:', error);
+          setIsLoadingUser(false);
           router.replace("/login");
         }
       };
@@ -726,6 +944,12 @@ export default function HomeScreen() {
           locationTracking.stopTracking();
           companionSearch.cleanup();
           resetAllModals(); // Ensure all modals are closed when leaving
+          
+          // Clear expiration timeout on unmount
+          if (expirationTimeoutRef.current) {
+            clearTimeout(expirationTimeoutRef.current);
+            expirationTimeoutRef.current = null;
+          }
         } catch (error) {
           console.error('Error during cleanup:', error);
         }
@@ -976,45 +1200,76 @@ export default function HomeScreen() {
           onPress: async () => {
             try {
               const token = await AsyncStorage.getItem("token");
-              if (!token || !activeRequest) return;
+              if (!token) return;
 
-              const response = await fetch(`${BASE_URL}/api/v1/trip/endTrip`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                  requestId: activeRequest._id,
-                }),
-              });
+              // Check if this is a trip match (new system) or legacy trip request
+              const activeTripMatch = activeMatches?.matches?.find(match => 
+                match.status === 'in-progress' || match.tripStarted
+              );
 
-              if (response.ok) {
-                Alert.alert(
-                  "Trip Completed! 🎉",
-                  "Thank you for using our companion service! We hope you had a safe journey.",
-                  [{ text: "OK" }]
-                );
-                
-                // Reset all states
-                setCurrentNavigationRoute(null);
-                setRouteCoordinates([]);
-                setStartMarker(null);
-                setEndMarker(null);
-                setActiveRequest(null);
-                setArrivalStatus({
-                  isNearMeetingPoint: false,
-                  hasArrivedAtMeetingPoint: false,
-                  distanceToMeetingPoint: null,
-                  canStartFinalJourney: false,
-                  bothUsersArrived: false
+              if (activeTripMatch) {
+                // Handle trip match ending
+                const response = await fetch(`${BASE_URL}/api/v1/trip/match/${activeTripMatch.matchId}/end-trip`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
                 });
-                setTripStatus({
-                  userReady: false,
-                  bothUsersReady: false,
-                  tripStarted: false
+
+                if (response.ok) {
+                  Alert.alert(
+                    "Trip Completed! 🎉",
+                    "Thank you for using BeSide! We hope you had a safe journey together.",
+                    [{ text: "Great!" }]
+                  );
+                }
+              } else if (activeRequest) {
+                // Handle legacy trip request ending
+                const response = await fetch(`${BASE_URL}/api/v1/trip/endTrip`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    requestId: activeRequest._id,
+                  }),
                 });
+
+                if (response.ok) {
+                  Alert.alert(
+                    "Trip Completed! 🎉",
+                    "Thank you for using our companion service! We hope you had a safe journey.",
+                    [{ text: "OK" }]
+                  );
+                }
               }
+                
+              // Reset all states regardless of which system was used
+              setCurrentNavigationRoute(null);
+              setRouteCoordinates([]);
+              setStartMarker(null);
+              setEndMarker(null);
+              setActiveRequest(null);
+              setArrivalStatus({
+                isNearMeetingPoint: false,
+                hasArrivedAtMeetingPoint: false,
+                distanceToMeetingPoint: null,
+                canStartFinalJourney: false,
+                bothUsersArrived: false
+              });
+              setTripStatus({
+                userReady: false,
+                bothUsersReady: false,
+                tripStarted: false
+              });
+              
+              // Refresh matches to remove completed match
+              if (activeMatches?.refreshMatches) {
+                activeMatches.refreshMatches();
+              }
+
             } catch (error) {
               console.error("Error ending trip:", error);
               Alert.alert("Error", "Failed to end trip. Please try again.");
@@ -1025,7 +1280,7 @@ export default function HomeScreen() {
     );
   };
 
-  // ⬇️ CHANGED: no search starts here; only createTripReq + open modal
+  // ⬇️ CHANGED: Only open consent modal - NO trip creation yet!
   const handleFindCompanion = async () => {
     try {
       console.log("🚀 [FIND COMPANION] Starting companion search flow...");
@@ -1052,51 +1307,9 @@ export default function HomeScreen() {
 
       console.log("📍 [FIND COMPANION] Current location:", currentLocation);
 
-      // 1) create trip request
-      const API_URL = BASE_URL.replace(/\/+$/, "");
-      console.log("📤 [CREATE REQUEST] Calling API:", `${API_URL}/api/v1/trip/createTripReq`);
-      const response = await fetch(`${API_URL}/api/v1/trip/createTripReq`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          user: { userId: parsed._id, userName: parsed.userName, userImage: parsed.userImage || "default.jpg" },
-          destination: "Find Companion", // Will be updated with actual preferences
-          destinationType: "By Walk", // Will be updated with actual preferences  
-          date: new Date(),
-          time: "12:00",
-          genderPreference: "any", // Will be updated with actual preferences
-          startLocation: {
-            latitude: currentLocation.latitude,
-            longitude: currentLocation.longitude,
-            address: "Current location"
-          },
-          destinationLocation: null, // Will be updated when preferences are submitted
-          routeCoordinates: [], // Will be updated when route is calculated
-          transportMode: "walking" // Will be updated when preferences are submitted
-        }),
-      });
-      
-      console.log("📥 [CREATE REQUEST] Response status:", response.status);
-      const result = await response.json();
-      console.log("📋 [CREATE REQUEST] Result:", JSON.stringify(result, null, 2));
-
-      if (result.status !== "success") {
-        console.log("❌ [CREATE REQUEST] Failed:", result.message);
-        throw new Error(result.message || "Failed to create trip request");
-      }
-      
-      const tripReqId = result.data.tripRequest.tripReqId;
-      console.log("✅ [CREATE REQUEST] Success! Trip Request ID:", tripReqId);
-      setCurrentTripRequestId(tripReqId);
-
-      // 2) prompt consent -> selfie -> preferences
+      // Just open consent modal - trip will be created later with all data
       console.log("📝 [FIND COMPANION] Opening consent modal...");
       setConsentVisible(true);
-
-      // 3) DO NOT START SEARCH YET
       setShowRadius(false);
     } catch (e) {
       console.error("❌ [FIND COMPANION] Error:", e);
@@ -1105,58 +1318,35 @@ export default function HomeScreen() {
   };
 
   const handlePhotoSubmit = async (uri) => {
-    if (!currentTripRequestId) {
-      Alert.alert("Error", "No active trip request found.");
-      return;
-    }
-    try {
-      const storedUser = await AsyncStorage.getItem("user");
-      const token = await AsyncStorage.getItem("token");
-      if (!storedUser || !token) {
-        Alert.alert("Error", "User not logged in.");
-        router.replace("/login");
-        return;
-      }
-      const API_URL = BASE_URL;
-      const formData = new FormData();
-      formData.append("photo", { uri, type: "image/jpeg", name: `selfie-${Date.now()}.jpg` });
-      const response = await fetch(`${API_URL}api/v1/trip/upload-photo/${currentTripRequestId}`, {
-        method: "POST",
-        body: formData,
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await response.json();
-      if (result.status === "success") {
-        setPhotoUrl(result.data.photoUrl);
-        setPhotoUploadVisible(false);
-        setPreferencesVisible(true);
-      } else {
-        throw new Error(result.message || "Failed to upload photo");
-      }
-    } catch (error) {
-      Alert.alert("Error", error.message || "Failed to upload photo.");
-    }
+    // Just store photo temporarily and move to preferences
+    console.log("📸 [PHOTO] Photo captured, storing temporarily");
+    setPhotoUrl(uri);
+    setPhotoUploadVisible(false);
+    setPreferencesVisible(true);
   };
 
   // NEW: Send trip request to nearby users
-  const sendTripRequestToNearby = async (startCoordinates) => {
+  const sendTripRequestToNearby = async (startCoordinates, tripReqId = null) => {
     try {
       console.log("📡 [SEND TO NEARBY] Starting...");
       const token = await AsyncStorage.getItem("token");
       const user = await AsyncStorage.getItem("user");
 
-      if (!token || !currentTripRequestId) {
+      // Use passed tripReqId or fallback to state
+      const requestId = tripReqId || currentTripRequestId;
+
+      if (!token || !requestId) {
         console.log("❌ [SEND TO NEARBY] Missing token or trip request ID");
         Alert.alert(
           "Debug Error",
-          `Missing: ${!token ? "Token" : ""} ${!currentTripRequestId ? "Trip Request ID" : ""}`
+          `Missing: ${!token ? "Token" : ""} ${!requestId ? "Trip Request ID" : ""}`
         );
         return;
       }
 
       const API_URL = BASE_URL.replace(/\/+$/, "");
       const requestBody = {
-        tripReqId: currentTripRequestId,
+        tripReqId: requestId,
         startCoordinates: { longitude: startCoordinates.longitude, latitude: startCoordinates.latitude },
         searchRadius: 500,
       };
@@ -1200,11 +1390,22 @@ export default function HomeScreen() {
 
   const handlePreferencesSubmit = async (preferences) => {
     try {
+      console.log("📝 [PREFERENCES] Received preferences:", preferences);
+      
+      const storedUser = await AsyncStorage.getItem("user");
+      const token = await AsyncStorage.getItem("token");
+      if (!storedUser || !token) {
+        Alert.alert("Error", "User not logged in.");
+        router.replace("/login");
+        return;
+      }
+      const parsed = JSON.parse(storedUser);
+
       setStartMarker(preferences.startCoordinates);
       setEndMarker(preferences.destinationCoordinates);
       setShowRadius(true);
 
-      // Calculate route
+      // Calculate route first
       const url =
         "https://maps.googleapis.com/maps/api/directions/json" +
         `?origin=${preferences.startCoordinates.latitude},${preferences.startCoordinates.longitude}` +
@@ -1217,17 +1418,15 @@ export default function HomeScreen() {
             : "transit"
         }` +
         `&key=${GOOGLE_MAPS_KEY}`;
-      console.log('🗺️ [ROUTE CALC] Making Google Maps API call:', url);
-      const response = await fetch(url);
-      console.log('📡 [ROUTE CALC] Response status:', response.status);
+      console.log('🗺️ [ROUTE CALC] Making Google Maps API call');
+      const routeResponse = await fetch(url);
+      const routeData = await routeResponse.json();
       
-      const data = await response.json();
-      console.log('📊 [ROUTE CALC] Google Maps response:', JSON.stringify(data, null, 2));
-      
-      if (data.routes && data.routes[0]) {
-        const points = data.routes[0].overview_polyline.points;
+      let validCoords = [];
+      if (routeData.routes && routeData.routes[0]) {
+        const points = routeData.routes[0].overview_polyline.points;
         const coords = decodePolyline(points);
-        const validCoords = coords.filter(
+        validCoords = coords.filter(
           (c) =>
             c.latitude >= -90 &&
             c.latitude <= 90 &&
@@ -1236,93 +1435,136 @@ export default function HomeScreen() {
         );
         setRouteCoordinates(validCoords);
         
-        // Update trip request with route data for persistence
-        if (currentTripRequestId && validCoords.length > 0) {
-          console.log('📍 [ROUTE UPDATE] Updating trip request with route data:', {
-            tripReqId: currentTripRequestId,
-            routePoints: validCoords.length,
-            transportMode: preferences.transport === "car" ? "driving" : 
-                          preferences.transport === "walk" ? "walking" : "transit",
-            startCoords: preferences.startCoordinates,
-            destCoords: preferences.destinationCoordinates
-          });
-          
-          await activeMatches.updateTripRequest(currentTripRequestId, {
-            destination: preferences.destinationAddress || 'Destination',
-            destinationType: preferences.transport === "car" ? "By Car" : 
-                            preferences.transport === "walk" ? "By Walk" : "By Transit",
-            routeCoordinates: validCoords,
-            startLocation: {
-              latitude: preferences.startCoordinates.latitude,
-              longitude: preferences.startCoordinates.longitude,
-              address: preferences.startAddress || 'Start location'
-            },
-            destinationLocation: {
-              latitude: preferences.destinationCoordinates.latitude,
-              longitude: preferences.destinationCoordinates.longitude,
-              address: preferences.destinationAddress || 'Destination'
-            },
-            transportMode: preferences.transport === "car" ? "driving" : 
-                          preferences.transport === "walk" ? "walking" : "transit"
-          });
-          
-          console.log('✅ [ROUTE UPDATE] Trip request updated successfully');
-        } else {
-          console.warn('⚠️ [ROUTE UPDATE] Cannot update trip request:', {
-            hasTripRequestId: !!currentTripRequestId,
-            routePointsCount: validCoords.length
-          });
-        }
-        
         if (validCoords.length > 0) {
           mapRef.current?.fitToCoordinates(validCoords, {
             edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
             animated: true,
           });
         }
-
-        // Send trip request to nearby users (no persistent searching)
-        if (currentTripRequestId) {
-          await sendTripRequestToNearby(preferences.startCoordinates);
-          
-          // Set 2-minute timeout for the request
-          setTimeout(async () => {
-            try {
-              const token = await AsyncStorage.getItem("token");
-              if (token && currentTripRequestId) {
-                await fetch(`${BASE_URL}/api/v1/trip/${currentTripRequestId}/expire`, {
-                  method: 'PUT',
-                  headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                  }
-                });
-                
-                Alert.alert(
-                  "Request Expired ⏰",
-                  "Your companion request has expired after 2 minutes. You can send a new request if needed.",
-                  [{ text: "OK" }]
-                );
-              }
-            } catch (error) {
-              console.error('Error expiring request:', error);
-            }
-          }, 2 * 60 * 1000); // 2 minutes
-        }
-      } else {
-        console.warn('⚠️ [ROUTE CALC] No routes found in Google Maps response');
-        Alert.alert(
-          "Route Not Found", 
-          "We couldn't calculate a route between these locations. You can still send the request manually."
-        );
-        
-        // Still send trip request even without route
-        if (currentTripRequestId) {
-          await sendTripRequestToNearby(preferences.startCoordinates);
-        }
       }
+
+      // NOW create trip request with ALL data (photo, preferences, route)
+      console.log("📤 [CREATE REQUEST] Creating trip request with complete data...");
+      
+      const API_URL = BASE_URL.replace(/\/+$/, "");
+      const formData = new FormData();
+      
+      // Add user data
+      formData.append("user", JSON.stringify({
+        userId: parsed._id,
+        userName: parsed.userName,
+        userImage: parsed.userImage || "default.jpg"
+      }));
+      
+      // Add trip details
+      formData.append("destination", preferences.destinationAddress || "Destination");
+      formData.append("destinationType", preferences.transport === "car" ? "By Car" : 
+                      preferences.transport === "walk" ? "By Walk" : "By Transit");
+      formData.append("date", new Date().toISOString());
+      formData.append("time", new Date().toLocaleTimeString());
+      formData.append("genderPreference", preferences.genderPreference || "any");
+      
+      // Add locations
+      formData.append("startLocation", JSON.stringify({
+        latitude: preferences.startCoordinates.latitude,
+        longitude: preferences.startCoordinates.longitude,
+        address: preferences.startAddress || "Start location"
+      }));
+      
+      formData.append("destinationLocation", JSON.stringify({
+        latitude: preferences.destinationCoordinates.latitude,
+        longitude: preferences.destinationCoordinates.longitude,
+        address: preferences.destinationAddress || "Destination"
+      }));
+      
+      if (validCoords.length > 0) {
+        formData.append("routeCoordinates", JSON.stringify(validCoords));
+      }
+      
+      formData.append("transportMode", preferences.transport === "car" ? "driving" : 
+                      preferences.transport === "walk" ? "walking" : "transit");
+      
+      // Add photo if available
+      if (photoUrl) {
+        formData.append("photo", {
+          uri: photoUrl,
+          type: "image/jpeg",
+          name: `selfie-${Date.now()}.jpg`
+        });
+      }
+      
+      const createResponse = await fetch(`${API_URL}/api/v1/trip/createTripReq`, {
+        method: "POST",
+        body: formData,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      console.log("📥 [CREATE REQUEST] Response status:", createResponse.status);
+      const createResult = await createResponse.json();
+      console.log("📋 [CREATE REQUEST] Result:", JSON.stringify(createResult, null, 2));
+
+      if (createResult.status !== "success") {
+        console.log("❌ [CREATE REQUEST] Failed:", createResult.message);
+        throw new Error(createResult.message || "Failed to create trip request");
+      }
+      
+      const tripReqId = createResult.data.tripRequest.tripReqId;
+      console.log("✅ [CREATE REQUEST] Success! Trip Request ID:", tripReqId);
+      setCurrentTripRequestId(tripReqId);
+
+      // NOW send to nearby users (receivers will get complete info)
+      // Pass tripReqId directly since state update is async
+      await sendTripRequestToNearby(preferences.startCoordinates, tripReqId);
+      
+      // Set expiration timeout
+      if (expirationTimeoutRef.current) {
+        clearTimeout(expirationTimeoutRef.current);
+      }
+      
+      expirationTimeoutRef.current = setTimeout(async () => {
+        try {
+          const token = await AsyncStorage.getItem("token");
+          if (token && tripReqId) {
+            // Check if a match was created before showing expiration
+            const matchResponse = await fetch(`${BASE_URL.replace(/\/+$/, '')}/api/v1/trip/active-matches`, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            const matchResult = await matchResponse.json();
+            const hasActiveMatch = matchResult?.data?.matches?.length > 0;
+            
+            // Only expire and show alert if no match was created
+            if (!hasActiveMatch) {
+              await fetch(`${BASE_URL}/api/v1/trip/${tripReqId}/expire`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              Alert.alert(
+                "Request Expired ⏰",
+                "Your companion request has expired after 2 minutes. You can send a new request if needed.",
+                [{ text: "OK" }]
+              );
+            } else {
+              console.log("✅ Match was created, skipping expiration notification");
+            }
+          }
+        } catch (error) {
+          console.error('Error handling request expiration:', error);
+        }
+      }, 2 * 60 * 1000); // 2 minutes
+      
+      // Close preferences modal
+      setPreferencesVisible(false);
     } catch (error) {
-      Alert.alert("Error", "Failed to fetch route information");
+      console.error("❌ [PREFERENCES] Error:", error);
+      Alert.alert("Error", error.message || "Failed to process your request");
     }
   };
 
@@ -1454,12 +1696,11 @@ export default function HomeScreen() {
   // Remove excessive rendering logs to reduce noise
   // console.log("🏠 [HOME RENDER] Rendering home screen...");
   
-  // Safety check to prevent crashes
-  if (!user) {
-    console.log("⚠️ [HOME] No user found, showing loading state...");
+  // Show loading state while user data is being fetched
+  if (isLoadingUser || !user) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ThemedText type="default">Loading user data...</ThemedText>
+        <ThemedText type="default">Loading...</ThemedText>
       </View>
     );
   }
@@ -1467,7 +1708,7 @@ export default function HomeScreen() {
   // UI
   return (
     <View style={styles.container}>
-      {/* Purple Gradient Header */}
+      {/* Simplified Header */}
       <View style={styles.gradientHeader}>
         <View style={styles.headerTop}>
           <View style={styles.userInfo}>
@@ -1476,95 +1717,36 @@ export default function HomeScreen() {
             </View>
             <View>
               <ThemedText style={styles.userName}>{user?.userName || 'Your Name'}</ThemedText>
-              <ThemedText style={styles.userSubtext}>12 min (3.4 Km)</ThemedText>
+              <ThemedText style={styles.userSubtext}>Safe Journey Companion</ThemedText>
             </View>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.headerButton} onPress={handleCurrentLocation}>
               <Ionicons name="location" size={20} color="white" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerButton} onPress={() => setAvailabilityModalVisible(true)}>
-              <Ionicons name={availability ? "toggle" : "toggle-outline"} size={20} color="white" />
-            </TouchableOpacity>
           </View>
         </View>
         
-        {/* Service Cards */}
+        {/* Compact Service Cards */}
         <View style={styles.serviceCards}>
-          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => setTripHistoryVisible(true)}>
-            <Ionicons name="car" size={24} color="#8B5CF6" />
-            <ThemedText style={styles.serviceCardTitle}>Trips</ThemedText>
-            <ThemedText style={styles.serviceCardSubtext}>4.1 Km, 12 min</ThemedText>
+          <TouchableOpacity style={styles.compactServiceCard} onPress={() => setTripHistoryVisible(true)}>
+            <Ionicons name="time-outline" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.compactCardText}>History</ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => setActiveMatchModalVisible(true)}>
-            <Ionicons name="people" size={24} color="#8B5CF6" />
-            <ThemedText style={styles.serviceCardTitle}>Active</ThemedText>
-            <ThemedText style={styles.serviceCardSubtext}>2.3 Km, 15 min</ThemedText>
+          <TouchableOpacity style={styles.compactServiceCard} onPress={() => router.push('/emergencyContacts')}>
+            <Ionicons name="call-outline" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.compactCardText}>Emergency</ThemedText>
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.serviceCard, styles.primaryCard]} onPress={() => handleSOS("000")}>
-            <Ionicons name="shield-checkmark" size={24} color="#8B5CF6" />
-            <ThemedText style={styles.serviceCardTitle}>SOS Station</ThemedText>
-            <ThemedText style={styles.serviceCardSubtext}>4.5 Km, 18 min</ThemedText>
-          </TouchableOpacity>
-        </View>
-        
-        {/* Secondary Service Row */}
-        <View style={styles.secondaryServices}>
-          <TouchableOpacity style={styles.secondaryCard} onPress={() => router.push('/profile')}>
-            <Ionicons name="wallet" size={20} color="#8B5CF6" />
-            <ThemedText style={styles.secondaryCardText}>Profile</ThemedText>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.secondaryCard} onPress={() => setTripHistoryVisible(true)}>
-            <Ionicons name="restaurant" size={20} color="#8B5CF6" />
-            <ThemedText style={styles.secondaryCardText}>History</ThemedText>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.secondaryCard} onPress={() => router.push('/emergencyContacts')}>
-            <Ionicons name="medical" size={20} color="#8B5CF6" />
-            <ThemedText style={styles.secondaryCardText}>Emergency</ThemedText>
+          <TouchableOpacity style={styles.compactServiceCard} onPress={() => handleSOS("000")}>
+            <Ionicons name="shield-checkmark-outline" size={20} color="#8B5CF6" />
+            <ThemedText style={styles.compactCardText}>SOS</ThemedText>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Central Find Companion Section */}
-      <View style={styles.findCompanionSection}>
-        <View style={styles.companionContainer}>
-          <ThemedText style={styles.companionTitle}>Find Your Travel Companion</ThemedText>
-          <ThemedText style={styles.companionSubtext}>Connect with nearby travelers for safer journeys</ThemedText>
-          
-          <TouchableOpacity 
-            style={styles.findCompanionButton}
-            onPress={handleFindCompanion}
-            disabled={isSearching}
-          >
-            <View style={styles.findButtonContent}>
-              <Ionicons name="people" size={24} color="white" />
-              <ThemedText style={styles.findButtonText}>
-                {isSearching ? 'Searching...' : 'Find Companion'}
-              </ThemedText>
-            </View>
-            {isSearching && (
-              <View style={styles.searchingIndicator}>
-                <Ionicons name="radio-button-on" size={12} color="white" />
-              </View>
-            )}
-          </TouchableOpacity>
-          
-          {senderRequestStatus?.status === 'pending' && (
-            <TouchableOpacity 
-              style={styles.statusButton}
-              onPress={() => setSentRequestStatusVisible(true)}
-            >
-              <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Compact Map */}
+      {/* Compact Map - Now appears first */}
       <View style={styles.compactMapContainer}>
         {currentLocation && currentLocation.latitude && currentLocation.longitude ? (
           <MapView
@@ -1606,11 +1788,12 @@ export default function HomeScreen() {
             {startMarker && (
               <Marker coordinate={startMarker}>
                 <View style={styles.markerContainer}>
-                  <MaterialCommunityIcons name="map-marker" size={30} color="#4CAF50" />
+                  <MaterialCommunityIcons name="account-multiple" size={30} color="#10b981" />
                 </View>
                 <Callout>
-                  <View style={{ width: 140 }}>
-                    <ThemedText type="defaultSemiBold">Start Point</ThemedText>
+                  <View style={{ width: 160 }}>
+                    <ThemedText type="defaultSemiBold">Meeting Point</ThemedText>
+                    <ThemedText type="caption">{startMarker.address || "Where you'll meet"}</ThemedText>
                   </View>
                 </Callout>
               </Marker>
@@ -1619,11 +1802,12 @@ export default function HomeScreen() {
             {endMarker && (
               <Marker coordinate={endMarker}>
                 <View style={styles.markerContainer}>
-                  <MaterialCommunityIcons name="map-marker" size={30} color="#F44336" />
+                  <MaterialCommunityIcons name="flag-checkered" size={30} color="#F44336" />
                 </View>
                 <Callout>
-                  <View style={{ width: 140 }}>
+                  <View style={{ width: 160 }}>
                     <ThemedText type="defaultSemiBold">Destination</ThemedText>
+                    <ThemedText type="caption">{endMarker.address || "Final destination"}</ThemedText>
                   </View>
                 </Callout>
               </Marker>
@@ -1711,6 +1895,38 @@ export default function HomeScreen() {
             <ThemedText type="default" style={styles.loadingMapText}>Loading map...</ThemedText>
           </View>
         )}
+      </View>
+
+      {/* Compact Find Companion Section - Now appears after map */}
+      <View style={styles.findCompanionSection}>
+        <View style={styles.companionContainer}>
+          <TouchableOpacity 
+            style={styles.findCompanionButton}
+            onPress={handleFindCompanion}
+            disabled={isSearching}
+          >
+            <View style={styles.findButtonContent}>
+              <Ionicons name="people" size={24} color="white" />
+              <ThemedText style={styles.findButtonText}>
+                {isSearching ? 'Searching...' : 'Find Companion'}
+              </ThemedText>
+            </View>
+            {isSearching && (
+              <View style={styles.searchingIndicator}>
+                <Ionicons name="radio-button-on" size={12} color="white" />
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          {senderRequestStatus?.status === 'pending' && (
+            <TouchableOpacity 
+              style={styles.statusButton}
+              onPress={() => setSentRequestStatusVisible(true)}
+            >
+              <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Show searching status when active */}
@@ -1910,7 +2126,7 @@ export default function HomeScreen() {
           onPress={() => {
             console.log("🚗 Opening Active Trips Modal");
             setActiveMatchModalVisible(true);
-            setEnableMatchPolling(true); // start polling only when user opens Active Trips
+            // Polling is already enabled in background
           }}
         >
           <View style={styles.navIconWithBadge}>
@@ -2075,11 +2291,13 @@ export default function HomeScreen() {
         visible={activeMatchModalVisible}
         onClose={() => {
           setActiveMatchModalVisible(false);
-          setEnableMatchPolling(false); // stop polling when user closes modal
+          // Keep polling enabled so match updates continue in background
         }}
         matches={activeMatches?.matches || []}
         isLoading={activeMatches?.loading}
         onRefresh={() => activeMatches?.refresh()}
+        currentUserId={user?._id} // Pass current user ID to identify organizer vs companion
+        arrivalStatus={arrivalStatus} // Pass real-time arrival status
         onUpdateStatus={async (matchId, status) => {
           try {
             await activeMatches.updateMatchStatus(matchId, status);
@@ -2099,6 +2317,20 @@ export default function HomeScreen() {
         onSetMeetingPoint={(matchId, meetingPoint) => {
           return activeMatches.setMeetingPoint(matchId, meetingPoint);
         }}
+      />
+
+      {/* Final Journey Modal */}
+      <FinalJourneyModal
+        visible={finalJourneyModalVisible}
+        onClose={() => {
+          setFinalJourneyModalVisible(false);
+          setActiveTripMatch(null);
+        }}
+        tripMatch={activeTripMatch}
+        userRole={activeTripMatch ? 
+          (activeTripMatch.organizer?.userId === user?._id ? 'organizer' : 'companion') 
+          : 'companion'
+        }
       />
 
       {/* Sender Acceptance Notification Modal */}
@@ -2195,7 +2427,7 @@ const styles = StyleSheet.create({
   gradientHeader: {
     backgroundColor: "#8B5CF6",
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 15,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 25,
     borderBottomRightRadius: 25,
@@ -2209,7 +2441,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 15,
   },
   userInfo: {
     flexDirection: "row",
@@ -2241,48 +2473,12 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   
-  // Service Cards
+  // Compact Service Cards
   serviceCards: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 15,
-  },
-  serviceCard: {
-    flex: 1,
-    backgroundColor: "white",
-    padding: 15,
-    borderRadius: 15,
-    alignItems: "center",
-    marginHorizontal: 4,
-    shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  primaryCard: {
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.1)",
-  },
-  serviceCardTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1f2937",
-    marginTop: 8,
-  },
-  serviceCardSubtext: {
-    fontSize: 10,
-    color: "#6b7280",
-    marginTop: 2,
-  },
-  
-  // Secondary Services
-  secondaryServices: {
     flexDirection: "row",
     justifyContent: "space-around",
   },
-  secondaryCard: {
+  compactServiceCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.25)",
@@ -2292,55 +2488,58 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.3)",
   },
-  secondaryCardText: {
+  compactCardText: {
     color: "white",
     fontSize: 12,
     marginLeft: 6,
+    fontWeight: "500",
   },
   
-  // Find Companion Section
+  // Find Companion Section - Compact
   findCompanionSection: {
-    padding: 20,
+    padding: 15,
     backgroundColor: "#f8fafc",
   },
   companionContainer: {
     backgroundColor: "white",
-    borderRadius: 20,
-    padding: 24,
+    borderRadius: 15,
+    padding: 16,
     alignItems: "center",
     shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     borderWidth: 1,
     borderColor: "rgba(139, 92, 246, 0.1)",
   },
   companionTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "700",
     color: "#1f2937",
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: "center",
+    display: "none", // Hide title to make it more compact
   },
   companionSubtext: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#6b7280",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 12,
+    display: "none", // Hide subtitle to make it more compact
   },
   findCompanionButton: {
     backgroundColor: "#8B5CF6",
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 30,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 25,
     flexDirection: "row",
     alignItems: "center",
     shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
     borderWidth: 0,
   },
   findButtonContent: {
@@ -2349,7 +2548,7 @@ const styles = StyleSheet.create({
   },
   findButtonText: {
     color: "white",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
     marginLeft: 8,
   },
@@ -2357,22 +2556,23 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   statusButton: {
-    marginTop: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
     backgroundColor: "#f3f4f6",
-    borderRadius: 15,
+    borderRadius: 12,
   },
   statusButtonText: {
     color: "#8B5CF6",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
   },
   
-  // Compact Map
+  // Compact Map - Takes more space
   compactMapContainer: {
-    flex: 1,
-    margin: 20,
+    flex: 2,
+    margin: 15,
+    marginTop: 10,
     borderRadius: 20,
     overflow: "hidden",
     backgroundColor: "white",
@@ -2385,7 +2585,7 @@ const styles = StyleSheet.create({
   compactMap: { 
     width: "100%", 
     height: "100%",
-    minHeight: 200,
+    minHeight: 300,
   },
   
   // Bottom Navigation
@@ -2729,4 +2929,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ff4444',
   },
-});
+})

@@ -10,7 +10,7 @@ const UserSchema = new Schema(
       default: function () {
         return this._id.toString();
       },
-    },       
+    },
     userName: {
       type: String,
       required: [true, "Username is required"],
@@ -45,6 +45,11 @@ const UserSchema = new Schema(
       type: String,
       enum: ["male", "female", "non-binary", "prefer-not-to-say", "other"],
     },
+    dob: {
+      type: Date,
+      required: false,
+    },
+
     mobileNo: {
       type: String,
       required: [true, "Mobile number is required"],
@@ -76,7 +81,8 @@ const UserSchema = new Schema(
     profilePhoto: {
       url: {
         type: String,
-        default: "/Users/nameranayat/Documents/GitHub/BeSide-App/Frontend/assets/images/placeholder2.jpg",
+        default:
+          "/Users/nameranayat/Documents/GitHub/BeSide-App/Frontend/assets/images/placeholder2.jpg",
       },
       filename: {
         type: String,
@@ -144,7 +150,7 @@ const UserSchema = new Schema(
       maxlength: 500,
     },
 
-    // Emergency Contacts (NEW) 
+    // Emergency Contacts (NEW)
     emergencyContacts: [
       {
         name: { type: String, required: true, trim: true },
@@ -158,8 +164,7 @@ const UserSchema = new Schema(
   },
   {
     timestamps: true,
-  },
-
+  }
 );
 
 // Pre-save hook to update lastUpdated field

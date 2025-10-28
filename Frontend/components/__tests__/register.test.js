@@ -42,7 +42,7 @@ jest.mock('@/components/ThemedButton', () => {
 jest.mock('react-native-country-picker-modal', () => 'CountryPicker');
 jest.mock('react-native-picker-select', () => 'RNPickerSelect');
 jest.mock('@react-native-community/datetimepicker', () => 'DateTimePicker');
-// 🔧 FIXED: correct relative path to app/
+// FIXED: correct relative path to app/
 jest.mock('../../app/PlacesAutocomplete', () => 'PlacesAutocomplete');
 
 // config
@@ -52,7 +52,7 @@ jest.mock('@/config', () => ({ BASE_URL: 'http://localhost/' }));
 import { Alert } from 'react-native';
 jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
-// SUT (🔧 FIXED PATH)
+// SUT  FIXED PATH)
 import RegisterScreen from '../../app/register';
 
 describe('RegisterScreen', () => {

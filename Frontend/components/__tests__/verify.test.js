@@ -90,7 +90,7 @@ describe('VerifyScreen', () => {
   it('shows "Missing field" for the first empty required field', async () => {
     const { getByTestId } = render(<VerifyScreen />);
 
-    // 🕐 Wait for useEffect to finish reading user from storage
+    // Wait for useEffect to finish reading user from storage
     const AsyncStorage = require('@react-native-async-storage/async-storage');
     await waitFor(() =>
       expect(AsyncStorage.getItem).toHaveBeenCalledWith('user')
@@ -112,7 +112,7 @@ describe('VerifyScreen', () => {
   it('shows "Invalid date" when expiry or dob is not DD-MM-YYYY', async () => {
     const { getByPlaceholderText, getByTestId } = render(<VerifyScreen />);
 
-    // 🕐 Wait for user to load
+    // Wait for user to load
     const AsyncStorage = require('@react-native-async-storage/async-storage');
     await waitFor(() =>
       expect(AsyncStorage.getItem).toHaveBeenCalledWith('user')
@@ -155,7 +155,7 @@ describe('VerifyScreen', () => {
 
     const { getByPlaceholderText, getByTestId } = render(<VerifyScreen />);
 
-    // 🕐 Wait for user to load
+    // Wait for user to load
     await waitFor(() =>
       expect(AsyncStorage.getItem).toHaveBeenCalledWith('user')
     );
@@ -210,7 +210,7 @@ describe('VerifyScreen', () => {
 
     const { getByPlaceholderText, getByTestId } = render(<VerifyScreen />);
 
-    // 🕐 Wait for user to load
+    //  Wait for user to load
     await waitFor(() =>
       expect(AsyncStorage.getItem).toHaveBeenCalledWith('user')
     );

@@ -18,16 +18,22 @@ import MapView, {
 } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BASE_URL } from '../config';
 
 const RouteMapView = ({ 
   tripMatch, 
   userRole, // 'organizer' or 'companion'
   onNavigationStart,
-  onArrivalDetected
+  onArrivalDetected,
+  onClose, // Function to close/dismiss the modal
+  hideOverlays = false // New prop to hide overlays
 }) => {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [hasArrived, setHasArrived] = useState(false); // Track if current user has arrived
+  const [bothArrived, setBothArrived] = useState(false); // Track if both users have arrived
   const [mapRegion, setMapRegion] = useState({
     latitude: 37.78825,
     longitude: -122.4324,
@@ -47,6 +53,18 @@ const RouteMapView = ({
       userRole
     });
   }, [tripMatch, userRole]);
+
+  // Check initial arrival status
+  useEffect(() => {
+    if (tripMatch?.arrivedUsers && tripMatch.arrivedUsers.length > 0) {
+      // Check if current user has arrived (you'll need to get current user ID)
+      // For now, let's check based on the trip status
+      if (tripMatch.status === 'ready-to-start') {
+        setBothArrived(true);
+        setHasArrived(true);
+      }
+    }
+  }, [tripMatch]);
 
   // Get current location
   useEffect(() => {
@@ -84,8 +102,14 @@ const RouteMapView = ({
       }
 
       // Check for arrival if navigating
-      if (isNavigating && tripMatch?.meetingPoint?.location) {
-        checkArrival(newLocation, tripMatch.meetingPoint.location);
+      if (isNavigating && tripMatch?.meetingPoint) {
+        // Handle both data structures: meetingPoint.location.latitude or meetingPoint.latitude
+        const meetingPointData = tripMatch.meetingPoint;
+        const meetingPoint = meetingPointData?.location ? meetingPointData.location : meetingPointData;
+        
+        if (meetingPoint?.latitude && meetingPoint?.longitude) {
+          checkArrival(newLocation, meetingPoint);
+        }
       }
 
     } catch (error) {
@@ -146,22 +170,48 @@ const RouteMapView = ({
     }
     
     // Get meeting point (sender's starting location) and destination
-    const meetingPoint = tripMatch?.meetingPoint;
+    const meetingPointData = tripMatch?.meetingPoint;
     const destination = tripMatch?.destinationLocation;
+    
+    // Handle both data structures: meetingPoint.location.latitude or meetingPoint.latitude
+    const meetingPoint = meetingPointData?.location ? {
+      latitude: meetingPointData.location.latitude,
+      longitude: meetingPointData.location.longitude
+    } : meetingPointData;
     
     if (!meetingPoint?.latitude || !meetingPoint?.longitude) {
       console.log('🗺️ [ROUTE MAP] No meeting point coordinates available');
+      console.log('🗺️ [ROUTE MAP] Meeting point data:', meetingPointData);
       return [];
     }
 
     console.log('🗺️ [ROUTE MAP] Generating route for:', {
       userRole,
+      tripStatus: tripMatch?.status,
+      tripStarted: tripMatch?.tripStarted,
       hasMeetingPoint: !!meetingPoint,
       hasDestination: !!destination,
       meetingPoint: {lat: meetingPoint.latitude, lng: meetingPoint.longitude},
       destination: destination ? {lat: destination.latitude, lng: destination.longitude} : 'not available'
     });
 
+    // FINAL JOURNEY PHASE: Both users show Meeting Point → Destination
+    if (tripMatch?.tripStarted || tripMatch?.status === 'in-progress') {
+      if (!destination?.latitude || !destination?.longitude) {
+        console.log('🗺️ [ROUTE MAP] No destination for final journey route');
+        return [];
+      }
+      
+      const finalJourneyRoute = [
+        {latitude: meetingPoint.latitude, longitude: meetingPoint.longitude}, // Meeting point
+        {latitude: destination.latitude, longitude: destination.longitude}    // Destination
+      ];
+      
+      console.log('🗺️ [ROUTE MAP] Final journey route: Meeting Point → Destination', finalJourneyRoute);
+      return finalJourneyRoute;
+    }
+
+    // INITIAL PHASE: Different routes based on user role
     // SENDER (organizer): Route from Meeting Point (starting location) → Destination
     if (userRole === 'organizer') {
       if (!destination?.latitude || !destination?.longitude) {
@@ -203,66 +253,195 @@ const RouteMapView = ({
     return [];
   };
 
-  // Open Google Maps for turn-by-turn navigation based on user role
-  const startExternalNavigation = () => {
-    const meetingPoint = tripMatch?.meetingPoint;
+  // Start in-app navigation instead of external navigation
+  const startInAppNavigation = () => {
+    const meetingPointData = tripMatch?.meetingPoint;
     const destination = tripMatch?.destinationLocation;
+    
+    // Handle both data structures: meetingPoint.location.latitude or meetingPoint.latitude
+    const meetingPoint = meetingPointData?.location ? {
+      latitude: meetingPointData.location.latitude,
+      longitude: meetingPointData.location.longitude
+    } : meetingPointData;
     
     if (!meetingPoint?.latitude || !meetingPoint?.longitude) {
       Alert.alert('Error', 'Meeting point not available');
+      console.log('🗺️ [NAVIGATION] Meeting point data:', meetingPointData);
       return;
     }
 
-    let destinationLat, destinationLng, label, navType;
+    let targetLocation, navType;
 
+    // FINAL JOURNEY PHASE: Both users navigate from Meeting Point to Destination
+    if (tripMatch?.tripStarted || tripMatch?.status === 'in-progress') {
+      if (!destination?.latitude || !destination?.longitude) {
+        Alert.alert('Error', 'Destination not available for final journey');
+        return;
+      }
+      targetLocation = destination;
+      navType = 'Meeting Point → Destination (Final Journey)';
+    }
+    // INITIAL PHASE: Different navigation based on user role
     // SENDER: Navigate from Meeting Point to Final Destination
-    if (userRole === 'organizer') {
+    else if (userRole === 'organizer') {
       if (!destination?.latitude || !destination?.longitude) {
         Alert.alert('Error', 'Destination not available');
         return;
       }
-      destinationLat = destination.latitude;
-      destinationLng = destination.longitude;
-      label = encodeURIComponent('Final Destination');
+      targetLocation = destination;
       navType = 'Meeting Point → Destination';
     }
     // RECEIVER: Navigate from Current Location to Meeting Point
     else if (userRole === 'companion') {
-      destinationLat = meetingPoint.latitude;
-      destinationLng = meetingPoint.longitude;
-      label = encodeURIComponent('Meeting Point');
+      targetLocation = meetingPoint;
       navType = 'Current Location → Meeting Point';
     }
     
-    console.log('🧭 [NAVIGATION] Starting navigation:', {
+    console.log('🧭 [IN-APP NAVIGATION] Starting in-app navigation:', {
       userRole,
       navType,
-      destination: {lat: destinationLat, lng: destinationLng}
+      target: {lat: targetLocation.latitude, lng: targetLocation.longitude}
     });
     
-    let url;
-    if (Platform.OS === 'ios') {
-      url = `maps://0,0?q=${label}@${destinationLat},${destinationLng}`;
-    } else {
-      url = `geo:0,0?q=${destinationLat},${destinationLng}(${label})`;
+    // Enable in-app navigation mode
+    setIsNavigating(true);
+    onNavigationStart && onNavigationStart();
+    
+    const isDestinationNav = targetLocation === destination;
+    const navigationMessage = isDestinationNav 
+      ? 'In-app navigation is now active. Follow the route on the map to reach your destination.'
+      : 'In-app navigation is now active. Follow the route on the map to reach the meeting point.';
+    
+    Alert.alert(
+      '🚀 Navigation Started!',
+      navigationMessage,
+      [{ text: 'Got it!', style: 'default' }]
+    );
+  };
+
+  // Handle "Almost There" button press
+  const handleAlmostThere = async () => {
+    if (!tripMatch?.matchId) {
+      Alert.alert('Error', 'Trip match not found');
+      return;
     }
 
-    Linking.canOpenURL(url)
-      .then((supported) => {
-        if (supported) {
-          setIsNavigating(true);
-          onNavigationStart && onNavigationStart();
-          return Linking.openURL(url);
-        } else {
-          // Fallback to Google Maps web
-          const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${destinationLat},${destinationLng}`;
-          return Linking.openURL(webUrl);
-        }
-      })
-      .catch((err) => {
-        console.error('Navigation error:', err);
-        Alert.alert('Error', 'Unable to open navigation app');
+    try {
+      console.log('📍 [ALMOST THERE] User pressed Almost There button, distance:', distance);
+      
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('Error', 'Please log in again');
+        return;
+      }
+
+      const API_URL = BASE_URL.replace(/\/+$/, '');
+      const response = await fetch(`${API_URL}/api/v1/trip/match/${tripMatch.matchId}/arrived`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          distance: Math.round(distance)
+        })
       });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to mark arrival');
+      }
+
+      if (result.data.bothArrived) {
+        setBothArrived(true);
+        setHasArrived(true);
+        Alert.alert(
+          '🎉 Both Users Have Arrived!',
+          'Great! Both you and your companion have arrived at the meeting point. You can now start your trip together.',
+          [{ text: 'Let\'s Go!', style: 'default' }]
+        );
+      } else {
+        setHasArrived(true);
+        Alert.alert(
+          '✅ Arrival Confirmed!',
+          'You have been marked as arrived at the meeting point. Waiting for your companion to arrive as well.',
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
+
+      console.log('✅ [ALMOST THERE] Arrival marked successfully:', result.data);
+
+    } catch (error) {
+      console.error('❌ [ALMOST THERE] Error marking arrival:', error);
+      Alert.alert('Error', 'Failed to mark arrival. Please try again.');
+    }
+  };
+
+  // Handle end trip button press
+  const handleEndTrip = async () => {
+    if (!tripMatch?.matchId) {
+      Alert.alert('Error', 'Trip match not found');
+      return;
+    }
+
+    Alert.alert(
+      '🏁 End Trip?',
+      'Have you safely reached your destination? This will complete the trip for both users.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, End Trip',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('🏁 [END TRIP] User confirmed ending trip');
+              
+              const token = await AsyncStorage.getItem('token');
+              if (!token) {
+                Alert.alert('Error', 'Please log in again');
+                return;
+              }
+
+              const API_URL = BASE_URL.replace(/\/+$/, '');
+              const response = await fetch(`${API_URL}/api/v1/trip/match/${tripMatch.matchId}/end-trip`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+
+              const result = await response.json();
+
+              if (!response.ok) {
+                throw new Error(result.message || 'Failed to end trip');
+              }
+
+              Alert.alert(
+                '🎉 Trip Completed!',
+                'Thank you for using BeSide! We hope you had a safe and pleasant journey.',
+                [
+                  {
+                    text: 'Close',
+                    onPress: () => {
+                      // Call onClose to dismiss the modal and return to home
+                      onClose && onClose();
+                    }
+                  }
+                ]
+              );
+
+              console.log('✅ [END TRIP] Trip ended successfully:', result.data);
+
+            } catch (error) {
+              console.error('❌ [END TRIP] Error ending trip:', error);
+              Alert.alert('Error', 'Failed to end trip. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Get markers for map based on new workflow
@@ -286,7 +465,14 @@ const RouteMapView = ({
     }
 
     // Meeting Point marker (sender's starting location)
-    const meetingPoint = tripMatch?.meetingPoint;
+    const meetingPointData = tripMatch?.meetingPoint;
+    
+    // Handle both data structures: meetingPoint.location.latitude or meetingPoint.latitude
+    const meetingPoint = meetingPointData?.location ? {
+      latitude: meetingPointData.location.latitude,
+      longitude: meetingPointData.location.longitude
+    } : meetingPointData;
+    
     if (meetingPoint?.latitude && meetingPoint?.longitude) {
       const meetingCoord = {
         latitude: meetingPoint.latitude,
@@ -414,56 +600,92 @@ const RouteMapView = ({
         )}
       </MapView>
 
-      {/* Route info overlay */}
-      <View style={styles.routeInfo}>
-        <Text style={styles.routeTitle}>
-          {userRole === 'organizer' ? '📍 Your Route (Sender)' : '🚶 Your Journey (Receiver)'}
-        </Text>
-        <Text style={styles.routeDescription}>
-          {userRole === 'organizer' 
-            ? 'From Starting Point → Final Destination'
-            : 'Current Location → Meeting Point → Destination'
-          }
-        </Text>
-        {userRole === 'companion' && distance > 0 && (
-          <Text style={styles.distanceText}>
-            📍 {Math.round(distance)}m to meeting point
+      {/* Route info overlay - only show if hideOverlays is false */}
+      {!hideOverlays && (
+        <View style={styles.routeInfo}>
+          <Text style={styles.routeTitle}>
+            {userRole === 'organizer' ? '📍 Your Route (Sender)' : '🚶 Your Journey (Receiver)'}
           </Text>
-        )}
-        <Text style={styles.meetingPointText}>
-          📍 {tripMatch?.meetingPoint?.name || 'Meeting Point'}
-        </Text>
-      </View>
+          <Text style={styles.routeDescription}>
+            {userRole === 'organizer' 
+              ? 'From Starting Point → Final Destination'
+              : 'Current Location → Meeting Point → Destination'
+            }
+          </Text>
+          {userRole === 'companion' && distance > 0 && (
+            <Text style={styles.distanceText}>
+              📍 {Math.round(distance)}m to meeting point
+            </Text>
+          )}
+          <Text style={styles.meetingPointText}>
+            📍 {tripMatch?.meetingPoint?.name || 'Meeting Point'}
+          </Text>
+        </View>
+      )}
 
-      {/* Navigation controls */}
-      <View style={styles.navigationControls}>
-        <TouchableOpacity
-          style={[
-            styles.navigationButton,
-            { backgroundColor: isNavigating ? '#FF5722' : '#4CAF50' }
-          ]}
-          onPress={isNavigating ? () => setIsNavigating(false) : startExternalNavigation}
-        >
-          <Ionicons 
-            name={isNavigating ? "stop" : "navigate"} 
-            size={24} 
-            color="white" 
-          />
-          <Text style={styles.navigationButtonText}>
-            {isNavigating ? 'Stop Navigation' : 'Start Navigation'}
-          </Text>
-        </TouchableOpacity>
-        
-        {distance > 0 && distance <= 100 && (
+      {/* Navigation controls - only show if hideOverlays is false */}
+      {!hideOverlays && (
+        <View style={styles.navigationControls}>
           <TouchableOpacity
-            style={[styles.navigationButton, { backgroundColor: '#2196F3' }]}
-            onPress={() => Alert.alert('Close!', 'You are very close to the meeting point!')}
+            style={[
+              styles.navigationButton,
+              { backgroundColor: isNavigating ? '#FF5722' : '#4CAF50' }
+            ]}
+            onPress={isNavigating ? () => setIsNavigating(false) : startInAppNavigation}
           >
-            <Ionicons name="checkmark-circle" size={24} color="white" />
-            <Text style={styles.navigationButtonText}>Almost There!</Text>
+            <Ionicons 
+              name={isNavigating ? "stop" : "navigate"} 
+              size={24} 
+              color="white" 
+            />
+            <Text style={styles.navigationButtonText}>
+              {isNavigating ? 'Stop Navigation' : 'Start Navigation'}
+            </Text>
           </TouchableOpacity>
-        )}
-      </View>
+          
+          {/* Almost There / Arrival Status Button */}
+          {distance > 0 && distance <= 100 && !hasArrived && (
+            <TouchableOpacity
+              style={[styles.navigationButton, { backgroundColor: '#2196F3' }]}
+              onPress={handleAlmostThere}
+            >
+              <Ionicons name="checkmark-circle" size={24} color="white" />
+              <Text style={styles.navigationButtonText}>Almost There!</Text>
+            </TouchableOpacity>
+          )}
+          
+          {hasArrived && !bothArrived && (
+            <TouchableOpacity
+              style={[styles.navigationButton, { backgroundColor: '#FFC107' }]}
+              disabled={true}
+            >
+              <Ionicons name="time" size={24} color="white" />
+              <Text style={styles.navigationButtonText}>Waiting for Companion</Text>
+            </TouchableOpacity>
+          )}
+          
+          {bothArrived && !tripMatch?.tripStarted && (
+            <TouchableOpacity
+              style={[styles.navigationButton, { backgroundColor: '#4CAF50' }]}
+              onPress={() => Alert.alert('Ready to Start!', 'Both users have arrived. You can now start your trip together!')}
+            >
+              <Ionicons name="rocket" size={24} color="white" />
+              <Text style={styles.navigationButtonText}>Ready to Start Trip!</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* End Trip Button - Shows during final journey */}
+          {(tripMatch?.tripStarted || tripMatch?.status === 'in-progress') && (
+            <TouchableOpacity
+              style={[styles.navigationButton, { backgroundColor: '#FF5722' }]}
+              onPress={handleEndTrip}
+            >
+              <Ionicons name="flag" size={24} color="white" />
+              <Text style={styles.navigationButtonText}>End Trip</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 };

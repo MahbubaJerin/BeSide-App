@@ -5,19 +5,7 @@ const User = require("../models/userModel");
 const AppError = require("../utils/AppError");
 const catchAsync = require("../utils/catchAsync");
 const { retryDatabaseOperation, withFallback } = require("../utils/retryHandler");
-// Temporarily disable real-time events to fix server crash
-// const { sendEventToUser, broadcastToUsers } = require("./realtimeController");
-
-// Dummy functions to prevent crashes
-const sendEventToUser = (userId, eventType, data) => {
-    console.log(`[REALTIME DISABLED] Would send ${eventType} to user ${userId}`);
-    return false;
-};
-
-const broadcastToUsers = (userIds, eventType, data) => {
-    console.log(`[REALTIME DISABLED] Would broadcast ${eventType} to ${userIds.length} users`);
-    return { delivered: [], failed: userIds };
-};
+const { sendEventToUser, broadcastToUsers } = require("./realtimeController");
 
 // Schedule automatic cleanup every 1 minute (to handle 2-minute expiration)
 let cleanupInterval = null;
@@ -543,13 +531,13 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             organizer: {
                 userId: tripRequest.user.userId,
                 userName: tripRequest.user.userName,
-                userImage: tripRequest.user.userImage,
+                userImage: tripRequest.photo?.url || tripRequest.user.userImage || "default.jpg", // Use sender's selfie
                 joinedAt: new Date(tripRequest.createdAt)
             },
             companion: {
                 userId: userId,
                 userName: req.user.userName,
-                userImage: req.user.profilePhoto?.url || "default.jpg",
+                userImage: receiverPhotoData?.url || req.user.profilePhoto?.url || "default.jpg", // Use receiver's selfie
                 joinedAt: new Date()
             },
             tripDetails: {
@@ -572,7 +560,7 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
             },
             // Auto-set meeting point to sender's start location
             meetingPoint: {
-                name: 'Meeting Point (Sender\'s Start Location)',
+                name: tripRequest.startLocation?.address || 'Meeting Point',
                 description: 'Starting location of the trip organizer',
                 location: {
                     latitude: tripRequest.startLocation?.latitude || 0,
@@ -593,8 +581,8 @@ exports.respondToTripRequest = catchAsync(async (req, res, next) => {
 
         console.log("✅ [MATCH CREATION] Match created successfully:");
         console.log("- Match ID:", matchId);
-        console.log("- Organizer:", tripRequest.user.userName);
-        console.log("- Companion:", req.user.userName);
+        console.log("- Organizer:", tripRequest.user.userName, "| Photo:", tripRequest.photo?.url || "No selfie");
+        console.log("- Companion:", req.user.userName, "| Photo:", receiverPhotoData?.url || "No selfie");
     }
 
     await tripRequest.save();

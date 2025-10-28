@@ -13,7 +13,6 @@ import {
   SafeAreaView,
   StatusBar
 } from "react-native";
-import * as Location from "expo-location";
 import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -29,7 +28,6 @@ export default function CompanionPreferencesModal({
   prefillDestination = null,
 }) {
   const [talk, setTalk] = useState(false);
-  const [useCurrent, setUseCurrent] = useState(false);
 
   const [startText, setStartText] = useState("");
   const [destText, setDestText] = useState("");
@@ -43,6 +41,7 @@ export default function CompanionPreferencesModal({
   
   // New state for modern interface
   const [showDestinationSearch, setShowDestinationSearch] = useState(false);
+  const [showMeetingPointSearch, setShowMeetingPointSearch] = useState(false);
   const [routeDistance, setRouteDistance] = useState("4.2 km");
   const [routeDuration, setRouteDuration] = useState("15 min");
   const [mapRef, setMapRef] = useState(null);
@@ -56,7 +55,6 @@ export default function CompanionPreferencesModal({
   // Prefills coming from map/home.jsx (optional)
   useEffect(() => {
     if (prefillStart) {
-      setUseCurrent(false);
       setStartCoordinates(prefillStart);
       setStartText(`Pinned (${prefillStart.latitude.toFixed(5)}, ${prefillStart.longitude.toFixed(5)})`);
     }
@@ -68,42 +66,9 @@ export default function CompanionPreferencesModal({
     }
   }, [prefillDestination]);
 
-  // Use current location
-  useEffect(() => {
-    if (!useCurrent) return;
-    (async () => {
-      try {
-        setLoading(true);
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") { 
-          Alert.alert("Permission required", "Location permission is needed."); 
-          setUseCurrent(false); 
-          return; 
-        }
-        const pos = await Location.getCurrentPositionAsync({});
-        const currentPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-        setStartCoordinates(currentPos);
-        setStartText("Current location");
-        
-        // Update map region to show current location
-        setRegion({
-          ...currentPos,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-      } catch (e) {
-        console.log("Use current location error:", e);
-        setUseCurrent(false);
-      } finally { 
-        setLoading(false); 
-      }
-    })();
-  }, [useCurrent]);
-
   // Selection handlers from PlacesAutocomplete
   const handleStartSelected = (item) => {
     if (!item) return;
-    setUseCurrent(false);
     setStartText(item.description);
     setStartCoordinates({ latitude: item.lat, longitude: item.lng });
   };
@@ -126,7 +91,7 @@ export default function CompanionPreferencesModal({
   };
 
   const handleConfirm = () => {
-    if (!startCoordinates) return Alert.alert("Missing start", "Please choose a starting point.");
+    if (!startCoordinates) return Alert.alert("Missing Meeting Point", "Please choose a meeting point where you'll meet your companion.");
     if (!destinationCoordinates) return Alert.alert("Missing destination", "Please choose a destination.");
 
     onSubmit({
@@ -137,7 +102,6 @@ export default function CompanionPreferencesModal({
       transport,
       gender,
       talk,
-      useCurrentLocation: useCurrent,
     });
     onClose?.();
   };
@@ -153,7 +117,7 @@ export default function CompanionPreferencesModal({
             <TouchableOpacity style={styles.backButton} onPress={onClose}>
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
-            <ThemedText style={styles.headerTitle}>Destination</ThemedText>
+            <ThemedText style={styles.headerTitle}>Meeting Point & Destination</ThemedText>
             <TouchableOpacity style={styles.headerButton}>
               <Ionicons name="notifications-outline" size={24} color="white" />
             </TouchableOpacity>
@@ -204,14 +168,14 @@ export default function CompanionPreferencesModal({
 
           {/* Destination Cards */}
           <View style={styles.destinationCards}>
-            {/* Your Location Card */}
-            <TouchableOpacity style={styles.destinationCard} onPress={() => setUseCurrent(true)}>
+            {/* Meeting Point Card */}
+            <TouchableOpacity style={styles.destinationCard} onPress={() => setShowMeetingPointSearch(true)}>
               <View style={styles.cardIcon}>
-                <Ionicons name="location" size={20} color="#10b981" />
+                <Ionicons name="people" size={20} color="#10b981" />
               </View>
               <View style={styles.cardContent}>
-                <ThemedText style={styles.cardTitle}>Your Location</ThemedText>
-                <ThemedText style={styles.cardSubtext}>0.8 km</ThemedText>
+                <ThemedText style={styles.cardTitle}>{startText || "Meeting Point"}</ThemedText>
+                <ThemedText style={styles.cardSubtext}>Where you'll meet</ThemedText>
               </View>
             </TouchableOpacity>
 
@@ -236,7 +200,32 @@ export default function CompanionPreferencesModal({
             )}
           </View>
 
-          {/* Search Overlay */}
+          {/* Search Overlays */}
+          {/* Meeting Point Search */}
+          {showMeetingPointSearch && (
+            <View style={styles.searchOverlay}>
+              <View style={styles.searchHeader}>
+                <TouchableOpacity onPress={() => setShowMeetingPointSearch(false)}>
+                  <Ionicons name="arrow-back" size={24} color="#333" />
+                </TouchableOpacity>
+                <ThemedText style={styles.searchTitle}>Choose Meeting Point</ThemedText>
+              </View>
+              
+              <PlacesAutocomplete
+                placeholder="Search for meeting point..."
+                value={startText}
+                onChangeText={setStartText}
+                onSelect={(item) => {
+                  handleStartSelected(item);
+                  setShowMeetingPointSearch(false);
+                }}
+                country="au"
+                style={styles.searchInput}
+              />
+            </View>
+          )}
+          
+          {/* Destination Search */}
           {showDestinationSearch && (
             <View style={styles.searchOverlay}>
               <View style={styles.searchHeader}>
@@ -509,6 +498,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
+  },
+  
+  // Current Location Option in Search
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dividerText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    paddingHorizontal: 12,
+    backgroundColor: 'white',
+    zIndex: 1,
   },
 
   // Bottom Panel
