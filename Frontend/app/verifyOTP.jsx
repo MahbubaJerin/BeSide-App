@@ -122,11 +122,12 @@ export default function VerifyOTPScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.form}>
-          <ThemedText type="title" style={styles.title}>
-            Verify OTP
-          </ThemedText>
+         <ThemedText testID="verifyOtpTitle" type="title" style={styles.title}>
+    Verify OTP
+  </ThemedText>
 
           <TextInput
+            testID="otpInput"
             style={[
               styles.input,
               { borderColor: otpErr ? danger : border, color: text },
@@ -147,7 +148,10 @@ export default function VerifyOTPScreen() {
           />
 
           {!!otpErr && (
-            <ThemedText style={[styles.helper, { color: danger }]}>
+            <ThemedText
+              testID="otpErrorText"
+              style={[styles.helper, { color: danger }]}
+            >
               {otpErr}
             </ThemedText>
           )}
@@ -158,6 +162,7 @@ export default function VerifyOTPScreen() {
           )}
 
           <ThemedButton
+            testID="verifyOtpBtn"
             title={loading ? "Verifying..." : "Verify OTP"}
             onPress={handleVerify}
             disabled={loading}

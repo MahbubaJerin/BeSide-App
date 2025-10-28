@@ -1,0 +1,51 @@
+appId: com.anonymous.Frontend
+---
+# Step 1 — launch and reach Forgot Password
+- launchApp
+- tapOn: { id: "welcomeLoginButton" }
+- tapOn: { id: "forgotPasswordLink" }
+
+# Step 2 — request OTP
+- tapOn: { id: "forgotEmailInput" }
+- inputText: "testuser@besideapp.com"
+- tapOn: { id: "forgotSendOtpBtn" }
+- tapOn: "OK"
+# Skip native Alert assertion; rely on navigation
+- assertVisible: { id: "verifyOtpTitle" }
+
+# Step 3 — wrong OTP (expect stay + inline error)
+- tapOn: { id: "otpInput" }
+- inputText: "1234"
+- hideKeyboard
+- waitForAnimationToEnd
+- tapOn: { id: "verifyOtpBtn" }
+- waitForAnimationToEnd
+- tapOn: "OK"
+- takeScreenshot:
+    path: /Users/nameranayat/Desktop/auth_login/failed_otp_verification.png
+
+# Step 4 — correct OTP (expect move to Reset Password)
+- tapOn: { id: "otpInput" }
+- eraseText
+- inputText: "999999"
+- hideKeyboard
+- waitForAnimationToEnd
+- tapOn: { id: "verifyOtpBtn" }
+- waitForAnimationToEnd
+- tapOn: "OK"
+- assertVisible: { id: "resetPwdTitle" }
+- takeScreenshot:
+    path: /Users/nameranayat/Desktop/auth_login/successful_otp_verification.png
+
+# Step 5 — reset password (optional; success navigates away)
+- tapOn: { id: "newPwdInput" }
+- inputText: "Test@999"
+- tapOn: { id: "confirmPwdInput" }
+- inputText: "Test@999"
+- hideKeyboard
+- tapOn: { id: "resetPwdBtn" }
+- waitForAnimationToEnd
+- tapOn: "OK"
+- takeScreenshot:
+    path: /Users/nameranayat/Desktop/auth_login/successful_password_reset.png
+- assertVisible: { id: "loginButton" }

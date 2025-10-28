@@ -232,11 +232,7 @@ if (token) await AsyncStorage.setItem("token", String(token));
           </View>
 
           {/* Forgot password */}
-          <ThemedText
-            type="link"
-            onPress={() => router.push("/forgotPassword")}
-            style={styles.forgotLink}
-          >
+          <ThemedText testID="forgotPasswordLink" style={styles.forgotLink} type="link" onPress={() => router.push("/forgotPassword")}>
             Forgot Password?
           </ThemedText>
 

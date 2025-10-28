@@ -104,12 +104,14 @@ export default function ForgotPasswordScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.form}>
-          <ThemedText type="title" style={styles.title}>
+          <ThemedText testID="forgotTitle"
+            type="title" style={styles.title}>
             Forgot Password
           </ThemedText>
 
           {/* Email input */}
           <TextInput
+            testID="forgotEmailInput"
             style={[styles.input, { borderColor: emailErr ? danger : border, color: text }]}
             placeholder="Enter your registered email"
             placeholderTextColor={border}
@@ -138,6 +140,7 @@ export default function ForgotPasswordScreen() {
 
           {/* Submit */}
           <ThemedButton
+            testID="forgotSendOtpBtn"
             title={loading ? "Sending..." : "Send OTP"}
             onPress={handleReset}
             disabled={loading}
@@ -147,7 +150,7 @@ export default function ForgotPasswordScreen() {
 
           {/* Footer */}
           <View style={styles.footerTextContainer}>
-            <ThemedText type="link" onPress={() => router.replace("/login")}>
+            <ThemedText testID="forgotBackToLogin" type="link" onPress={() => router.replace("/login")}>
               Back to Login
             </ThemedText>
           </View>

@@ -110,13 +110,13 @@ export default function ResetPasswordScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.form}>
-          <ThemedText type="title" style={styles.title}>
+          <ThemedText testID="resetPwdTitle"  type="title" style={styles.title}>
             Reset Password
           </ThemedText>
 
           {/* New Password (with Show/Hide) */}
           <View style={styles.passwordRow}>
-            <TextInput
+            <TextInput testID="newPwdInput"
               style={[
                 styles.input,
                 styles.passwordInput,
@@ -144,7 +144,7 @@ export default function ResetPasswordScreen() {
 
           {/* Confirm Password (with Show/Hide) */}
           <View style={styles.passwordRow}>
-            <TextInput
+            <TextInput testID="confirmPwdInput"
               style={[
                 styles.input,
                 styles.passwordInput,
@@ -178,7 +178,7 @@ export default function ResetPasswordScreen() {
           )}
 
           {/* Submit */}
-          <ThemedButton
+          <ThemedButton testID="resetPwdBtn"
             title={loading ? "Resetting…" : "Reset Password"}
             onPress={handleResetPassword}
             disabled={loading}

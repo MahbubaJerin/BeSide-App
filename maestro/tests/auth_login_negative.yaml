@@ -1,0 +1,24 @@
+appId: com.anonymous.Frontend
+---
+# CASE 1 — Invalid password
+- launchApp
+- tapOn: { id: "welcomeLoginButton" }
+- assertVisible: { id: "loginButton" }
+- tapOn: { id: "usernameInput" }
+- inputText: "lululemom"
+- tapOn: { id: "passwordInput" }
+- inputText: "WrongPass123"
+- tapOn: { id: "loginButton" }
+- assertVisible: "Incorrect username/email or password."
+- takeScreenshot:
+    path: /Users/nameranayat/Desktop/auth_login/invalid_password_error.png
+
+# CASE 2 — Empty fields validation
+- launchApp
+- tapOn: { id: "welcomeLoginButton" }
+- assertVisible: { id: "loginButton" }
+- tapOn: { id: "loginButton" }
+- assertVisible: "Username or email is required."
+- assertVisible: "Password is required."
+- takeScreenshot:
+    path: /Users/nameranayat/Desktop/auth_login/empty_fields_error.png
