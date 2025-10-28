@@ -394,14 +394,14 @@ export default function HomeScreen() {
         console.log('🔄 [ACTIVE TRIP MATCH] Updating active trip match with latest data');
         setActiveTripMatch(updatedMatch);
       } else if (activeTripMatch.matchId) {
-        // Match no longer in active list (might be completed)
-        console.log('🏁 [ACTIVE TRIP MATCH] Match no longer active, likely completed');
+        // Match no longer in active list (might be completed or cancelled)
+        console.log('🏁 [ACTIVE TRIP MATCH] Match no longer active, checking reason...');
+        
+        // Always clear route from map when trip ends (completion or cancellation)
+        clearRouteFromMap();
         
         // Check if trip was completed
         if (finalJourneyModalVisible) {
-          // Clear route display from map
-          clearRouteFromMap();
-          
           // Show completion alert for the first user who is still in the modal
           Alert.alert(
             '🎉 Trip Completed!',
@@ -415,10 +415,14 @@ export default function HomeScreen() {
               }
             }]
           );
+        } else {
+          // Trip was likely cancelled, just clean up
+          console.log('🧹 [ROUTE CLEANUP] Trip cancelled or ended, route cleared from map');
+          setActiveTripMatch(null);
         }
       }
     }
-  }, [activeMatches.matches, activeTripMatch, finalJourneyModalVisible]);
+  }, [activeMatches.matches, activeTripMatch, finalJourneyModalVisible, clearRouteFromMap]);
 
   // Safe modal management functions
   const safeCloseModal = useCallback((modalSetter) => {

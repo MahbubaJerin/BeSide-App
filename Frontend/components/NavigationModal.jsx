@@ -488,23 +488,6 @@ const NavigationModal = ({
               <Text style={styles.actionButtonText}>Trip Completed</Text>
             </TouchableOpacity>
           )}
-          
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: '#FF5722' }]}
-            onPress={() => {
-              Alert.alert(
-                'Cancel Trip?',
-                'Are you sure you want to cancel this trip match?',
-                [
-                  { text: 'No', style: 'cancel' },
-                  { text: 'Yes, Cancel', onPress: onClose }
-                ]
-              );
-            }}
-          >
-            <Ionicons name="close-circle" size={24} color="white" />
-            <Text style={styles.actionButtonText}>Cancel Trip</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -639,8 +622,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
-    flex: 0.48,
     justifyContent: 'center',
+    width: '100%', // Take full width since we only have one button now
   },
   actionButtonText: {
     color: 'white',
