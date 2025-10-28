@@ -336,6 +336,56 @@ export default function HomeScreen() {
   // State for sender notifications
   const [senderRequestStatus, setSenderRequestStatus] = useState(null);
 
+  // Handle real-time trip completion events
+  useEffect(() => {
+    if (realTimeUpdates.addEventHandler) {
+      // Handler for when trip is completed by both users
+      realTimeUpdates.addEventHandler('trip_completed', (data) => {
+        console.log('🎉 [REAL-TIME] Trip completed:', data);
+        
+        // Refresh active matches to remove completed trip
+        activeMatches.refresh();
+        
+        // Show completion alert
+        Alert.alert(
+          '🎉 Trip Completed!',
+          data.message || 'Both users have confirmed the trip has ended.',
+          [{ 
+            text: 'View Trip History', 
+            onPress: () => setTripHistoryVisible(true)
+          }]
+        );
+        
+        // Close any open modals
+        setFinalJourneyModalVisible(false);
+        setActiveTripMatch(null);
+      });
+
+      // Handler for when one user ends trip (waiting for other)
+      realTimeUpdates.addEventHandler('trip_ending_waiting', (data) => {
+        console.log('⏳ [REAL-TIME] Trip ending - waiting:', data);
+        
+        // Refresh active matches to update status
+        activeMatches.refresh();
+        
+        // Show waiting notification
+        Alert.alert(
+          'Trip Ending',
+          data.message || `${data.endedBy} has ended the trip. Please confirm when you're ready.`,
+          [{ text: 'OK' }]
+        );
+      });
+    }
+
+    // Cleanup event handlers
+    return () => {
+      if (realTimeUpdates.removeEventHandler) {
+        realTimeUpdates.removeEventHandler('trip_completed');
+        realTimeUpdates.removeEventHandler('trip_ending_waiting');
+      }
+    };
+  }, [realTimeUpdates, activeMatches]);
+
   // Safe modal management functions
   const safeCloseModal = useCallback((modalSetter) => {
     try {
@@ -2359,6 +2409,10 @@ export default function HomeScreen() {
           (activeTripMatch.organizer?.userId === user?._id ? 'organizer' : 'companion') 
           : 'companion'
         }
+        currentUserId={user?._id}
+        onTripCompleted={() => {
+          setTripHistoryVisible(true);
+        }}
       />
 
       {/* Sender Acceptance Notification Modal */}
