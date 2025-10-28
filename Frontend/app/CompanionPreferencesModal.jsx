@@ -26,6 +26,7 @@ export default function CompanionPreferencesModal({
   onSubmit,
   prefillStart = null,
   prefillDestination = null,
+  shouldReset = false, // New prop to trigger reset
 }) {
   const [talk, setTalk] = useState(false);
 
@@ -51,6 +52,31 @@ export default function CompanionPreferencesModal({
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
+
+  // Reset modal state when shouldReset prop changes
+  useEffect(() => {
+    if (shouldReset) {
+      console.log('🧹 [MODAL RESET] Clearing CompanionPreferencesModal state');
+      setTalk(false);
+      setStartText("");
+      setDestText("");
+      setStartCoordinates(null);
+      setDestinationCoordinates(null);
+      setTransport("walk");
+      setGender("any");
+      setLoading(false);
+      setShowDestinationSearch(false);
+      setShowMeetingPointSearch(false);
+      setRouteDistance("4.2 km");
+      setRouteDuration("15 min");
+      setRegion({
+        latitude: -37.8136,
+        longitude: 144.9631,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+    }
+  }, [shouldReset]);
 
   // Prefills coming from map/home.jsx (optional)
   useEffect(() => {
