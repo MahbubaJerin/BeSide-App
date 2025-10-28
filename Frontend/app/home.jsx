@@ -436,104 +436,51 @@ export default function HomeScreen() {
   useEffect(() => {
     if (realTimeUpdates.addEventHandler) {
       // Handler for when trip is completed by both users
-      realTimeUpdates.addEventHandler("trip_completed", (data) => {
-        console.log("🎉 [REAL-TIME] Trip completed:", data);
-
-        // Clear all preferences and route data on trip completion
-        resetAllPreferencesAndRoute();
-
+      realTimeUpdates.addEventHandler('trip_completed', (data) => {
+        console.log('🎉 [REAL-TIME] Trip completed:', data);
+        
         // Refresh active matches to remove completed trip
         activeMatches.refresh();
-
+        
         // Show completion alert
         Alert.alert(
-          "🎉 Trip Completed!",
-          data.message || "Both users have confirmed the trip has ended.",
-          [
-            {
-              text: "View Trip History",
-              onPress: () => setTripHistoryVisible(true),
-            },
-          ]
+          '🎉 Trip Completed!',
+          data.message || 'Both users have confirmed the trip has ended.',
+          [{ 
+            text: 'View Trip History', 
+            onPress: () => setTripHistoryVisible(true)
+          }]
         );
-
+        
         // Close any open modals
         setFinalJourneyModalVisible(false);
         setActiveTripMatch(null);
       });
 
       // Handler for when one user ends trip (waiting for other)
-      realTimeUpdates.addEventHandler("trip_ending_waiting", (data) => {
-        console.log("⏳ [REAL-TIME] Trip ending - waiting:", data);
-
+      realTimeUpdates.addEventHandler('trip_ending_waiting', (data) => {
+        console.log('⏳ [REAL-TIME] Trip ending - waiting:', data);
+        
         // Refresh active matches to update status
         activeMatches.refresh();
+        
+        // Show waiting notification
+        Alert.alert(
+          'Trip Ending',
+          data.message || `${data.endedBy} has ended the trip. Please confirm when you're ready.`,
+          [{ text: 'OK' }]
+        );
       });
     }
 
     // Cleanup event handlers
     return () => {
       if (realTimeUpdates.removeEventHandler) {
-        realTimeUpdates.removeEventHandler("trip_completed");
-        realTimeUpdates.removeEventHandler("trip_ending_waiting");
+        realTimeUpdates.removeEventHandler('trip_completed');
+        realTimeUpdates.removeEventHandler('trip_ending_waiting');
       }
     };
   }, [realTimeUpdates, activeMatches]);
-
-  // Update activeTripMatch when activeMatches data changes
-  useEffect(() => {
-    if (activeTripMatch && activeMatches.matches) {
-      // Find the updated match data
-      const updatedMatch = activeMatches.matches.find(
-        (match) => match.matchId === activeTripMatch.matchId
-      );
-
-      if (updatedMatch) {
-        console.log(
-          "🔄 [ACTIVE TRIP MATCH] Updating active trip match with latest data"
-        );
-        setActiveTripMatch(updatedMatch);
-      } else if (activeTripMatch.matchId) {
-        // Match no longer in active list (might be completed or cancelled)
-        console.log(
-          "🏁 [ACTIVE TRIP MATCH] Match no longer active, checking reason..."
-        );
-
-        // Always clear route from map when trip ends (completion or cancellation)
-        clearRouteFromMap();
-
-        // Check if trip was completed
-        if (finalJourneyModalVisible) {
-          // Show completion alert for the first user who is still in the modal
-          Alert.alert(
-            "🎉 Trip Completed!",
-            "Both users have confirmed the trip has ended. Thank you for traveling with BeSide!",
-            [
-              {
-                text: "View Trip History",
-                onPress: () => {
-                  setFinalJourneyModalVisible(false);
-                  setActiveTripMatch(null);
-                  setTripHistoryVisible(true);
-                },
-              },
-            ]
-          );
-        } else {
-          // Trip was likely cancelled, just clean up
-          console.log(
-            "🧹 [ROUTE CLEANUP] Trip cancelled or ended, route cleared from map"
-          );
-          setActiveTripMatch(null);
-        }
-      }
-    }
-  }, [
-    activeMatches.matches,
-    activeTripMatch,
-    finalJourneyModalVisible,
-    clearRouteFromMap,
-  ]);
 
   // Safe modal management functions
   const safeCloseModal = useCallback((modalSetter) => {
@@ -3023,6 +2970,10 @@ export default function HomeScreen() {
           (activeTripMatch.organizer?.userId === user?._id ? 'organizer' : 'companion') 
           : 'companion'
         }
+        currentUserId={user?._id}
+        onTripCompleted={() => {
+          setTripHistoryVisible(true);
+        }}
       />
 
       {/* Sender Acceptance Notification Modal */}
