@@ -28,6 +28,7 @@ export default function CompanionPreferencesModal({
   prefillStart = null,
   prefillDestination = null,
   shouldReset = false, // New prop to trigger reset
+  shouldReset = false, // New prop to trigger reset
 }) {
   const [talk, setTalk] = useState(false);
 
@@ -66,6 +67,8 @@ export default function CompanionPreferencesModal({
       setLoading(false);
       setShowDestinationSearch(false);
       setShowMeetingPointSearch(false);
+      setRouteDistance("4.2 km");
+      setRouteDuration("15 min");
       setRegion({
         latitude: -37.8136,
         longitude: 144.9631,

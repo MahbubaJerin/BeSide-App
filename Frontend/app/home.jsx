@@ -387,6 +387,7 @@ export default function HomeScreen() {
   const [photoUrl, setPhotoUrl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [shouldResetModal, setShouldResetModal] = useState(false);
+  const [shouldResetModal, setShouldResetModal] = useState(false);
 
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [startMarker, setStartMarker] = useState(null);
@@ -439,8 +440,8 @@ export default function HomeScreen() {
       realTimeUpdates.addEventHandler('trip_completed', (data) => {
         console.log('🎉 [REAL-TIME] Trip completed:', data);
         
-        // Clear route display from map
-        clearRouteFromMap();
+        // Clear all preferences and route data on trip completion
+        resetAllPreferencesAndRoute();
         
         // Refresh active matches to remove completed trip
         activeMatches.refresh();
@@ -538,6 +539,54 @@ export default function HomeScreen() {
     setCurrentNavigationRoute(null);
     setStartMarker(null);
     setEndMarker(null);
+  }, []);
+
+  // Helper function to completely reset all preferences and state
+  const resetAllPreferencesAndRoute = useCallback(() => {
+    console.log('🧹 [RESET ALL] Clearing all preferences, consent, and route data');
+    
+    // Clear route and map markers
+    setRouteCoordinates([]);
+    setStartMarker(null);
+    setEndMarker(null);
+    setShowRadius(false);
+    
+    // Clear consent form data
+    setConsent({ noTouch: false, respectful: false, safety: false });
+    
+    // Clear photo
+    setPhotoUrl(null);
+    
+    // Clear trip request data
+    setCurrentTripRequestId(null);
+    setSelectedUser(null);
+    
+    // Clear modal states
+    setConsentVisible(false);
+    setPhotoUploadVisible(false);
+    setPreferencesVisible(false);
+    
+    // Clear any navigation routes
+    setCurrentNavigationRoute(null);
+    
+    // Trigger modal reset
+    setShouldResetModal(true);
+    setTimeout(() => setShouldResetModal(false), 100); // Reset flag after modal processes it
+    
+    console.log('✅ [RESET ALL] All preferences and route data cleared');
+  }, []);
+
+  // Helper function to reset just route and visual elements (lighter reset)
+  const resetRouteAndVisuals = useCallback(() => {
+    console.log('🧹 [RESET ROUTE] Clearing route and visual elements only');
+    
+    setRouteCoordinates([]);
+    setStartMarker(null);
+    setEndMarker(null);
+    setShowRadius(false);
+    setCurrentNavigationRoute(null);
+    
+    console.log('✅ [RESET ROUTE] Route and visual elements cleared');
   }, []);
 
   const resetAllModals = useCallback(() => {
@@ -1970,18 +2019,16 @@ export default function HomeScreen() {
   };
 
   // Enhanced cancel search - gives user options for what to clear
-  // Enhanced cancel search - gives user options for what to clear
   const cancelSearch = async () => {
     await companionSearch.stopSearch();
     
     // Ask user what they want to do with their preferences and route
+    // Ask user what they want to do with their preferences and route
     Alert.alert(
       "Search Cancelled",
       "What would you like to do with your saved preferences and route?",
-      "What would you like to do with your saved preferences and route?",
       [
         {
-          text: "Start Fresh",
           text: "Start Fresh",
           style: "destructive",
           onPress: () => {
@@ -1991,8 +2038,15 @@ export default function HomeScreen() {
         },
         {
           text: "Clear Route Only",
-          text: "Clear Route Only",
           onPress: () => {
+            // Just clear route and visual elements, keep consent and photo
+            resetRouteAndVisuals();
+          }
+        },
+        {
+          text: "Keep Everything",
+          onPress: () => {
+            // Just stop searching, keep all data for next time
             // Just clear route and visual elements, keep consent and photo
             resetRouteAndVisuals();
           }
