@@ -15,7 +15,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { BASE_URL } from "../config";
 
-export default function SentRequestStatusModal({ visible, onClose }) {
+export default function SentRequestStatusModal({ visible, onClose, onRequestCancelled }) {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -85,6 +85,10 @@ export default function SentRequestStatusModal({ visible, onClose }) {
               if (result.status === "success") {
                 Alert.alert("Success", "Request cancelled successfully");
                 fetchSentRequests(); // Refresh list
+                // Notify parent component to clear preferences
+                if (onRequestCancelled) {
+                  onRequestCancelled();
+                }
               } else {
                 throw new Error(result.message || "Failed to cancel request");
               }

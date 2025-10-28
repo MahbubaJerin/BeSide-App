@@ -291,6 +291,7 @@ export default function HomeScreen() {
   const [consent, setConsent] = useState({ noTouch: false, respectful: false, safety: false });
   const [photoUrl, setPhotoUrl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [shouldResetModal, setShouldResetModal] = useState(false);
 
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [startMarker, setStartMarker] = useState(null);
@@ -343,8 +344,8 @@ export default function HomeScreen() {
       realTimeUpdates.addEventHandler('trip_completed', (data) => {
         console.log('🎉 [REAL-TIME] Trip completed:', data);
         
-        // Clear route display from map
-        clearRouteFromMap();
+        // Clear all preferences and route data on trip completion
+        resetAllPreferencesAndRoute();
         
         // Refresh active matches to remove completed trip
         activeMatches.refresh();
@@ -442,6 +443,54 @@ export default function HomeScreen() {
     setCurrentNavigationRoute(null);
     setStartMarker(null);
     setEndMarker(null);
+  }, []);
+
+  // Helper function to completely reset all preferences and state
+  const resetAllPreferencesAndRoute = useCallback(() => {
+    console.log('🧹 [RESET ALL] Clearing all preferences, consent, and route data');
+    
+    // Clear route and map markers
+    setRouteCoordinates([]);
+    setStartMarker(null);
+    setEndMarker(null);
+    setShowRadius(false);
+    
+    // Clear consent form data
+    setConsent({ noTouch: false, respectful: false, safety: false });
+    
+    // Clear photo
+    setPhotoUrl(null);
+    
+    // Clear trip request data
+    setCurrentTripRequestId(null);
+    setSelectedUser(null);
+    
+    // Clear modal states
+    setConsentVisible(false);
+    setPhotoUploadVisible(false);
+    setPreferencesVisible(false);
+    
+    // Clear any navigation routes
+    setCurrentNavigationRoute(null);
+    
+    // Trigger modal reset
+    setShouldResetModal(true);
+    setTimeout(() => setShouldResetModal(false), 100); // Reset flag after modal processes it
+    
+    console.log('✅ [RESET ALL] All preferences and route data cleared');
+  }, []);
+
+  // Helper function to reset just route and visual elements (lighter reset)
+  const resetRouteAndVisuals = useCallback(() => {
+    console.log('🧹 [RESET ROUTE] Clearing route and visual elements only');
+    
+    setRouteCoordinates([]);
+    setStartMarker(null);
+    setEndMarker(null);
+    setShowRadius(false);
+    setCurrentNavigationRoute(null);
+    
+    console.log('✅ [RESET ROUTE] Route and visual elements cleared');
   }, []);
 
   const resetAllModals = useCallback(() => {
@@ -750,12 +799,20 @@ export default function HomeScreen() {
             setAcceptanceData(modalData);
             setSenderAcceptanceVisible(true);
           } else if (eventData.response === 'declined') {
-            // Request declined - show brief notification
+            // Request declined - clear all preferences and route data
             setTimeout(() => {
               Alert.alert(
-                "Request Update",
+                "Request Declined",
                 eventData.detailedMessage,
-                [{ text: "OK" }]
+                [
+                  { 
+                    text: "OK", 
+                    onPress: () => {
+                      // Reset all preferences and route data when request is declined
+                      resetAllPreferencesAndRoute();
+                    }
+                  }
+                ]
               );
             }, 500);
           }
@@ -796,11 +853,8 @@ export default function HomeScreen() {
         case 'trip_cancelled':
           console.log("❌ [REAL-TIME] Trip cancelled event received:", eventData);
           
-          // Clear current navigation and trip state
-          setCurrentNavigationRoute(null);
-          setRouteCoordinates([]);
-          setStartMarker(null);
-          setEndMarker(null);
+          // Clear all preferences, route data, and trip state
+          resetAllPreferencesAndRoute();
           setActiveRequest(null);
           setArrivalStatus({
             isNearMeetingPoint: false,
@@ -1018,6 +1072,20 @@ export default function HomeScreen() {
                   "Request Accepted! 🎉",
                   `${myRequest.acceptedBy?.userName || 'Someone'} has accepted your companion request! You can now set a meeting point.`,
                   [{ text: "OK" }]
+                );
+              } else if (myRequest.status === 'expired') {
+                // Request expired - clear all preferences and route
+                Alert.alert(
+                  "Request Expired ⏰",
+                  "Your companion request has expired. You can start a new search with fresh preferences.",
+                  [
+                    { 
+                      text: "OK", 
+                      onPress: () => {
+                        resetAllPreferencesAndRoute();
+                      }
+                    }
+                  ]
                 );
               }
             }
@@ -1279,11 +1347,8 @@ export default function HomeScreen() {
                   [{ text: "OK" }]
                 );
                 
-                // Reset all states
-                setCurrentNavigationRoute(null);
-                setRouteCoordinates([]);
-                setStartMarker(null);
-                setEndMarker(null);
+                // Reset all states including preferences and route data
+                resetAllPreferencesAndRoute();
                 setActiveRequest(null);
                 setArrivalStatus({
                   isNearMeetingPoint: false,
@@ -1365,11 +1430,8 @@ export default function HomeScreen() {
                 }
               }
                 
-              // Reset all states regardless of which system was used
-              setCurrentNavigationRoute(null);
-              setRouteCoordinates([]);
-              setStartMarker(null);
-              setEndMarker(null);
+              // Reset all states and preferences regardless of which system was used
+              resetAllPreferencesAndRoute();
               setActiveRequest(null);
               setArrivalStatus({
                 isNearMeetingPoint: false,
@@ -1668,7 +1730,15 @@ export default function HomeScreen() {
               Alert.alert(
                 "Request Expired ⏰",
                 "Your companion request has expired after 2 minutes. You can send a new request if needed.",
-                [{ text: "OK" }]
+                [
+                  { 
+                    text: "OK", 
+                    onPress: () => {
+                      // Clear all preferences and route when request expires
+                      resetAllPreferencesAndRoute();
+                    }
+                  }
+                ]
               );
             } else {
               console.log("✅ Match was created, skipping expiration notification");
@@ -1687,30 +1757,34 @@ export default function HomeScreen() {
     }
   };
 
-  // Enhanced cancel search - keeps route but stops search
+  // Enhanced cancel search - gives user options for what to clear
   const cancelSearch = async () => {
     await companionSearch.stopSearch();
     
-    // Ask user if they want to keep the route visible
+    // Ask user what they want to do with their preferences and route
     Alert.alert(
       "Search Cancelled",
-      "Would you like to keep your route visible for when you search again?",
+      "What would you like to do with your saved preferences and route?",
       [
         {
-          text: "Clear Route",
+          text: "Start Fresh",
           style: "destructive",
           onPress: () => {
-            setRouteCoordinates([]);
-            setStartMarker(null);
-            setEndMarker(null);
-            setShowRadius(false);
-            setCurrentTripRequestId(null);
+            // Complete reset - clear everything
+            resetAllPreferencesAndRoute();
           }
         },
         {
-          text: "Keep Route",
+          text: "Clear Route Only",
           onPress: () => {
-            // Route stays visible, only stop searching
+            // Just clear route and visual elements, keep consent and photo
+            resetRouteAndVisuals();
+          }
+        },
+        {
+          text: "Keep Everything",
+          onPress: () => {
+            // Just stop searching, keep all data for next time
             setShowRadius(false);
           }
         }
@@ -2359,10 +2433,12 @@ export default function HomeScreen() {
         visible={preferencesVisible}
         onClose={() => setPreferencesVisible(false)}
         onSubmit={handlePreferencesSubmit}
+        shouldReset={shouldResetModal}
       />
       <SentRequestStatusModal
         visible={sentRequestStatusVisible}
         onClose={() => setSentRequestStatusVisible(false)}
+        onRequestCancelled={resetAllPreferencesAndRoute}
       />
       <TripHistoryModal
         visible={tripHistoryVisible}
