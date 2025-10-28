@@ -305,26 +305,9 @@ export default function ActiveMatchModal({
                       </View>
                     </View>
 
-                    {/* Action Buttons - Redesigned */}
+                    {/* Action Buttons - Simplified */}
                     <View style={styles.actionButtonsContainer}>
-                      {/* Top Row: Details & Start Navigation */}
                       <View style={styles.buttonRow}>
-                        <TouchableOpacity
-                          style={styles.actionButton}
-                          onPress={() => {
-                            Alert.alert(
-                              "Trip Details",
-                              `Destination: ${match.tripDetails?.destination || "Unknown"}\n` +
-                              `Status: ${match.status}\n` +
-                              `Companion: ${otherUser.userName}\n` +
-                              `Role: ${userRole}`
-                            );
-                          }}
-                        >
-                          <Ionicons name="information-circle-outline" size={18} color="#fff" />
-                          <Text style={styles.actionButtonText}>Details</Text>
-                        </TouchableOpacity>
-
                         <TouchableOpacity
                           style={[styles.actionButton, styles.navigationButton]}
                           onPress={() => {
@@ -335,18 +318,6 @@ export default function ActiveMatchModal({
                         >
                           <Ionicons name="navigate-outline" size={18} color="#fff" />
                           <Text style={styles.actionButtonText}>Navigate</Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* Bottom Row: Live View & Cancel */}
-                      <View style={styles.buttonRow}>
-                        <TouchableOpacity
-                          style={[styles.actionButton, styles.liveViewButton]}
-                          onPress={() => handleStartTrip(match)}
-                          disabled={match.status !== "active"}
-                        >
-                          <Ionicons name="eye-outline" size={18} color="#fff" />
-                          <Text style={styles.actionButtonText}>Live View</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -544,10 +515,9 @@ const styles = StyleSheet.create({
   },
   meetingPointSubtext: { fontSize: 12, color: "#6b7280", lineHeight: 16 },
   
-  // Action Buttons - Redesigned
+  // Action Buttons - Simplified
   actionButtonsContainer: {
     marginTop: 12,
-    gap: 8,
   },
   buttonRow: {
     flexDirection: "row",
@@ -559,7 +529,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#1c52c8", // Primary blue
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 10,
     gap: 6,
@@ -571,16 +541,12 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: "#fff",
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
   },
   navigationButton: {
     backgroundColor: "#2ca07b", // Secondary teal/green
     shadowColor: "#2ca07b",
-  },
-  liveViewButton: {
-    backgroundColor: "#214E34", // Accent dark green
-    shadowColor: "#214E34",
   },
   cancelButton: {
     backgroundColor: "#e32002", // Danger red
