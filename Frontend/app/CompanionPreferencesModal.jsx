@@ -43,8 +43,6 @@ export default function CompanionPreferencesModal({
   // New state for modern interface
   const [showDestinationSearch, setShowDestinationSearch] = useState(false);
   const [showMeetingPointSearch, setShowMeetingPointSearch] = useState(false);
-  const [routeDistance, setRouteDistance] = useState("4.2 km");
-  const [routeDuration, setRouteDuration] = useState("15 min");
   const [mapRef, setMapRef] = useState(null);
   const [region, setRegion] = useState({
     latitude: -37.8136,
@@ -67,8 +65,6 @@ export default function CompanionPreferencesModal({
       setLoading(false);
       setShowDestinationSearch(false);
       setShowMeetingPointSearch(false);
-      setRouteDistance("4.2 km");
-      setRouteDuration("15 min");
       setRegion({
         latitude: -37.8136,
         longitude: 144.9631,
@@ -110,10 +106,6 @@ export default function CompanionPreferencesModal({
       latitudeDelta: 0.01,
       longitudeDelta: 0.01,
     });
-    
-    // Calculate approximate distance and duration (placeholder)
-    setRouteDistance("4.2 km");
-    setRouteDuration("15 min");
   };
 
   const handleConfirm = () => {
@@ -176,22 +168,6 @@ export default function CompanionPreferencesModal({
             )}
           </MapView>
 
-          {/* Route Information Card */}
-          <View style={styles.routeInfoCard}>
-            <View style={styles.routeHeader}>
-              <View style={styles.routeStats}>
-                <View style={styles.routeStat}>
-                  <Ionicons name="bus" size={16} color="#8B5CF6" />
-                  <ThemedText style={styles.routeStatText}>{routeDistance}</ThemedText>
-                </View>
-                <View style={styles.routeStat}>
-                  <Ionicons name="time" size={16} color="#8B5CF6" />
-                  <ThemedText style={styles.routeStatText}>{routeDuration}</ThemedText>
-                </View>
-              </View>
-            </View>
-          </View>
-
           {/* Destination Cards */}
           <View style={styles.destinationCards}>
             {/* Meeting Point Card */}
@@ -213,7 +189,7 @@ export default function CompanionPreferencesModal({
                 </View>
                 <View style={styles.cardContent}>
                   <ThemedText style={styles.cardTitle} numberOfLines={1}>{destText}</ThemedText>
-                  <ThemedText style={styles.cardSubtext}>{routeDistance}</ThemedText>
+                  <ThemedText style={styles.cardSubtext}>Destination</ThemedText>
                 </View>
               </TouchableOpacity>
             ) : (
@@ -393,41 +369,6 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
-  },
-
-  // Route Info Card
-  routeInfoCard: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  routeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  routeStats: {
-    flexDirection: 'row',
-    gap: 20,
-  },
-  routeStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  routeStatText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
   },
 
   // Destination Cards
