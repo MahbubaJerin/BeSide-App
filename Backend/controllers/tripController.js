@@ -1309,41 +1309,86 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
   const otherUserId = tripMatch.organizer.userId === userId ? 
     tripMatch.companion.userId : tripMatch.organizer.userId;
   
-  if (bothUsersEnded) {
-    // Send completion notification to both users
-    const completionEventData = {
-      matchId: matchId,
-      message: `� Trip completed! Both users have confirmed the trip has ended.`,
-      timestamp: new Date().toISOString(),
-      tripCompleted: true
-    };
+  const eventData = {
+    matchId: matchId,
+    message: newMessage,
+    senderName: req.user.userName,
+    timestamp: new Date().toISOString()
+  };
 
-    sendEventToUser(otherUserId, 'trip_completed', completionEventData);
-    sendEventToUser(userId, 'trip_completed', completionEventData);
-  } else {
-    // Send waiting notification to the other user
-    const waitingEventData = {
-      matchId: matchId,
-      endedBy: req.user.userName,
-      message: `${req.user.userName} has ended the trip. Waiting for you to confirm.`,
-      timestamp: new Date().toISOString(),
-      waitingForConfirmation: true
-    };
+  sendEventToUser(otherUserId, 'new_message', eventData);
 
-    sendEventToUser(otherUserId, 'trip_ending_waiting', waitingEventData);
+  console.log(`✅ [MESSAGE SENT] Message delivered for match ${matchId}`);
+
+  res.status(201).json({
+    status: "success",
+    message: "Message sent successfully",
+    data: {
+      message: newMessage
+    }
+  });
+});
+
+// Get messages for trip match
+exports.getMessages = catchAsync(async (req, res, next) => {
+  const { matchId } = req.params;
+  const userId = req.user._id.toString();
+  const { lastMessageId } = req.query; // For pagination
+
+  console.log(`📖 [GET MESSAGES] User ${req.user.userName} getting messages for match ${matchId}`);
+
+  // Find the trip match
+  const tripMatch = await TripMatch.findOne({ matchId });
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  if (tripMatch.organizer.userId !== userId && tripMatch.companion.userId !== userId) {
+    return next(new AppError("You are not part of this trip match", 403));
+  }
+
+  // Initialize messages array if it doesn't exist (backward compatibility)
+  if (!tripMatch.messages) {
+    tripMatch.messages = [];
+  }
+
+  let messages = tripMatch.messages;
+
+  // If lastMessageId is provided, only return newer messages
+  if (lastMessageId) {
+    const lastMessageIndex = messages.findIndex(msg => msg.messageId === lastMessageId);
+    if (lastMessageIndex !== -1) {
+      messages = messages.slice(lastMessageIndex + 1);
+    }
+  }
+
+  // Mark messages as read by current user
+  let hasNewReads = false;
+  messages.forEach(message => {
+    if (message.senderId !== userId) {
+      const existingRead = message.readBy.find(read => read.userId === userId);
+      if (!existingRead) {
+        message.readBy.push({
+          userId: userId,
+          readAt: new Date()
+        });
+        hasNewReads = true;
+      }
+    }
+  });
+
+  // Save if we added any read receipts
+  if (hasNewReads) {
+    await tripMatch.save();
   }
 
   res.status(200).json({
     status: "success",
-    message: bothUsersEnded 
-      ? "Trip completed successfully! Both users have confirmed the trip has ended." 
-      : "You have ended the trip. Waiting for your companion to confirm.",
     data: {
-      tripMatch,
-      userEnded: true,
-      waitingForOther: !bothUsersEnded,
-      bothEnded: bothUsersEnded,
-      tripCompleted: bothUsersEnded
+      messages: messages,
+      totalMessages: tripMatch.messages.length,
+      hasMoreMessages: lastMessageId ? true : false // Simple implementation
     }
   });
 });

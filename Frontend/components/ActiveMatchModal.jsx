@@ -22,8 +22,6 @@ import { BASE_URL } from "../config";
 import NavigationModal from "./NavigationModal";
 import TripMessagingModal from "./TripMessagingModal";
 
-const { width } = Dimensions.get('window');
-
 export default function ActiveMatchModal({
   visible,
   onClose,
@@ -36,6 +34,7 @@ export default function ActiveMatchModal({
   onBothArrived, // NEW: Callback when both users arrive
 }) {
   const [navigationModalVisible, setNavigationModalVisible] = useState(false);
+  const [messagingModalVisible, setMessagingModalVisible] = useState(false);
   const [messagingModalVisible, setMessagingModalVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [cachedMatches, setCachedMatches] = useState([]);
@@ -417,7 +416,7 @@ export default function ActiveMatchModal({
                       </View>
                     </View>
 
-                    {/* Action Buttons - Simplified */}
+                    {/* Action Buttons - Three buttons */}
                     <View style={styles.actionButtonsContainer}>
                       <View style={styles.buttonRow}>
                         <TouchableOpacity
@@ -430,6 +429,17 @@ export default function ActiveMatchModal({
                         >
                           <Ionicons name="navigate-outline" size={16} color="#fff" />
                           <Text style={styles.actionButtonText}>Navigate</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.messageButton]}
+                          onPress={() => {
+                            setSelectedMatch(match);
+                            setMessagingModalVisible(true);
+                          }}
+                        >
+                          <Ionicons name="chatbubble-outline" size={16} color="#fff" />
+                          <Text style={styles.actionButtonText}>Message</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -481,7 +491,7 @@ export default function ActiveMatchModal({
               currentUserId={currentUserId}
             />
           )}
-        </Animated.View>
+        </View>
       </View>
     </Modal>
   );
@@ -738,6 +748,10 @@ const styles = StyleSheet.create({
   navigationButton: {
     backgroundColor: "#10B981",
     shadowColor: "#10B981",
+  },
+  messageButton: {
+    backgroundColor: "#8b5cf6", // Purple for messaging
+    shadowColor: "#8b5cf6",
   },
   cancelButton: {
     backgroundColor: "#EF4444",
