@@ -2425,7 +2425,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Floating Find Companion Button */}
-      <TouchableOpacity
+      <TouchableOpacity 
         style={styles.findCompanionButton}
         onPress={handleFindCompanion}
         disabled={isSearching}
@@ -2433,7 +2433,7 @@ export default function HomeScreen() {
         <View style={styles.findButtonContent}>
           <Ionicons name="people" size={24} color="white" />
           <ThemedText style={styles.findButtonText}>
-            {isSearching ? "Searching..." : "Find Companion"}
+            {isSearching ? 'Searching...' : 'Find Companion'}
           </ThemedText>
         </View>
         {isSearching && (
@@ -2442,16 +2442,14 @@ export default function HomeScreen() {
           </View>
         )}
       </TouchableOpacity>
-
+      
       {/* Status Button - Also floating if needed */}
-      {senderRequestStatus?.status === "pending" && (
-        <TouchableOpacity
+      {senderRequestStatus?.status === 'pending' && (
+        <TouchableOpacity 
           style={styles.statusButton}
           onPress={() => setSentRequestStatusVisible(true)}
         >
-          <ThemedText style={styles.statusButtonText}>
-            View Request Status
-          </ThemedText>
+          <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
         </TouchableOpacity>
       )}
 
@@ -3187,15 +3185,21 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontWeight: "500",
   },
-
+  
   // Floating Find Companion Button
   findCompanionButton: {
     backgroundColor: "#8B5CF6",
     paddingHorizontal: 28,
     paddingVertical: 16,
     borderRadius: 30,
+    paddingVertical: 16,
+    borderRadius: 30,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginVertical: 20,
+    marginHorizontal: 20,
     justifyContent: "center",
     alignSelf: "center",
     marginVertical: 20,
@@ -3205,7 +3209,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
     borderWidth: 0,
+    minWidth: 200,
     minWidth: 200,
   },
   findButtonContent: {
