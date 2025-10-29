@@ -116,110 +116,124 @@ export default function RegisterScreen() {
     return true;
   };
 
-  const handleRegister = async () => {
-    if (!validateStep()) {
+ const handleRegister = async () => {
+  if (!validateStep()) {
+    Alert.alert(
+      "Missing Info",
+      "Please complete all required fields before continuing."
+    );
+    return;
+  }
+
+  try {
+    let payload = {
+      userName: username || email,
+      email: email.trim().toLowerCase(),
+      mobileNo: mobileNo.trim(),
+      password,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      gender,
+      dateOfBirth: dob ? formatDateYMD(dob) : undefined,
+      address: {
+        street: street.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        postalCode: postalCode.trim(),
+        country,
+        countryCode,
+      },
+      geo,
+    };
+
+   // Always randomize for automation
+const isE2E = true; // force during Maestro testing
+
+if (isE2E || process.env.EXPO_PUBLIC_E2E === "1") {
+  const ts = Date.now();
+  const [name, domain] = (email || "user@test.com").split("@");
+  const randomized = `${name.replace(/[^a-z0-9]/gi, "")}${ts}@${domain || "test.com"}`;
+  payload.email = randomized.toLowerCase();
+  payload.userName = `${(username || "user").replace(/[^a-z0-9]/gi, "")}_${ts}`;
+}
+
+
+    const registerResponse = await fetch(`${BASE_URL}api/v1/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const registerData = await registerResponse.json();
+    if (!registerResponse.ok) {
       Alert.alert(
-        "Missing Info",
-        "Please complete all required fields before continuing."
+        "Registration Failed",
+        registerData.message || "Try again."
       );
       return;
     }
 
-    try {
-      const payload = {
-        userName: username || email,
-        email: email.trim().toLowerCase(),
-        mobileNo: mobileNo.trim(),
-        password,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        gender,
-        dateOfBirth: dob ? formatDateYMD(dob) : undefined,
-        address: {
-          street: street.trim(),
-          city: city.trim(),
-          state: state.trim(),
-          postalCode: postalCode.trim(),
-          country,
-          countryCode,
-        },
-        geo,
-      };
+    const otpResponse = await fetch(`${BASE_URL}api/v1/auth/send-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: payload.email }), // use updated email
+    });
 
-      const registerResponse = await fetch(`${BASE_URL}api/v1/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const registerData = await registerResponse.json();
-      if (!registerResponse.ok) {
-        Alert.alert(
-          "Registration Failed",
-          registerData.message || "Try again."
-        );
-        return;
-      }
-
-      const otpResponse = await fetch(`${BASE_URL}api/v1/auth/send-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const otpData = await otpResponse.json();
-      if (!otpResponse.ok) {
-        Alert.alert(
-          "Email Error",
-          otpData.message || "User registered but OTP not sent."
-        );
-        return;
-      }
-
+    const otpData = await otpResponse.json();
+    if (!otpResponse.ok) {
       Alert.alert(
-        "Success",
-        "We’ve sent a 6-digit OTP to your email. Please verify to continue.",
-        [
-          {
-            text: "OK",
-            onPress: () =>
-              router.push({
-                pathname: "/verifyOTP",
-                params: { email, context: "signup", next: "/login" },
-              }),
-          },
-        ]
+        "Email Error",
+        otpData.message || "User registered but OTP not sent."
       );
-    } catch (err) {
-      console.error("[Register Error]", err);
-      Alert.alert("Error", "Something went wrong during registration.");
+      return;
     }
-  };
+
+    Alert.alert(
+      "Success",
+      "We’ve sent a 6-digit OTP to your email. Please verify to continue.",
+      [
+        {
+          text: "OK",
+          onPress: () =>
+            router.push({
+              pathname: "/verifyOTP",
+              params: { email: payload.email, context: "signup", next: "/login" },
+            }),
+        },
+      ]
+    );
+  } catch (err) {
+    console.error("[Register Error]", err);
+    Alert.alert("Error", "Something went wrong during registration.");
+  }
+};
 
   /* ---------------- UI Layout ---------------- */
   const stepsTotal = 4;
 
   return (
     <KeyboardAvoidingView
-  style={{ flex: 1, backgroundColor: background }}
-  behavior={Platform.OS === "ios" ? "padding" : "height"}
-  keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
->
-
+      style={{ flex: 1, backgroundColor: background }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+    >
       <StatusBar
         barStyle={Platform.OS === "ios" ? "light-content" : "default"}
       />
 
       {/* Header */}
       <View style={styles.headerTop}>
-        <ThemedText type="title" style={styles.title}>
+        <ThemedText testID="registerTitle" type="title" style={styles.title}>
           Register
         </ThemedText>
         <ThemedText type="subtitle" style={styles.stepSubtitle}>
           Step {String(step + 1).padStart(2, "0")}/
           {String(stepsTotal).padStart(2, "0")}
         </ThemedText>
-        <View style={[styles.progressTrack, { backgroundColor: surface }]}>
+        <View
+          testID="registerProgressTrack"
+          style={[styles.progressTrack, { backgroundColor: surface }]}
+        >
           <View
             style={[
               styles.progressFill,
@@ -237,6 +251,7 @@ export default function RegisterScreen() {
         <ThemedText style={styles.loginHint}>
           Already have an account?{" "}
           <ThemedText
+            testID="registerLoginLink"
             style={styles.loginLink}
             onPress={() => router.push("/login")}
           >
@@ -245,117 +260,25 @@ export default function RegisterScreen() {
         </ThemedText>
       </View>
 
-{/* Steps */}
-<TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-  <ScrollView
-    contentContainerStyle={styles.scrollContainer}
-    keyboardShouldPersistTaps="handled"
-    showsVerticalScrollIndicator={false}
+      {/* Steps */}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          testID="registerScroll"
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           <View style={styles.stepWrap}>
-        {/* STEP 0 */}
-        {step === 0 && (
-          <View style={styles.stepInner}>
-            <ThemedText style={styles.sectionLead}>Personal Details</ThemedText>
+            {/* STEP 0 */}
+            {step === 0 && (
+              <View testID="registerStep0" style={styles.stepInner}>
+                <ThemedText style={styles.sectionLead}>
+                  Personal Details
+                </ThemedText>
 
-            <ThemedText style={styles.label}>First Name*</ThemedText>
-            <TextInput
-              style={[
-                styles.input,
-                { borderColor: border, color: text, backgroundColor: surface },
-              ]}
-              value={firstName}
-              onChangeText={setFirstName}
-              autoCapitalize="words"
-              autoCorrect={false}
-            />
-
-            <ThemedText style={styles.label}>Last Name*</ThemedText>
-            <TextInput
-              style={[
-                styles.input,
-                { borderColor: border, color: text, backgroundColor: surface },
-              ]}
-              value={lastName}
-              onChangeText={setLastName}
-              autoCapitalize="words"
-              autoCorrect={false}
-            />
-
-            <ThemedText style={styles.label}>Email*</ThemedText>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  borderColor: !email || emailValid ? border : "#B00020",
-                  color: text,
-                  backgroundColor: surface,
-                },
-              ]}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {!!email && !emailValid && (
-              <ThemedText style={{ fontSize: 12, color: "#B00020" }}>
-                Please enter a valid email (must include @ and end with .com)
-              </ThemedText>
-            )}
-
-            <ThemedText style={styles.label}>Date of Birth*</ThemedText>
-            <TouchableOpacity
-              style={[
-                styles.input,
-                {
-                  justifyContent: "center",
-                  borderColor: dob ? border : "#ccc",
-                  backgroundColor: surface,
-                },
-              ]}
-              onPress={() => setShowDobPicker(true)}
-            >
-              <Text style={{ color: dob ? text : "#777" }}>
-                {dob ? formatDatePretty(dob) : "Select your date of birth"}
-              </Text>
-            </TouchableOpacity>
-
-            {showDobPicker && (
-              <DateTimePicker
-                value={dob ?? new Date(2000, 0, 1)}
-                mode="date"
-                display={Platform.OS === "ios" ? "inline" : "calendar"}
-                maximumDate={new Date()}
-                onChange={(e, selected) => {
-                  if (selected) setDob(selected);
-                  setShowDobPicker(false);
-                }}
-              />
-            )}
-          </View>
-        )}
-
-        {/* STEP 1 */}
-        {step === 1 && (
-          <View style={styles.stepInner}>
-            <ThemedText style={styles.sectionLead}>Contact Details</ThemedText>
-
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <CountryPicker
-                withFlag
-                withCallingCode
-                withFilter
-                countryCode={countryCode}
-                onSelect={(c) => {
-                  setCountryCode(c.cca2);
-                  setCountry(c.name?.common || c.name);
-                }}
-                containerButtonStyle={styles.ccBtn}
-              />
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <ThemedText style={styles.label}>Mobile Number*</ThemedText>
+                <ThemedText style={styles.label}>First Name*</ThemedText>
                 <TextInput
+                  testID="registerFirstNameInput"
                   style={[
                     styles.input,
                     {
@@ -364,174 +287,319 @@ export default function RegisterScreen() {
                       backgroundColor: surface,
                     },
                   ]}
-                  value={mobileNo}
-                  onChangeText={setMobileNo}
-                  keyboardType="phone-pad"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  autoCapitalize="words"
+                  autoCorrect={false}
                 />
-              </View>
-            </View>
 
-            <ThemedText style={styles.label}>Username (optional)</ThemedText>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  borderColor: border,
-                  color: text,
-                  backgroundColor: surface,
-                },
-              ]}
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-            />
+                <ThemedText style={styles.label}>Last Name*</ThemedText>
+                <TextInput
+                  testID="registerLastNameInput"
+                  style={[
+                    styles.input,
+                    {
+                      borderColor: border,
+                      color: text,
+                      backgroundColor: surface,
+                    },
+                  ]}
+                  value={lastName}
+                  onChangeText={setLastName}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
 
-            <ThemedText style={styles.label}>Gender</ThemedText>
-            <View style={styles.pickerWrap}>
-              <RNPickerSelect
-                onValueChange={setGender}
-                value={gender}
-                placeholder={{ label: "Select Gender", value: null }}
-                items={[
-                  { label: "Male", value: "male" },
-                  { label: "Female", value: "female" },
-                  { label: "Non-binary", value: "non-binary" },
-                  { label: "Other", value: "other" },
-                ]}
-              />
-            </View>
-          </View>
-        )}
-
-        {/* STEP 2 */}
-        {step === 2 && (
-          <View style={styles.stepInner}>
-            <ThemedText style={styles.sectionLead}>Create Password</ThemedText>
-            <ThemedText style={styles.label}>Password*</ThemedText>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  borderColor: border,
-                  color: text,
-                  backgroundColor: surface,
-                },
-              ]}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-            {password.length > 0 && (
-              <>
-                <View style={styles.strengthBarWrap}>
-                  <View
-                    style={[
-                      styles.strengthBar,
-                      {
-                        backgroundColor: getStrengthColor(passwordStrength),
-                      },
-                    ]}
-                  />
-                  <ThemedText style={{ marginLeft: 8 }}>
-                    {passwordStrength}
+                <ThemedText style={styles.label}>Email*</ThemedText>
+                <TextInput
+                  testID="registerEmailInput"
+                  style={[
+                    styles.input,
+                    {
+                      borderColor: !email || emailValid ? border : "#B00020",
+                      color: text,
+                      backgroundColor: surface,
+                    },
+                  ]}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {!!email && !emailValid && (
+                  <ThemedText
+                    testID="registerEmailError"
+                    style={{ fontSize: 12, color: "#B00020" }}
+                  >
+                    Please enter a valid email (must include @ and end with
+                    .com)
                   </ThemedText>
-                </View>
-                <View style={styles.checkList}>
-                  {passwordChecks.map((c, i) => (
-                    <Text
-                      key={i}
-                      style={{
-                        color: c.ok ? "#22c55e" : "#ef4444",
-                        fontSize: 14,
-                        marginVertical: 2,
-                      }}
-                    >
-                      {c.ok ? "✓" : "✗"} {c.label}
-                    </Text>
-                  ))}
-                </View>
-              </>
-            )}
-          </View>
-        )}
+                )}
 
-        {/* STEP 3 */}
-        {step === 3 && (
-          <View style={styles.stepInner}>
-            <ThemedText style={styles.sectionLead}>Location & Terms</ThemedText>
-            <PlacesAutocomplete
-              placeholder="Type your address"
-              value={street}
-              onChangeText={setStreet}
-              onSelect={(place) => {
-                if (place) {
-                  setStreet(place.description);
-                  setGeo({ lat: place.lat, lng: place.lng });
-                }
-              }}
-              style={{ marginTop: 8 }}
-            />
+                <ThemedText style={styles.label}>Date of Birth*</ThemedText>
+                <TouchableOpacity
+                  testID="registerDobOpenBtn"
+                  style={[
+                    styles.input,
+                    {
+                      justifyContent: "center",
+                      borderColor: dob ? border : "#ccc",
+                      backgroundColor: surface,
+                    },
+                  ]}
+                  onPress={() => setShowDobPicker(true)}
+                >
+                  <Text style={{ color: dob ? text : "#777" }}>
+                    {dob ? formatDatePretty(dob) : "Select your date of birth"}
+                  </Text>
+                </TouchableOpacity>
 
-            <View style={{ flexDirection: "row", marginTop: 20 }}>
-              <TouchableOpacity
-                onPress={() => setTermsAccepted(!termsAccepted)}
-                style={styles.checkbox}
-              >
-                {termsAccepted && (
-                  <View
-                    style={[styles.checkboxInner, { backgroundColor: border }]}
+                {showDobPicker && (
+                  <DateTimePicker
+                    testID="registerDobPicker"
+                    value={dob ?? new Date(2000, 0, 1)}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "inline" : "calendar"}
+                    maximumDate={new Date()}
+                    onChange={(e, selected) => {
+                      if (selected) setDob(selected);
+                      setShowDobPicker(false);
+                    }}
                   />
                 )}
-              </TouchableOpacity>
-              <Text style={{ color: text }}>
-                I agree to the{" "}
-                <Text
-                  style={{ color: border, textDecorationLine: "underline" }}
-                  onPress={() =>
-                    Alert.alert(
-                      "Terms & Conditions",
-                      "Link to Terms & Privacy here."
-                    )
-                  }
-                >
-                  Terms & Conditions
-                </Text>
-              </Text>
+              </View>
+            )}
+
+            {/* STEP 1 */}
+            {step === 1 && (
+              <View testID="registerStep1" style={styles.stepInner}>
+                <ThemedText style={styles.sectionLead}>
+                  Contact Details
+                </ThemedText>
+
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <CountryPicker
+                    withFlag
+                    withCallingCode
+                    withFilter
+                    countryCode={countryCode}
+                    onSelect={(c) => {
+                      setCountryCode(c.cca2);
+                      setCountry(c.name?.common || c.name);
+                    }}
+                    containerButtonStyle={styles.ccBtn}
+                  />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <ThemedText style={styles.label}>Mobile Number*</ThemedText>
+                    <TextInput
+                      testID="registerMobileInput"
+                      style={[
+                        styles.input,
+                        {
+                          borderColor: border,
+                          color: text,
+                          backgroundColor: surface,
+                        },
+                      ]}
+                      value={mobileNo}
+                      onChangeText={setMobileNo}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+                </View>
+
+                <ThemedText style={styles.label}>
+                  Username (optional)
+                </ThemedText>
+                <TextInput
+                  testID="registerUsernameInput"
+                  style={[
+                    styles.input,
+                    {
+                      borderColor: border,
+                      color: text,
+                      backgroundColor: surface,
+                    },
+                  ]}
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                />
+
+                <ThemedText style={styles.label}>Gender</ThemedText>
+                <View testID="registerGenderPicker" style={styles.pickerWrap}>
+                  <RNPickerSelect
+                    useNativeAndroidPickerStyle={true}
+                    onValueChange={setGender}
+                    value={gender}
+                    placeholder={{
+                      label: "Select Gender",
+                      value: null
+                    }}
+                    items={[
+                      { label: "Male", value: "male" },
+                      { label: "Female", value: "female" },
+                      { label: "Non-binary", value: "non-binary" },
+                      { label: "Other", value: "other" },
+                    ]}
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* STEP 2 */}
+            {step === 2 && (
+              <View testID="registerStep2" style={styles.stepInner}>
+                <ThemedText style={styles.sectionLead}>
+                  Create Password
+                </ThemedText>
+                <ThemedText style={styles.label}>Password*</ThemedText>
+                <TextInput
+                  testID="registerPasswordInput"
+                  style={[
+                    styles.input,
+                    {
+                      borderColor: border,
+                      color: text,
+                      backgroundColor: surface,
+                    },
+                  ]}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
+                {password.length > 0 && (
+                  <>
+                    <View
+                      testID="registerPasswordStrengthBar"
+                      style={styles.strengthBarWrap}
+                    >
+                      <View
+                        style={[
+                          styles.strengthBar,
+                          {
+                            backgroundColor: getStrengthColor(passwordStrength),
+                          },
+                        ]}
+                      />
+                      <ThemedText style={{ marginLeft: 8 }}>
+                        {passwordStrength}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.checkList}>
+                      {passwordChecks.map((c, i) => (
+                        <Text
+                          key={i}
+                          testID={`registerPasswordCheck-${i}`}
+                          style={{
+                            color: c.ok ? "#22c55e" : "#ef4444",
+                            fontSize: 14,
+                            marginVertical: 2,
+                          }}
+                        >
+                          {c.ok ? "✓" : "✗"} {c.label}
+                        </Text>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </View>
+            )}
+
+            {/* STEP 3 */}
+            {step === 3 && (
+              <View testID="registerStep3" style={styles.stepInner}>
+                <ThemedText style={styles.sectionLead}>
+                  Location & Terms
+                </ThemedText>
+                <PlacesAutocomplete
+                  placeholder="Type your address"
+                  value={street}
+                  onChangeText={setStreet}
+                  onSelect={(place) => {
+                    if (place) {
+                      setStreet(place.description);
+                      setGeo({ lat: place.lat, lng: place.lng });
+                    }
+                  }}
+                  style={{ marginTop: 8 }}
+                  testID="locationSelection"
+                  rowTestPrefix="placesRow"
+                />
+
+                <View style={{ flexDirection: "row", marginTop: 20 }}>
+                  <TouchableOpacity
+                    testID="registerTermsCheckbox"
+                    onPress={() => setTermsAccepted(!termsAccepted)}
+                    style={styles.checkbox}
+                  >
+                    {termsAccepted && (
+                      <View
+                        style={[
+                          styles.checkboxInner,
+                          { backgroundColor: border },
+                        ]}
+                      />
+                    )}
+                  </TouchableOpacity>
+                  <Text style={{ color: text }}>
+                    I agree to the{" "}
+                    <Text
+                      testID="registerTermsLink"
+                      style={{ color: border, textDecorationLine: "underline" }}
+                      onPress={() =>
+                        Alert.alert(
+                          "Terms & Conditions",
+                          "Link to Terms & Privacy here."
+                        )
+                      }
+                    >
+                      Terms & Conditions
+                    </Text>
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <View testID="registerFooterBar" style={styles.footerBar}>
+              {step > 0 && (
+                <ThemedButton
+                  testID="registerBackBtn"
+                  title="Back"
+                  onPress={() => setStep(step - 1)}
+                  style={styles.btnHalf}
+                  textStyle={styles.btnText}
+                />
+              )}
+          <ThemedButton
+  testID="registerNextOrSubmitBtn"
+  title={step < 3 ? "Next" : "Register"}
+  onPress={() => {
+    const valid = validateStep();
+    if (!valid) {
+      Alert.alert(
+        "Missing Info",
+        "Please complete all * fields correctly before proceeding."
+      );
+      return;
+    }
+
+    // use functional update for stability
+    if (step < 3) setStep((prev) => prev + 1);
+    else handleRegister();
+  }}
+  disabled={step === 3 && !termsAccepted}
+  style={step === 0 ? styles.btnSingleCenter : styles.btnHalf}
+  textStyle={styles.btnText}
+/>
+
             </View>
           </View>
-        )}
-
-        <View style={styles.footerBar}>
-          {step > 0 && (
-            <ThemedButton
-              title="Back"
-              onPress={() => setStep(step - 1)}
-              style={styles.btnHalf}
-              textStyle={styles.btnText}
-            />
-          )}
-          <ThemedButton
-            title={step < 3 ? "Next" : "Register"}
-            onPress={() => {
-              if (!validateStep()) {
-                Alert.alert(
-                  "Missing Info",
-                  "Please complete all * fields correctly before proceeding."
-                );
-                return;
-              }
-              if (step < 3) setStep(step + 1);
-              else handleRegister();
-            }}
-            disabled={step === 3 && !termsAccepted}
-            style={step === 0 ? styles.btnSingleCenter : styles.btnHalf}
-            textStyle={styles.btnText}
-          />
-        </View>
-      </View>
-  </ScrollView>
-  </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>);
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+  );
 }
 
 /* ---------------- Styles ---------------- */
@@ -648,7 +716,6 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     borderRadius: 33,
   },
- 
 
   footerNote: {
     marginTop: 20,

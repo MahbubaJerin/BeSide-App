@@ -84,6 +84,7 @@ export default function WelcomeScreen() {
             style={[styles.ctaTouch, { marginTop: 14 }]}
           >
             <ThemedButton
+              testID="welcomeRegisterButton" 
               title="Register"
               type="primary"
               onPress={handleRegister}

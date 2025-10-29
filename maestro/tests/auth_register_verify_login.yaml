@@ -1,0 +1,88 @@
+appId: com.anonymous.Frontend
+---
+# Step 1 — Launch and open Register
+- launchApp
+- tapOn: { id: welcomeRegisterButton }
+- assertVisible: { id: registerTitle }
+- assertVisible: { id: registerProgressTrack }
+- assertVisible: { id: registerStep0 }
+
+# Step 2 — Personal details
+- tapOn: { id: registerFirstNameInput }
+- inputText: Ava
+- tapOn: { id: registerLastNameInput }
+- inputText: Stone
+- tapOn: { id: registerEmailInput }
+- inputText: ava.stone+e2e@besideapp.com
+- hideKeyboard
+- waitForAnimationToEnd
+- tapOn: { id: registerDobOpenBtn }
+- waitForAnimationToEnd
+- tapOn: OK
+- waitForAnimationToEnd
+- tapOn: { id: registerNextOrSubmitBtn }
+- assertVisible: { id: registerStep1 }
+
+# Step 3 — Contact details
+- waitForAnimationToEnd
+- tapOn: { id: registerMobileInput }
+- inputText: '+610412345678'
+- tapOn: { id: registerUsernameInput }
+- inputText: ava_e2e
+- tapOn: { id: registerGenderPicker }
+- tapOn: Male
+- hideKeyboard
+- waitForAnimationToEnd
+- tapOn: { id: registerNextOrSubmitBtn }
+- assertVisible: { id: registerStep2 }
+
+# Step 4 — Password
+- tapOn: { id: registerPasswordInput }
+- inputText: Test@1234
+- assertVisible: { id: registerPasswordStrengthBar }
+- assertVisible: { id: registerPasswordCheck-0 }
+- hideKeyboard
+- waitForAnimationToEnd
+- tapOn: { id: registerNextOrSubmitBtn }
+- assertVisible: { id: registerStep3 }
+
+# Step 5 — Location & Terms
+- tapOn: { id: locationSelection }
+- inputText: 122 Smith St, Collingwood VIC, Australia
+- hideKeyboard
+- waitForAnimationToEnd
+# (no placesRow tap needed; onSelect auto-runs)
+
+- waitForAnimationToEnd
+- tapOn: { id: registerTermsCheckbox }
+- waitForAnimationToEnd
+- tapOn: { id: registerNextOrSubmitBtn }
+- tapOn: { id: registerNextOrSubmitBtn }
+
+- waitForAnimationToEnd
+- tapOn: OK
+- takeScreenshot:
+    path: /Users/nameranayat/Desktop/register_auth/after_submit_registration.png
+
+# Step 6 — OTP
+- assertVisible: { id: verifyOtpTitle }
+- tapOn: { id: otpInput }
+- inputText: '222222'
+- hideKeyboard
+- waitForAnimationToEnd
+- tapOn: { id: verifyOtpBtn }
+- waitForAnimationToEnd
+- tapOn: OK
+- takeScreenshot:
+    path: /Users/nameranayat/Desktop/register_auth/registration_success.png
+
+# Step 7 — Login verification
+- tapOn: { id: usernameInput }
+- inputText: ava_e2e
+- tapOn: { id: passwordInput }
+- inputText: Test@1234
+- tapOn: { id: loginButton }
+- waitForAnimationToEnd
+- assertVisible: Safe Journey Companion
+- takeScreenshot:
+    path: /Users/nameranayat/Desktop/register_auth/new_user_login_success.png

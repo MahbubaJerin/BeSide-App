@@ -33,11 +33,7 @@ const { width, height } = Dimensions.get("window");
 const ProfileHeader = ({ onSettingsPress, text, border }) => {
   const handleGoBack = () => {
     try {
-      console.log("Header back pressed");
       router.back();
-      setTimeout(() => {
-        router.replace("/");
-      }, 300);
     } catch (e) {
       console.warn("Back navigation failed:", e.message);
     }
