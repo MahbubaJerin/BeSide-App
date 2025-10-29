@@ -1,5 +1,5 @@
 // Frontend/components/ActiveMatchModal.jsx
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   RefreshControl,
   Image,
   Alert,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { ThemedButton } from "@/components/ThemedButton";
 import { ThemedText } from "@/components/ThemedText";
@@ -19,6 +21,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BASE_URL } from "../config";
 import NavigationModal from "./NavigationModal";
 import TripMessagingModal from "./TripMessagingModal";
+
+const { width } = Dimensions.get('window');
 
 export default function ActiveMatchModal({
   visible,
@@ -34,6 +38,74 @@ export default function ActiveMatchModal({
   const [navigationModalVisible, setNavigationModalVisible] = useState(false);
   const [messagingModalVisible, setMessagingModalVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
+  const [cachedMatches, setCachedMatches] = useState([]);
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Cache matches to preserve them when child modals open
+  useEffect(() => {
+    if (matches && matches.length > 0) {
+      console.log(`📋 [ACTIVE MATCH MODAL] Caching ${matches.length} matches`);
+      setCachedMatches(matches);
+    }
+  }, [matches]);
+
+  // Use cached matches if current matches is empty but we have cached data
+  const displayMatches = (matches && matches.length > 0) ? matches : cachedMatches;
+  
+  // Debug log
+  useEffect(() => {
+    console.log(`🔍 [ACTIVE MATCH MODAL] visible=${visible}, matches=${matches?.length || 0}, cached=${cachedMatches.length}, display=${displayMatches.length}`);
+  }, [visible, matches, cachedMatches, displayMatches]);
+
+  // Animate on mount
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Pulse animation for stats
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.05,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      fadeAnim.setValue(0);
+      slideAnim.setValue(50);
+      scaleAnim.setValue(0.95);
+    }
+  }, [visible]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -161,37 +233,71 @@ export default function ActiveMatchModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal visible={visible} animationType="fade" transparent>
       <View style={styles.overlay}>
-        <View style={styles.container}>
-          {/* Header */}
+        <Animated.View 
+          style={[
+            styles.container,
+            {
+              opacity: fadeAnim,
+              transform: [
+                { translateY: slideAnim },
+                { scale: scaleAnim }
+              ]
+            }
+          ]}
+        >
+          {/* Purple Gradient Header */}
           <View style={styles.modernHeader}>
-            <View style={styles.headerContent}>
-              <View style={styles.headerLeft}>
-                <Text style={styles.headerIcon}>🚗</Text>
-                <Text style={styles.headerTitle}>Active Trips</Text>
+            <View style={styles.headerGradient}>
+              <View style={styles.headerContent}>
+                <View style={styles.headerLeft}>
+                  <View style={styles.headerIconContainer}>
+                    <Ionicons name="car-sport" size={28} color="white" />
+                  </View>
+                  <View>
+                    <Text style={styles.headerTitle}>Active Trips</Text>
+                    <Text style={styles.headerSubtitle}>Your ongoing journeys</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color="white" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
 
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{matches.length}</Text>
-                <Text style={styles.statLabel}>
-                  Active {matches.length === 1 ? "Trip" : "Trips"}
-                </Text>
+              <View style={styles.statsRow}>
+                <Animated.View 
+                  style={[
+                    styles.statCard,
+                    { transform: [{ scale: pulseAnim }] }
+                  ]}
+                >
+                  <View style={styles.statIconCircle}>
+                    <Ionicons name="map" size={20} color="#8B5CF6" />
+                  </View>
+                  <Text style={styles.statNumber}>{displayMatches.length}</Text>
+                  <Text style={styles.statLabel}>
+                    Active {displayMatches.length === 1 ? "Trip" : "Trips"}
+                  </Text>
+                </Animated.View>
+                
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={onRefresh}
+                  disabled={isLoading}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name="refresh" 
+                    size={18} 
+                    color="white" 
+                    style={isLoading && { transform: [{ rotate: '360deg' }] }}
+                  />
+                  <Text style={styles.refreshButtonText}>
+                    {isLoading ? "Refreshing..." : "Refresh"}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={styles.refreshButton}
-                onPress={onRefresh}
-                disabled={isLoading}
-              >
-                <Text style={styles.refreshButtonText}>
-                  {isLoading ? "🔄 Refreshing..." : "🔄 Refresh"}
-                </Text>
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -203,7 +309,7 @@ export default function ActiveMatchModal({
             }
             showsVerticalScrollIndicator={false}
           >
-            {matches.length === 0 ? (
+            {displayMatches.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <ThemedText style={styles.emptyIcon}>🗺️</ThemedText>
                 <ThemedText style={styles.emptyText}>No active trips</ThemedText>
@@ -212,7 +318,7 @@ export default function ActiveMatchModal({
                 </ThemedText>
               </View>
             ) : (
-              matches.map((match) => {
+              displayMatches.map((match) => {
                 const userRole = getUserRole(match);
                 const isOrganizer = userRole === "organizer";
                 const otherUser = isOrganizer
@@ -382,7 +488,7 @@ export default function ActiveMatchModal({
               currentUserId={currentUserId}
             />
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -391,57 +497,125 @@ export default function ActiveMatchModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
   container: {
     backgroundColor: "#fff",
-    borderRadius: 20,
+    borderRadius: 24,
     width: "100%",
     maxWidth: 420,
     maxHeight: "90%",
+    overflow: 'hidden',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
   },
   modernHeader: {
-    backgroundColor: "#1c52c8", // Primary blue to match your UI
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: "#8B5CF6",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  headerGradient: {
     padding: 24,
   },
   headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
+    alignItems: "flex-start",
+    marginBottom: 20,
   },
-  headerLeft: { flexDirection: "row", alignItems: "center" },
-  headerIcon: { fontSize: 24, marginRight: 12 },
-  headerTitle: { fontSize: 20, fontWeight: "700", color: "white" },
+  headerLeft: { 
+    flexDirection: "row", 
+    alignItems: "center",
+    flex: 1,
+  },
+  headerIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  headerTitle: { 
+    fontSize: 24, 
+    fontWeight: "700", 
+    color: "white",
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
+  },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
   },
-  closeButtonText: { fontSize: 16, color: "#fff", fontWeight: "600" },
   statsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 12,
   },
-  statItem: { alignItems: "flex-start" },
-  statNumber: { fontSize: 28, fontWeight: "700", color: "white" },
-  statLabel: { fontSize: 14, color: "rgba(255,255,255,0.8)" },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3E8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statNumber: { 
+    fontSize: 32, 
+    fontWeight: "700", 
+    color: "#8B5CF6",
+    marginBottom: 4,
+  },
+  statLabel: { 
+    fontSize: 12, 
+    color: "#6B7280",
+    fontWeight: '600',
+  },
   refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     backgroundColor: "rgba(255,255,255,0.2)",
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  refreshButtonText: { color: "white", fontWeight: "600" },
+  refreshButtonText: { 
+    color: "white", 
+    fontWeight: "600",
+    fontSize: 14,
+  },
   matchesList: { paddingHorizontal: 20 },
   emptyContainer: { alignItems: "center", padding: 40 },
   emptyIcon: { fontSize: 48, marginBottom: 16 },
@@ -453,16 +627,17 @@ const styles = StyleSheet.create({
   },
   matchCard: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 16,
+    marginTop: 16,
     borderWidth: 1,
-    borderColor: "#f1f5f9",
-    shadowColor: "#1c52c8", // Primary blue
+    borderColor: "#E9D5FF",
+    shadowColor: "#8B5CF6",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 6,
   },
   matchHeader: {
     flexDirection: "row",
@@ -494,30 +669,30 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     marginRight: 12,
-    borderWidth: 2,
-    borderColor: "#1c52c8", // Primary blue
+    borderWidth: 3,
+    borderColor: "#8B5CF6",
   },
   companionName: { fontSize: 16, fontWeight: "700", color: "#1f2937" },
   companionRole: {
     fontSize: 13,
-    color: "#1c52c8", // Primary blue
+    color: "#8B5CF6",
     fontWeight: "600",
     marginBottom: 2,
   },
   meetingPointCard: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 12,
+    backgroundColor: "#F3E8FF",
+    borderRadius: 16,
     padding: 16,
     marginVertical: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#E9D5FF",
   },
   meetingPointHeader: { flexDirection: "row", alignItems: "flex-start" },
   meetingPointIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#1c52c8", // Primary blue
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#8B5CF6",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -526,14 +701,14 @@ const styles = StyleSheet.create({
   meetingPointContent: { flex: 1 },
   meetingPointTitle: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#1f2937",
+    fontWeight: "700",
+    color: "#6B21A8",
     marginBottom: 4,
   },
   meetingPointLocation: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#1c52c8", // Primary blue
+    fontWeight: "600",
+    color: "#8B5CF6",
     marginBottom: 6,
   },
   meetingPointSubtext: { fontSize: 12, color: "#6b7280", lineHeight: 16 },
@@ -551,33 +726,33 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#1c52c8", // Primary blue
-    paddingVertical: 12,
+    backgroundColor: "#8B5CF6",
+    paddingVertical: 14,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     gap: 6,
-    elevation: 2,
-    shadowColor: "#1c52c8",
+    elevation: 3,
+    shadowColor: "#8B5CF6",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   actionButtonText: {
     color: "#fff",
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   navigationButton: {
-    backgroundColor: "#2ca07b", // Secondary teal/green
-    shadowColor: "#2ca07b",
+    backgroundColor: "#10B981",
+    shadowColor: "#10B981",
   },
   messageButton: {
-    backgroundColor: "#8b5cf6", // Purple for messaging
-    shadowColor: "#8b5cf6",
+    backgroundColor: "#C77DFF",
+    shadowColor: "#C77DFF",
   },
   cancelButton: {
-    backgroundColor: "#e32002", // Danger red
-    shadowColor: "#e32002",
+    backgroundColor: "#EF4444",
+    shadowColor: "#EF4444",
   },
   
   navigateButton: {
@@ -601,14 +776,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 20,
     borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
-    backgroundColor: "#f8fafc",
+    borderTopColor: "#E9D5FF",
+    backgroundColor: "#F9FAFB",
   },
   footerText: {
     fontSize: 12,
     color: "#6b7280",
     textAlign: "center",
     marginBottom: 16,
+    lineHeight: 18,
   },
-  closeButtonBottom: { backgroundColor: "#1c52c8" }, // Primary blue
+  closeButtonBottom: { 
+    backgroundColor: "#8B5CF6",
+    borderRadius: 12,
+  },
 });

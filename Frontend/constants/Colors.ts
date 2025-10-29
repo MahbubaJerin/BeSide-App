@@ -2,40 +2,40 @@ export const Colors = {
   // Light mode palette
   light: {
     text: "#272e3a",
-    background: "#0c078c",
+    background: "#8B5CF6",
     surface: "#FFFFFF",
 
-    primary: "#1c52c8",
-    secondary: "#2ca07b",
-    accent: "#214E34",
+    primary: "#8B5CF6",
+    secondary: "#C77DFF",
+    accent: "#7209B7",
 
-    info: "#1F5FEA",
-    success: "#2ca07b",
-    warning: "#fff700",
-    danger: "#e32002",
+    info: "#8B5CF6",
+    success: "#10B981",
+    warning: "#F59E0B",
+    danger: "#EF4444",
 
-    outline: "#A7C6D9",
+    outline: "#E9D5FF",
     muted: "#E5E7EB",
-    footer: "#353C46",
+    footer: "#6B21A8",
   },
 
   // Dark mode palette
   dark: {
     text: "#F9FAFB",
-    background: "#111827",
+    background: "#1F2937",
     surface: "#272e3a",
 
-    primary: "#76b6ff",
-    secondary: "#7ADFBB",
-    accent: "#f58feb",
+    primary: "#A78BFA",
+    secondary: "#DDD6FE",
+    accent: "#C77DFF",
 
-    info: "#76b6ff",
-    success: "#7ADFBB",
-    warning: "#f3d705",
-    danger: "#c40303",
+    info: "#A78BFA",
+    success: "#34D399",
+    warning: "#FBBF24",
+    danger: "#F87171",
 
-    outline: "#76b6ff",
-    muted: "#272e3a",
+    outline: "#7C3AED",
+    muted: "#374151",
     footer: "#111827",
   },
 };
