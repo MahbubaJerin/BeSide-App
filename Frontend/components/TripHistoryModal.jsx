@@ -8,7 +8,12 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  Dimensions,
+  SafeAreaView,
+  StatusBar,
+  Animated,
 } from "react-native";
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemedButton } from "@/components/ThemedButton";
 import { ThemedText } from "@/components/ThemedText";
@@ -19,10 +24,20 @@ export default function TripHistoryModal({ visible, onClose }) {
   const [tripHistory, setTripHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     if (visible) {
       fetchTripHistory();
+      // Animate in
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // Reset animation
+      fadeAnim.setValue(0);
     }
   }, [visible]);
 
@@ -62,37 +77,37 @@ export default function TripHistoryModal({ visible, onClose }) {
   const getStatusColor = (status) => {
     switch (status) {
       case "completed":
-        return "#4CAF50"; // Green
+        return "#10b981"; // Modern green
       case "cancelled":
-        return "#f44336"; // Red  
+        return "#ef4444"; // Modern red  
       case "expired":
-        return "#757575"; // Gray
+        return "#6b7280"; // Modern gray
       case "declined":
-        return "#FF9800"; // Orange
+        return "#f59e0b"; // Modern orange
       default:
-        return "#2196F3"; // Blue
+        return "#3b82f6"; // Modern blue
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusConfig = (status) => {
     switch (status) {
       case "completed":
-        return "✅";
+        return { icon: "checkmark-circle", color: "#10b981", bg: "#d1fae5" };
       case "cancelled":
-        return "❌";
+        return { icon: "close-circle", color: "#ef4444", bg: "#fee2e2" };
       case "expired":
-        return "⏰";
+        return { icon: "time", color: "#6b7280", bg: "#f3f4f6" };
       case "declined":
-        return "❌";
+        return { icon: "alert-circle", color: "#f59e0b", bg: "#fef3c7" };
       default:
-        return "ℹ️";
+        return { icon: "information-circle", color: "#3b82f6", bg: "#dbeafe" };
     }
   };
 
   const getStatusText = (request) => {
     switch (request.status) {
       case "completed":
-        return "Trip completed successfully";
+        return request.type === 'match' ? "Journey completed with companion" : "Trip completed successfully";
       case "cancelled":
         return "Trip was cancelled";
       case "expired":
@@ -106,209 +121,489 @@ export default function TripHistoryModal({ visible, onClose }) {
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    
     return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
       month: 'short',
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
     });
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <ThemedText type="subtitle">Trip History</ThemedText>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <ThemedText style={styles.closeText}>✕</ThemedText>
-            </TouchableOpacity>
-          </View>
+  const formatDateTime = (dateString, timeString) => {
+    if (!dateString) return "Date not available";
+    
+    const date = new Date(dateString);
+    const dateStr = date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    });
+    
+    return timeString ? `${dateStr} • ${timeString}` : dateStr;
+  };
 
+  return (
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#8B5CF6" />
+        
+        {/* Modern Gradient Header */}
+        <View style={styles.gradientHeader}>
+          <View style={styles.headerTop}>
+            <TouchableOpacity style={styles.backButton} onPress={onClose}>
+              <Ionicons name="arrow-back" size={24} color="white" />
+            </TouchableOpacity>
+            <ThemedText style={styles.headerTitle}>Trip History</ThemedText>
+          </View>
+          <ThemedText style={styles.headerSubtitle}>
+            Your recent journey memories
+          </ThemedText>
+        </View>
+
+        {/* Content */}
+        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
           <ScrollView
             style={styles.historyList}
+            showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={handleRefresh}
+                tintColor="#8B5CF6"
+                colors={["#8B5CF6"]}
+              />
             }
           >
             {loading && tripHistory.length === 0 ? (
               <View style={styles.loadingContainer}>
-                <ThemedText>Loading trip history...</ThemedText>
+                <Ionicons name="hourglass-outline" size={48} color="#8B5CF6" />
+                <ThemedText style={styles.loadingText}>Loading your journey history...</ThemedText>
               </View>
             ) : tripHistory.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <ThemedText style={styles.emptyText}>No trip history</ThemedText>
+                <Ionicons name="map-outline" size={64} color="#d1d5db" />
+                <ThemedText style={styles.emptyText}>No trips yet</ThemedText>
                 <ThemedText style={styles.emptySubtext}>
-                  Your completed, cancelled and expired trips will appear here
+                  Your completed and cancelled trips will appear here
+                </ThemedText>
+                <ThemedText style={styles.emptyHint}>
+                  Start your first journey to build your travel history!
                 </ThemedText>
               </View>
             ) : (
-              tripHistory.map((trip) => (
-                <View key={trip.matchId || trip.tripReqId || trip.id || trip._id} style={styles.historyCard}>
-                  <View style={styles.cardHeader}>
-                    <View style={styles.statusBadge}>
-                      <ThemedText style={styles.statusIcon}>
-                        {getStatusIcon(trip.status)}
-                      </ThemedText>
-                      <ThemedText style={[styles.statusText, { color: getStatusColor(trip.status) }]}>
-                        {trip.status.toUpperCase()}
-                      </ThemedText>
-                    </View>
-                    <ThemedText style={styles.dateText}>
-                      {formatDate(trip.createdAt)}
-                    </ThemedText>
+              <>
+                <View style={styles.statsContainer}>
+                  <View style={styles.statCard}>
+                    <ThemedText style={styles.statNumber}>{tripHistory.length}</ThemedText>
+                    <ThemedText style={styles.statLabel}>Total Trips</ThemedText>
                   </View>
-
-                  <ThemedText style={styles.destination}>
-                    📍 {trip.destination}
-                  </ThemedText>
-                  
-                  <ThemedText style={styles.dateTime}>
-                    📅 {trip.plannedDate ? new Date(trip.plannedDate).toLocaleDateString() : new Date(trip.date).toLocaleDateString()} at {trip.plannedTime || trip.time}
-                  </ThemedText>
-
-                  <ThemedText style={styles.statusDescription}>
-                    {getStatusText(trip)}
-                  </ThemedText>
-
-                  {/* Show companion info for completed matches */}
-                  {trip.type === 'match' && trip.companionInfo && (
-                    <ThemedText style={styles.companionInfo}>
-                      👥 Traveled with: {trip.companionInfo.userName || "Anonymous"}
+                  <View style={styles.statCard}>
+                    <ThemedText style={styles.statNumber}>
+                      {tripHistory.filter(t => t.status === 'completed').length}
                     </ThemedText>
-                  )}
-
-                  {/* Show trip type badge */}
-                  {trip.type === 'match' && trip.status === 'completed' && (
-                    <ThemedText style={styles.tripTypeBadge}>
-                      🎉 Completed Journey
+                    <ThemedText style={styles.statLabel}>Completed</ThemedText>
+                  </View>
+                  <View style={styles.statCard}>
+                    <ThemedText style={styles.statNumber}>
+                      {tripHistory.filter(t => t.type === 'match').length}
                     </ThemedText>
-                  )}
-
-                  {trip.acceptedBy && trip.type !== 'match' && (
-                    <ThemedText style={styles.companionInfo}>
-                      👥 Companion: {trip.acceptedBy.userName || "Anonymous"}
-                    </ThemedText>
-                  )}
+                    <ThemedText style={styles.statLabel}>With Companion</ThemedText>
+                  </View>
                 </View>
-              ))
+
+                {tripHistory.map((trip, index) => {
+                  const statusConfig = getStatusConfig(trip.status);
+                  return (
+                    <Animated.View 
+                      key={trip.matchId || trip.tripReqId || trip.id || trip._id} 
+                      style={[
+                        styles.modernCard,
+                        { 
+                          transform: [{ 
+                            translateY: fadeAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [50 * (index + 1), 0]
+                            })
+                          }]
+                        }
+                      ]}
+                    >
+                      {/* Card Header */}
+                      <View style={styles.cardHeader}>
+                        <View style={styles.leftSection}>
+                          <View style={[styles.statusIconContainer, { backgroundColor: statusConfig.bg }]}>
+                            <Ionicons name={statusConfig.icon} size={18} color={statusConfig.color} />
+                          </View>
+                          <View style={styles.headerInfo}>
+                            <ThemedText style={styles.cardTitle} numberOfLines={1}>
+                              {trip.destination || "Destination not available"}
+                            </ThemedText>
+                            <ThemedText style={styles.cardDate}>
+                              {formatDate(trip.createdAt)}
+                            </ThemedText>
+                          </View>
+                        </View>
+                        <View style={[styles.statusChip, { backgroundColor: statusConfig.bg }]}>
+                          <ThemedText style={[styles.statusText, { color: statusConfig.color }]}>
+                            {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
+                          </ThemedText>
+                        </View>
+                      </View>
+
+                      {/* Trip Details */}
+                      <View style={styles.cardContent}>
+                        {trip.plannedDate && trip.plannedTime && (
+                          <View style={styles.detailRow}>
+                            <Ionicons name="calendar-outline" size={16} color="#6b7280" />
+                            <ThemedText style={styles.detailText}>
+                              {formatDateTime(trip.plannedDate, trip.plannedTime)}
+                            </ThemedText>
+                          </View>
+                        )}
+
+                        {trip.startLocation && (
+                          <View style={styles.detailRow}>
+                            <Ionicons name="location-outline" size={16} color="#6b7280" />
+                            <ThemedText style={styles.detailText} numberOfLines={1}>
+                              From: {trip.startLocation.address || "Meeting point"}
+                            </ThemedText>
+                          </View>
+                        )}
+
+                        {trip.destinationType && (
+                          <View style={styles.detailRow}>
+                            <Ionicons name="business-outline" size={16} color="#6b7280" />
+                            <ThemedText style={styles.detailText}>
+                              {trip.destinationType.charAt(0).toUpperCase() + trip.destinationType.slice(1)} destination
+                            </ThemedText>
+                          </View>
+                        )}
+
+                        <View style={styles.statusRow}>
+                          <ThemedText style={styles.statusDescription}>
+                            {getStatusText(trip)}
+                          </ThemedText>
+                        </View>
+
+                        {/* Companion Info */}
+                        {trip.type === 'match' && trip.companionInfo && (
+                          <View style={styles.companionSection}>
+                            <View style={styles.companionRow}>
+                              <View style={styles.companionAvatar}>
+                                <Ionicons name="person" size={16} color="#8B5CF6" />
+                              </View>
+                              <View>
+                                <ThemedText style={styles.companionName}>
+                                  {trip.companionInfo.userName || "Anonymous"}
+                                </ThemedText>
+                                <ThemedText style={styles.companionLabel}>Travel companion</ThemedText>
+                              </View>
+                            </View>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Success Badge for Completed Matches */}
+                      {trip.type === 'match' && trip.status === 'completed' && (
+                        <View style={styles.successBadge}>
+                          <Ionicons name="trophy" size={16} color="#f59e0b" />
+                          <ThemedText style={styles.successText}>Successful Journey!</ThemedText>
+                        </View>
+                      )}
+                    </Animated.View>
+                  );
+                })}
+
+                {/* Footer hint */}
+                <View style={styles.footerHint}>
+                  <ThemedText style={styles.hintText}>
+                    🗑️ Only your last 10 trips are kept for privacy
+                  </ThemedText>
+                </View>
+              </>
             )}
           </ScrollView>
-        </View>
-      </View>
+        </Animated.View>
+      </SafeAreaView>
     </Modal>
   );
 }
 
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const isSmallScreen = screenHeight < 700;
+
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
   container: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "80%",
-    minHeight: "60%",
+    flex: 1,
+    backgroundColor: '#f8fafc',
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
+  
+  // Modern Gradient Header
+  gradientHeader: {
+    background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+    backgroundColor: '#8B5CF6',
+    paddingTop: isSmallScreen ? 8 : 10,
+    paddingHorizontal: screenWidth * 0.05,
+    paddingBottom: isSmallScreen ? 20 : 24,
   },
-  closeButton: {
-    padding: 5,
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: isSmallScreen ? 5 : 10,
+    marginBottom: isSmallScreen ? 8 : 12,
   },
-  closeText: {
-    fontSize: 18,
-    color: "#666",
+  backButton: {
+    width: screenWidth * 0.1,
+    height: screenWidth * 0.1,
+    borderRadius: screenWidth * 0.05,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: screenWidth * 0.04,
+  },
+  headerTitle: {
+    fontSize: isSmallScreen ? 20 : 24,
+    fontWeight: '700',
+    color: 'white',
+    flex: 1,
+  },
+  headerSubtitle: {
+    fontSize: isSmallScreen ? 14 : 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 4,
+  },
+
+  // Content
+  content: {
+    flex: 1,
   },
   historyList: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: screenWidth * 0.05,
+    paddingTop: isSmallScreen ? 16 : 20,
   },
+
+  // Loading State
   loadingContainer: {
-    alignItems: "center",
-    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: screenHeight * 0.15,
   },
+  loadingText: {
+    fontSize: isSmallScreen ? 16 : 18,
+    color: '#6b7280',
+    marginTop: 16,
+    fontWeight: '500',
+  },
+
+  // Empty State
   emptyContainer: {
-    alignItems: "center",
-    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: screenHeight * 0.12,
+    paddingHorizontal: screenWidth * 0.1,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#666",
+    fontSize: isSmallScreen ? 20 : 24,
+    fontWeight: '700',
+    color: '#374151',
+    marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
-    fontSize: 14,
-    color: "#999",
-    textAlign: "center",
+    fontSize: isSmallScreen ? 14 : 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 8,
   },
-  historyCard: {
-    backgroundColor: "#f8f9fa",
+  emptyHint: {
+    fontSize: isSmallScreen ? 13 : 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+
+  // Stats Section
+  statsContainer: {
+    flexDirection: 'row',
+    marginBottom: isSmallScreen ? 20 : 24,
+    gap: isSmallScreen ? 8 : 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+    padding: isSmallScreen ? 12 : 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
+  statNumber: {
+    fontSize: isSmallScreen ? 20 : 24,
+    fontWeight: '700',
+    color: '#8B5CF6',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: isSmallScreen ? 11 : 12,
+    color: '#6b7280',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+
+  // Modern Trip Cards
+  modernCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    marginBottom: isSmallScreen ? 12 : 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+
+  // Card Header
   cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: isSmallScreen ? 14 : 16,
+    paddingBottom: isSmallScreen ? 10 : 12,
   },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+  leftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
   },
-  statusIcon: {
-    fontSize: 14,
-    marginRight: 6,
+  statusIconContainer: {
+    width: isSmallScreen ? 36 : 40,
+    height: isSmallScreen ? 36 : 40,
+    borderRadius: isSmallScreen ? 18 : 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: isSmallScreen ? 15 : 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  cardDate: {
+    fontSize: isSmallScreen ? 12 : 13,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  statusChip: {
+    paddingHorizontal: isSmallScreen ? 8 : 10,
+    paddingVertical: isSmallScreen ? 4 : 6,
+    borderRadius: 12,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: isSmallScreen ? 11 : 12,
+    fontWeight: '600',
   },
-  dateText: {
-    fontSize: 12,
-    color: "#666",
+
+  // Card Content
+  cardContent: {
+    paddingHorizontal: isSmallScreen ? 14 : 16,
+    paddingBottom: isSmallScreen ? 14 : 16,
   },
-  destination: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 8,
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: isSmallScreen ? 6 : 8,
   },
-  dateTime: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 8,
+  detailText: {
+    fontSize: isSmallScreen ? 13 : 14,
+    color: '#4b5563',
+    marginLeft: 8,
+    flex: 1,
+  },
+  statusRow: {
+    marginTop: isSmallScreen ? 4 : 6,
+    marginBottom: isSmallScreen ? 8 : 10,
   },
   statusDescription: {
-    fontSize: 14,
-    color: "#666",
-    fontStyle: "italic",
-    marginBottom: 8,
+    fontSize: isSmallScreen ? 13 : 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    lineHeight: 20,
   },
-  companionInfo: {
-    fontSize: 14,
-    color: "#4CAF50",
-    fontWeight: "500",
+
+  // Companion Section
+  companionSection: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    padding: isSmallScreen ? 10 : 12,
+    marginTop: isSmallScreen ? 6 : 8,
+  },
+  companionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  companionAvatar: {
+    width: isSmallScreen ? 28 : 32,
+    height: isSmallScreen ? 28 : 32,
+    borderRadius: isSmallScreen ? 14 : 16,
+    backgroundColor: '#e0e7ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  companionName: {
+    fontSize: isSmallScreen ? 13 : 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  companionLabel: {
+    fontSize: isSmallScreen ? 11 : 12,
+    color: '#8B5CF6',
+    fontWeight: '500',
+  },
+
+  // Success Badge
+  successBadge: {
+    backgroundColor: '#fef3c7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: isSmallScreen ? 8 : 10,
+    marginTop: isSmallScreen ? 8 : 10,
+  },
+  successText: {
+    fontSize: isSmallScreen ? 12 : 13,
+    fontWeight: '600',
+    color: '#f59e0b',
+    marginLeft: 6,
+  },
+
+  // Footer
+  footerHint: {
+    alignItems: 'center',
+    paddingVertical: isSmallScreen ? 20 : 24,
+    marginTop: isSmallScreen ? 12 : 16,
+  },
+  hintText: {
+    fontSize: isSmallScreen ? 12 : 13,
+    color: '#9ca3af',
+    fontStyle: 'italic',
   },
 });
