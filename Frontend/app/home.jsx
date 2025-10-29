@@ -1553,7 +1553,7 @@ export default function HomeScreen() {
         console.log(`✅ [SEND TO NEARBY] Success! Sent to ${result.data.recipientCount} users`);
         Alert.alert(
           "Request Sent! 🚀",
-          `Your companion request has been sent to ${result.data.recipientCount} active users within 500m radius.\n\nThe request is valid for 30 minutes. You'll be notified when someone accepts your request.`,
+          `Your companion request has been sent to ${result.data.recipientCount} active users within 500m radius.\n\nThe request is valid for 2 minutes. You'll be notified when someone accepts your request.`,
           [{ text: "OK" }]
         );
         

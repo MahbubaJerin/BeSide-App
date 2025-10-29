@@ -11,7 +11,8 @@ import {
   ScrollView,
   TextInput,
   SafeAreaView,
-  StatusBar
+  StatusBar,
+  Dimensions
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from '@expo/vector-icons';
@@ -136,9 +137,6 @@ export default function CompanionPreferencesModal({
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
             <ThemedText style={styles.headerTitle}>Meeting Point & Destination</ThemedText>
-            <TouchableOpacity style={styles.headerButton}>
-              <Ionicons name="notifications-outline" size={24} color="white" />
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -205,54 +203,59 @@ export default function CompanionPreferencesModal({
           {/* Search Overlays */}
           {/* Meeting Point Search */}
           {showMeetingPointSearch && (
-            <View style={styles.searchOverlay}>
-              <View style={styles.searchHeader}>
-                <TouchableOpacity onPress={() => setShowMeetingPointSearch(false)}>
-                  <Ionicons name="arrow-back" size={24} color="#333" />
-                </TouchableOpacity>
-                <ThemedText style={styles.searchTitle}>Choose Meeting Point</ThemedText>
-              </View>
-              
-              <PlacesAutocomplete
-                placeholder="Search for meeting point..."
-                value={startText}
-                onChangeText={setStartText}
-                onSelect={(item) => {
-                  handleStartSelected(item);
-                  setShowMeetingPointSearch(false);
-                }}
-                country="au"
-                style={styles.searchInput}
-              />
+            <View style={styles.fullScreenSearchOverlay}>
+              <SafeAreaView style={styles.searchContainer}>
+                <View style={styles.searchHeader}>
+                  <TouchableOpacity onPress={() => setShowMeetingPointSearch(false)}>
+                    <Ionicons name="arrow-back" size={24} color="#333" />
+                  </TouchableOpacity>
+                  <ThemedText style={styles.searchTitle}>Choose Meeting Point</ThemedText>
+                </View>
+                
+                <PlacesAutocomplete
+                  placeholder="Search for meeting point..."
+                  value={startText}
+                  onChangeText={setStartText}
+                  onSelect={(item) => {
+                    handleStartSelected(item);
+                    setShowMeetingPointSearch(false);
+                  }}
+                  country="au"
+                  style={styles.searchInput}
+                />
+              </SafeAreaView>
             </View>
           )}
           
           {/* Destination Search */}
           {showDestinationSearch && (
-            <View style={styles.searchOverlay}>
-              <View style={styles.searchHeader}>
-                <TouchableOpacity onPress={() => setShowDestinationSearch(false)}>
-                  <Ionicons name="arrow-back" size={24} color="#333" />
-                </TouchableOpacity>
-                <ThemedText style={styles.searchTitle}>Choose Destination</ThemedText>
-              </View>
-              <PlacesAutocomplete
-                placeholder="Search destination..."
-                value={destText}
-                onChangeText={setDestText}
-                onSelect={(item) => {
-                  handleDestSelected(item);
-                  setShowDestinationSearch(false);
-                }}
-                country="au"
-                style={styles.searchInput}
-              />
+            <View style={styles.fullScreenSearchOverlay}>
+              <SafeAreaView style={styles.searchContainer}>
+                <View style={styles.searchHeader}>
+                  <TouchableOpacity onPress={() => setShowDestinationSearch(false)}>
+                    <Ionicons name="arrow-back" size={24} color="#333" />
+                  </TouchableOpacity>
+                  <ThemedText style={styles.searchTitle}>Choose Destination</ThemedText>
+                </View>
+                <PlacesAutocomplete
+                  placeholder="Search destination..."
+                  value={destText}
+                  onChangeText={setDestText}
+                  onSelect={(item) => {
+                    handleDestSelected(item);
+                    setShowDestinationSearch(false);
+                  }}
+                  country="au"
+                  style={styles.searchInput}
+                />
+              </SafeAreaView>
             </View>
           )}
         </View>
 
-        {/* Bottom Panel */}
-        <View style={styles.bottomPanel}>
+        {/* Bottom Panel - Hide when searching */}
+        {!showMeetingPointSearch && !showDestinationSearch && (
+          <View style={styles.bottomPanel}>
           {/* Preferences Section */}
           <View style={styles.preferencesSection}>
             {/* Transport Mode */}
@@ -306,17 +309,22 @@ export default function CompanionPreferencesModal({
           </View>
 
           {/* Confirm Button */}
-          <ThemedButton 
-            title={loading ? "Finding Companions..." : "Find Companion"} 
-            disabled={loading || !destinationCoordinates} 
-            onPress={handleConfirm}
-            style={styles.confirmButton}
-          />
-        </View>
+            <ThemedButton 
+              title={loading ? "Finding Companions..." : "Find Companion"} 
+              disabled={loading || !destinationCoordinates} 
+              onPress={handleConfirm}
+              style={styles.confirmButton}
+            />
+          </View>
+        )}
       </SafeAreaView>
     </Modal>
   );
 }
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const isSmallScreen = screenHeight < 700;
+const isMediumScreen = screenHeight >= 700 && screenHeight < 900;
 
 const styles = StyleSheet.create({
   container: {
@@ -324,42 +332,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   
-  // Header Styles - Same as Homepage
+  // Header Styles - Responsive
   gradientHeader: {
     background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
     backgroundColor: '#8B5CF6',
-    paddingTop: 10,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: isSmallScreen ? 8 : 10,
+    paddingHorizontal: screenWidth * 0.05, // 5% of screen width
+    paddingBottom: isSmallScreen ? 15 : 20,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
   },
   headerTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: isSmallScreen ? 5 : 10,
+    paddingHorizontal: screenWidth * 0.02, // Add consistent padding
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: screenWidth * 0.1, // 10% of screen width
+    height: screenWidth * 0.1,
+    borderRadius: screenWidth * 0.05,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: '600',
     color: 'white',
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flex: 1, // Take remaining space
+    textAlign: 'center', // Center the text
+    marginLeft: screenWidth * 0.02, // Consistent gap from back button
   },
 
   // Map Container
@@ -371,30 +374,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Destination Cards
+  // Destination Cards - Responsive positioning
   destinationCards: {
     position: 'absolute',
-    bottom: 200,
-    left: 20,
-    right: 20,
-    gap: 12,
+    top: isSmallScreen ? '12%' : isMediumScreen ? '15%' : '18%',
+    left: screenWidth * 0.05, // 5% margin
+    right: screenWidth * 0.05,
+    gap: isSmallScreen ? 8 : 12,
   },
   destinationCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
-    padding: 16,
+    padding: isSmallScreen ? 12 : 16,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    minHeight: isSmallScreen ? 60 : 70,
   },
   cardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: isSmallScreen ? 35 : 40,
+    height: isSmallScreen ? 35 : 40,
+    borderRadius: isSmallScreen ? 17.5 : 20,
     backgroundColor: '#f1f5f9',
     justifyContent: 'center',
     alignItems: 'center',
@@ -404,36 +408,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 14 : 16,
     fontWeight: '600',
     color: '#1f2937',
     marginBottom: 2,
   },
   cardSubtext: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 12 : 14,
     color: '#6b7280',
   },
   addDestinationCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
-    padding: 16,
+    padding: isSmallScreen ? 12 : 16,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#e2e8f0',
     borderStyle: 'dashed',
+    minHeight: isSmallScreen ? 60 : 70,
   },
   addIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: isSmallScreen ? 35 : 40,
+    height: isSmallScreen ? 35 : 40,
+    borderRadius: isSmallScreen ? 17.5 : 20,
     backgroundColor: '#f8fafc',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   addDestinationText: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 14 : 16,
     fontWeight: '500',
     color: '#8B5CF6',
   },
@@ -448,14 +453,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     padding: 20,
   },
+  fullScreenSearchOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'white',
+    zIndex: 1000,
+  },
+  searchContainer: {
+    flex: 1,
+    paddingHorizontal: screenWidth * 0.05,
+    paddingTop: isSmallScreen ? 15 : 20,
+  },
   searchHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: isSmallScreen ? 15 : 20,
     gap: 16,
   },
   searchTitle: {
-    fontSize: 18,
+    fontSize: isSmallScreen ? 16 : 18,
     fontWeight: '600',
     color: '#1f2937',
   },
@@ -463,8 +482,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
     borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
+    padding: isSmallScreen ? 12 : 16,
+    fontSize: isSmallScreen ? 14 : 16,
+    minHeight: isSmallScreen ? 45 : 52,
   },
   
   // Current Location Option in Search
@@ -481,11 +501,11 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 
-  // Bottom Panel
+  // Bottom Panel - Responsive
   bottomPanel: {
     backgroundColor: 'white',
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingHorizontal: screenWidth * 0.05,
+    paddingVertical: isSmallScreen ? 16 : 24,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     shadowColor: '#000',
@@ -493,34 +513,35 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
+    maxHeight: screenHeight * 0.4, // Maximum 40% of screen height
   },
 
-  // Preferences Section
+  // Preferences Section - Responsive
   preferencesSection: {
-    marginBottom: 20,
+    marginBottom: isSmallScreen ? 12 : 20,
   },
   preferenceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: isSmallScreen ? 12 : 16,
   },
   preferenceLabel: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 14 : 16,
     fontWeight: '500',
     color: '#374151',
     flex: 1,
   },
 
-  // Transport Options
+  // Transport Options - Responsive
   transportOptions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: isSmallScreen ? 6 : 8,
   },
   transportButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: isSmallScreen ? 38 : 44,
+    height: isSmallScreen ? 38 : 44,
+    borderRadius: isSmallScreen ? 19 : 22,
     backgroundColor: '#f8fafc',
     borderWidth: 2,
     borderColor: '#e2e8f0',
@@ -532,14 +553,14 @@ const styles = StyleSheet.create({
     borderColor: '#8B5CF6',
   },
 
-  // Gender Options
+  // Gender Options - Responsive
   genderOptions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: isSmallScreen ? 6 : 8,
   },
   genderButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: isSmallScreen ? 12 : 16,
+    paddingVertical: isSmallScreen ? 6 : 8,
     borderRadius: 20,
     backgroundColor: '#f8fafc',
     borderWidth: 1,
@@ -550,7 +571,7 @@ const styles = StyleSheet.create({
     borderColor: '#8B5CF6',
   },
   genderButtonText: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 12 : 14,
     fontWeight: '500',
     color: '#6b7280',
   },
@@ -558,11 +579,12 @@ const styles = StyleSheet.create({
     color: 'white',
   },
 
-  // Confirm Button
+  // Confirm Button - Responsive
   confirmButton: {
     backgroundColor: '#8B5CF6',
     borderRadius: 12,
-    paddingVertical: 16,
-    marginTop: 8,
+    paddingVertical: isSmallScreen ? 12 : 16,
+    marginTop: isSmallScreen ? 6 : 8,
+    minHeight: isSmallScreen ? 45 : 52,
   },
 });
