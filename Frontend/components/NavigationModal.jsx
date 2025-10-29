@@ -230,7 +230,7 @@ const NavigationModal = ({
 
   const handleTripComplete = async () => {
     Alert.alert(
-      '✅ Complete Trip?',
+      'Complete Trip?',
       'Have you successfully met and completed your journey together?',
       [
         { text: 'Not Yet', style: 'cancel' },
