@@ -23,24 +23,49 @@ const FinalJourneyModal = ({
   onClose, 
   tripMatch,
   userRole = 'companion', // 'organizer' or 'companion'
+  currentUserId,
+  onTripCompleted, // New callback for when trip is completed
 }) => {
   const [routeData, setRouteData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tripStatus, setTripStatus] = useState('in-progress');
+  const [endTripStatus, setEndTripStatus] = useState({
+    userEnded: false,
+    waitingForOther: false,
+    bothEnded: false,
+    tripCompleted: false
+  });
 
   useEffect(() => {
     console.log("🗺️ [FINAL JOURNEY MODAL] Modal state - visible:", visible, "tripMatch:", tripMatch ? "EXISTS" : "NULL");
-    if (visible && tripMatch && tripMatch.meetingPoint && tripMatch.tripDetails?.destinationLocation) {
-      console.log("🗺️ [FINAL JOURNEY MODAL] Calculating route from meeting point to destination");
-      calculateRoute();
-    } else {
-      console.log("🗺️ [FINAL JOURNEY MODAL] Not calculating route - missing data");
-      console.log("- visible:", visible);
-      console.log("- tripMatch:", tripMatch ? "EXISTS" : "NULL"); 
-      console.log("- meetingPoint:", tripMatch?.meetingPoint ? "EXISTS" : "NULL");
-      console.log("- destinationLocation:", tripMatch?.tripDetails?.destinationLocation ? "EXISTS" : "NULL");
+    
+    if (visible && tripMatch) {
+      // Check initial trip ending status
+      if (currentUserId && tripMatch.endedUsers) {
+        const userEnded = tripMatch.endedUsers.includes(currentUserId);
+        const bothEnded = tripMatch.tripEnded || tripMatch.endedUsers.length === 2;
+        const tripCompleted = tripMatch.status === 'completed' && bothEnded;
+        
+        setEndTripStatus({
+          userEnded,
+          waitingForOther: userEnded && !bothEnded,
+          bothEnded,
+          tripCompleted
+        });
+      }
+      
+      if (tripMatch.meetingPoint && tripMatch.tripDetails?.destinationLocation) {
+        console.log("🗺️ [FINAL JOURNEY MODAL] Calculating route from meeting point to destination");
+        calculateRoute();
+      } else {
+        console.log("🗺️ [FINAL JOURNEY MODAL] Not calculating route - missing data");
+        console.log("- visible:", visible);
+        console.log("- tripMatch:", tripMatch ? "EXISTS" : "NULL"); 
+        console.log("- meetingPoint:", tripMatch?.meetingPoint ? "EXISTS" : "NULL");
+        console.log("- destinationLocation:", tripMatch?.tripDetails?.destinationLocation ? "EXISTS" : "NULL");
+      }
     }
-  }, [visible, tripMatch]);
+  }, [visible, tripMatch, currentUserId]);
 
   const calculateRoute = async () => {
     try {
@@ -159,49 +184,82 @@ const FinalJourneyModal = ({
 
   const handleEndTrip = async () => {
     try {
+      if (endTripStatus.userEnded) {
+        Alert.alert(
+          'Trip Already Ended',
+          endTripStatus.bothEnded 
+            ? 'Both users have confirmed the trip has ended!' 
+            : 'You have already ended this trip. Waiting for your companion to confirm.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       Alert.alert(
         'End Trip',
-        'Are you sure you want to end this trip?',
+        'Are you sure you want to end this trip? You will need to wait for your companion to also confirm before the trip is completed.',
         [
           { text: 'Cancel', style: 'cancel' },
           { 
             text: 'End Trip', 
             style: 'destructive',
             onPress: async () => {
-              const token = await AsyncStorage.getItem('token');
-              const API_URL = BASE_URL.replace(/\/+$/, '');
-              
-              const response = await fetch(`${API_URL}/api/v1/trip/match/${tripMatch.matchId}/end-trip`, {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                }
-              });
-
-              const result = await response.json();
-
-              if (!response.ok) {
-                throw new Error(result.message || 'Failed to end trip');
-              }
-
-              Alert.alert(
-                '🎉 Trip Completed!',
-                'Thank you for traveling with BeSide! We hope you had a safe journey.',
-                [{ 
-                  text: 'OK', 
-                  onPress: () => {
-                    setTripStatus('completed');
-                    onClose();
+              try {
+                const token = await AsyncStorage.getItem('token');
+                const API_URL = BASE_URL.replace(/\/+$/, '');
+                
+                const response = await fetch(`${API_URL}/api/v1/trip/match/${tripMatch.matchId}/end-trip`, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
                   }
-                }]
-              );
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                  throw new Error(result.message || 'Failed to end trip');
+                }
+
+                const { userEnded, waitingForOther, bothEnded, tripCompleted } = result.data;
+                
+                setEndTripStatus({
+                  userEnded,
+                  waitingForOther,
+                  bothEnded,
+                  tripCompleted
+                });
+
+                if (tripCompleted) {
+                  Alert.alert(
+                    '🎉 Trip Completed!',
+                    'Both users have confirmed the trip has ended. Thank you for traveling with BeSide!',
+                    [{ 
+                      text: 'View Trip History', 
+                      onPress: () => {
+                        onClose();
+                        onTripCompleted && onTripCompleted();
+                      }
+                    }]
+                  );
+                } else if (waitingForOther) {
+                  Alert.alert(
+                    '✅ Trip Ended',
+                    'You have successfully ended the trip. Waiting for your companion to confirm.',
+                    [{ text: 'OK' }]
+                  );
+                }
+              } catch (error) {
+                console.error('❌ [END TRIP] Error ending trip:', error);
+                Alert.alert('Error', error.message || 'Failed to end trip. Please try again.');
+              }
             }
           }
         ]
       );
     } catch (error) {
-      console.error('❌ [END TRIP] Error ending trip:', error);
+      console.error('❌ [END TRIP] Error in handleEndTrip:', error);
       Alert.alert('Error', 'Failed to end trip. Please try again.');
     }
   };
@@ -288,6 +346,23 @@ const FinalJourneyModal = ({
               </Text>
             </View>
           )}
+          
+          {/* Trip Status Indicator */}
+          {endTripStatus.tripCompleted ? (
+            <View style={styles.tripInfoRow}>
+              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+              <Text style={[styles.tripInfoText, { color: '#4CAF50' }]}>
+                Trip completed by both users
+              </Text>
+            </View>
+          ) : endTripStatus.userEnded ? (
+            <View style={styles.tripInfoRow}>
+              <Ionicons name="hourglass" size={20} color="#FF9800" />
+              <Text style={[styles.tripInfoText, { color: '#FF9800' }]}>
+                Waiting for companion to end trip
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Map */}
@@ -360,15 +435,40 @@ const FinalJourneyModal = ({
           </View>
         </View>
 
-        {/* End Trip Button */}
+        {/* Action Buttons */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.endTripButton}
-            onPress={handleEndTrip}
-          >
-            <Ionicons name="stop-circle" size={24} color="white" />
-            <Text style={styles.endTripButtonText}>End Trip</Text>
-          </TouchableOpacity>
+          {endTripStatus.tripCompleted ? (
+            // Both users have ended - show trip history button
+            <TouchableOpacity
+              style={styles.tripHistoryButton}
+              onPress={() => {
+                onClose();
+                onTripCompleted && onTripCompleted();
+              }}
+            >
+              <Ionicons name="list" size={24} color="white" />
+              <Text style={styles.tripHistoryButtonText}>View Trip History</Text>
+            </TouchableOpacity>
+          ) : (
+            // Trip not completed - show end trip button
+            <TouchableOpacity
+              style={[
+                styles.endTripButton,
+                endTripStatus.userEnded && styles.endTripButtonDisabled
+              ]}
+              onPress={handleEndTrip}
+              disabled={endTripStatus.userEnded}
+            >
+              <Ionicons 
+                name={endTripStatus.userEnded ? "checkmark-circle" : "stop-circle"} 
+                size={24} 
+                color="white" 
+              />
+              <Text style={styles.endTripButtonText}>
+                {endTripStatus.userEnded ? "Trip Ended - Waiting" : "End Trip"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Modal>
@@ -496,6 +596,28 @@ const styles = StyleSheet.create({
     shadowRadius: 2.22,
   },
   endTripButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  endTripButtonDisabled: {
+    backgroundColor: '#95A5A6',
+  },
+  tripHistoryButton: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+  },
+  tripHistoryButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',

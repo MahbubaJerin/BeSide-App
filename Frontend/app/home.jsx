@@ -291,6 +291,7 @@ export default function HomeScreen() {
   const [consent, setConsent] = useState({ noTouch: false, respectful: false, safety: false });
   const [photoUrl, setPhotoUrl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [shouldResetModal, setShouldResetModal] = useState(false);
 
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [startMarker, setStartMarker] = useState(null);
@@ -336,6 +337,94 @@ export default function HomeScreen() {
   // State for sender notifications
   const [senderRequestStatus, setSenderRequestStatus] = useState(null);
 
+  // Handle real-time trip completion events
+  useEffect(() => {
+    if (realTimeUpdates.addEventHandler) {
+      // Handler for when trip is completed by both users
+      realTimeUpdates.addEventHandler('trip_completed', (data) => {
+        console.log('🎉 [REAL-TIME] Trip completed:', data);
+        
+        // Clear all preferences and route data on trip completion
+        resetAllPreferencesAndRoute();
+        
+        // Refresh active matches to remove completed trip
+        activeMatches.refresh();
+        
+        // Show completion alert
+        Alert.alert(
+          '🎉 Trip Completed!',
+          data.message || 'Both users have confirmed the trip has ended.',
+          [{ 
+            text: 'View Trip History', 
+            onPress: () => setTripHistoryVisible(true)
+          }]
+        );
+        
+        // Close any open modals
+        setFinalJourneyModalVisible(false);
+        setActiveTripMatch(null);
+      });
+
+      // Handler for when one user ends trip (waiting for other)
+      realTimeUpdates.addEventHandler('trip_ending_waiting', (data) => {
+        console.log('⏳ [REAL-TIME] Trip ending - waiting:', data);
+        
+        // Refresh active matches to update status
+        activeMatches.refresh();
+      });
+    }
+
+    // Cleanup event handlers
+    return () => {
+      if (realTimeUpdates.removeEventHandler) {
+        realTimeUpdates.removeEventHandler('trip_completed');
+        realTimeUpdates.removeEventHandler('trip_ending_waiting');
+      }
+    };
+  }, [realTimeUpdates, activeMatches]);
+
+  // Update activeTripMatch when activeMatches data changes
+  useEffect(() => {
+    if (activeTripMatch && activeMatches.matches) {
+      // Find the updated match data
+      const updatedMatch = activeMatches.matches.find(
+        match => match.matchId === activeTripMatch.matchId
+      );
+      
+      if (updatedMatch) {
+        console.log('🔄 [ACTIVE TRIP MATCH] Updating active trip match with latest data');
+        setActiveTripMatch(updatedMatch);
+      } else if (activeTripMatch.matchId) {
+        // Match no longer in active list (might be completed or cancelled)
+        console.log('🏁 [ACTIVE TRIP MATCH] Match no longer active, checking reason...');
+        
+        // Always clear route from map when trip ends (completion or cancellation)
+        clearRouteFromMap();
+        
+        // Check if trip was completed
+        if (finalJourneyModalVisible) {
+          // Show completion alert for the first user who is still in the modal
+          Alert.alert(
+            '🎉 Trip Completed!',
+            'Both users have confirmed the trip has ended. Thank you for traveling with BeSide!',
+            [{ 
+              text: 'View Trip History', 
+              onPress: () => {
+                setFinalJourneyModalVisible(false);
+                setActiveTripMatch(null);
+                setTripHistoryVisible(true);
+              }
+            }]
+          );
+        } else {
+          // Trip was likely cancelled, just clean up
+          console.log('🧹 [ROUTE CLEANUP] Trip cancelled or ended, route cleared from map');
+          setActiveTripMatch(null);
+        }
+      }
+    }
+  }, [activeMatches.matches, activeTripMatch, finalJourneyModalVisible, clearRouteFromMap]);
+
   // Safe modal management functions
   const safeCloseModal = useCallback((modalSetter) => {
     try {
@@ -345,6 +434,63 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error closing modal:', error);
     }
+  }, []);
+
+  // Clear all route-related data from map
+  const clearRouteFromMap = useCallback(() => {
+    console.log('🗺️ [ROUTE CLEANUP] Clearing all route data from map');
+    setRouteCoordinates([]);
+    setCurrentNavigationRoute(null);
+    setStartMarker(null);
+    setEndMarker(null);
+  }, []);
+
+  // Helper function to completely reset all preferences and state
+  const resetAllPreferencesAndRoute = useCallback(() => {
+    console.log('🧹 [RESET ALL] Clearing all preferences, consent, and route data');
+    
+    // Clear route and map markers
+    setRouteCoordinates([]);
+    setStartMarker(null);
+    setEndMarker(null);
+    setShowRadius(false);
+    
+    // Clear consent form data
+    setConsent({ noTouch: false, respectful: false, safety: false });
+    
+    // Clear photo
+    setPhotoUrl(null);
+    
+    // Clear trip request data
+    setCurrentTripRequestId(null);
+    setSelectedUser(null);
+    
+    // Clear modal states
+    setConsentVisible(false);
+    setPhotoUploadVisible(false);
+    setPreferencesVisible(false);
+    
+    // Clear any navigation routes
+    setCurrentNavigationRoute(null);
+    
+    // Trigger modal reset
+    setShouldResetModal(true);
+    setTimeout(() => setShouldResetModal(false), 100); // Reset flag after modal processes it
+    
+    console.log('✅ [RESET ALL] All preferences and route data cleared');
+  }, []);
+
+  // Helper function to reset just route and visual elements (lighter reset)
+  const resetRouteAndVisuals = useCallback(() => {
+    console.log('🧹 [RESET ROUTE] Clearing route and visual elements only');
+    
+    setRouteCoordinates([]);
+    setStartMarker(null);
+    setEndMarker(null);
+    setShowRadius(false);
+    setCurrentNavigationRoute(null);
+    
+    console.log('✅ [RESET ROUTE] Route and visual elements cleared');
   }, []);
 
   const resetAllModals = useCallback(() => {
@@ -653,12 +799,20 @@ export default function HomeScreen() {
             setAcceptanceData(modalData);
             setSenderAcceptanceVisible(true);
           } else if (eventData.response === 'declined') {
-            // Request declined - show brief notification
+            // Request declined - clear all preferences and route data
             setTimeout(() => {
               Alert.alert(
-                "Request Update",
+                "Request Declined",
                 eventData.detailedMessage,
-                [{ text: "OK" }]
+                [
+                  { 
+                    text: "OK", 
+                    onPress: () => {
+                      // Reset all preferences and route data when request is declined
+                      resetAllPreferencesAndRoute();
+                    }
+                  }
+                ]
               );
             }, 500);
           }
@@ -699,11 +853,8 @@ export default function HomeScreen() {
         case 'trip_cancelled':
           console.log("❌ [REAL-TIME] Trip cancelled event received:", eventData);
           
-          // Clear current navigation and trip state
-          setCurrentNavigationRoute(null);
-          setRouteCoordinates([]);
-          setStartMarker(null);
-          setEndMarker(null);
+          // Clear all preferences, route data, and trip state
+          resetAllPreferencesAndRoute();
           setActiveRequest(null);
           setArrivalStatus({
             isNearMeetingPoint: false,
@@ -921,6 +1072,20 @@ export default function HomeScreen() {
                   "Request Accepted! 🎉",
                   `${myRequest.acceptedBy?.userName || 'Someone'} has accepted your companion request! You can now set a meeting point.`,
                   [{ text: "OK" }]
+                );
+              } else if (myRequest.status === 'expired') {
+                // Request expired - clear all preferences and route
+                Alert.alert(
+                  "Request Expired ⏰",
+                  "Your companion request has expired. You can start a new search with fresh preferences.",
+                  [
+                    { 
+                      text: "OK", 
+                      onPress: () => {
+                        resetAllPreferencesAndRoute();
+                      }
+                    }
+                  ]
                 );
               }
             }
@@ -1182,11 +1347,8 @@ export default function HomeScreen() {
                   [{ text: "OK" }]
                 );
                 
-                // Reset all states
-                setCurrentNavigationRoute(null);
-                setRouteCoordinates([]);
-                setStartMarker(null);
-                setEndMarker(null);
+                // Reset all states including preferences and route data
+                resetAllPreferencesAndRoute();
                 setActiveRequest(null);
                 setArrivalStatus({
                   isNearMeetingPoint: false,
@@ -1268,11 +1430,8 @@ export default function HomeScreen() {
                 }
               }
                 
-              // Reset all states regardless of which system was used
-              setCurrentNavigationRoute(null);
-              setRouteCoordinates([]);
-              setStartMarker(null);
-              setEndMarker(null);
+              // Reset all states and preferences regardless of which system was used
+              resetAllPreferencesAndRoute();
               setActiveRequest(null);
               setArrivalStatus({
                 isNearMeetingPoint: false,
@@ -1571,7 +1730,15 @@ export default function HomeScreen() {
               Alert.alert(
                 "Request Expired ⏰",
                 "Your companion request has expired after 2 minutes. You can send a new request if needed.",
-                [{ text: "OK" }]
+                [
+                  { 
+                    text: "OK", 
+                    onPress: () => {
+                      // Clear all preferences and route when request expires
+                      resetAllPreferencesAndRoute();
+                    }
+                  }
+                ]
               );
             } else {
               console.log("✅ Match was created, skipping expiration notification");
@@ -1590,30 +1757,34 @@ export default function HomeScreen() {
     }
   };
 
-  // Enhanced cancel search - keeps route but stops search
+  // Enhanced cancel search - gives user options for what to clear
   const cancelSearch = async () => {
     await companionSearch.stopSearch();
     
-    // Ask user if they want to keep the route visible
+    // Ask user what they want to do with their preferences and route
     Alert.alert(
       "Search Cancelled",
-      "Would you like to keep your route visible for when you search again?",
+      "What would you like to do with your saved preferences and route?",
       [
         {
-          text: "Clear Route",
+          text: "Start Fresh",
           style: "destructive",
           onPress: () => {
-            setRouteCoordinates([]);
-            setStartMarker(null);
-            setEndMarker(null);
-            setShowRadius(false);
-            setCurrentTripRequestId(null);
+            // Complete reset - clear everything
+            resetAllPreferencesAndRoute();
           }
         },
         {
-          text: "Keep Route",
+          text: "Clear Route Only",
           onPress: () => {
-            // Route stays visible, only stop searching
+            // Just clear route and visual elements, keep consent and photo
+            resetRouteAndVisuals();
+          }
+        },
+        {
+          text: "Keep Everything",
+          onPress: () => {
+            // Just stop searching, keep all data for next time
             setShowRadius(false);
           }
         }
@@ -1919,37 +2090,34 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Compact Find Companion Section - Now appears after map */}
-      <View style={styles.findCompanionSection}>
-        <View style={styles.companionContainer}>
-          <TouchableOpacity 
-            style={styles.findCompanionButton}
-            onPress={handleFindCompanion}
-            disabled={isSearching}
-          >
-            <View style={styles.findButtonContent}>
-              <Ionicons name="people" size={24} color="white" />
-              <ThemedText style={styles.findButtonText}>
-                {isSearching ? 'Searching...' : 'Find Companion'}
-              </ThemedText>
-            </View>
-            {isSearching && (
-              <View style={styles.searchingIndicator}>
-                <Ionicons name="radio-button-on" size={12} color="white" />
-              </View>
-            )}
-          </TouchableOpacity>
-          
-          {senderRequestStatus?.status === 'pending' && (
-            <TouchableOpacity 
-              style={styles.statusButton}
-              onPress={() => setSentRequestStatusVisible(true)}
-            >
-              <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
-            </TouchableOpacity>
-          )}
+      {/* Floating Find Companion Button */}
+      <TouchableOpacity 
+        style={styles.findCompanionButton}
+        onPress={handleFindCompanion}
+        disabled={isSearching}
+      >
+        <View style={styles.findButtonContent}>
+          <Ionicons name="people" size={24} color="white" />
+          <ThemedText style={styles.findButtonText}>
+            {isSearching ? 'Searching...' : 'Find Companion'}
+          </ThemedText>
         </View>
-      </View>
+        {isSearching && (
+          <View style={styles.searchingIndicator}>
+            <Ionicons name="radio-button-on" size={12} color="white" />
+          </View>
+        )}
+      </TouchableOpacity>
+      
+      {/* Status Button - Also floating if needed */}
+      {senderRequestStatus?.status === 'pending' && (
+        <TouchableOpacity 
+          style={styles.statusButton}
+          onPress={() => setSentRequestStatusVisible(true)}
+        >
+          <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
+        </TouchableOpacity>
+      )}
 
       {/* Show searching status when active */}
       {isSearching && (
@@ -2262,10 +2430,12 @@ export default function HomeScreen() {
         visible={preferencesVisible}
         onClose={() => setPreferencesVisible(false)}
         onSubmit={handlePreferencesSubmit}
+        shouldReset={shouldResetModal}
       />
       <SentRequestStatusModal
         visible={sentRequestStatusVisible}
         onClose={() => setSentRequestStatusVisible(false)}
+        onRequestCancelled={resetAllPreferencesAndRoute}
       />
       <TripHistoryModal
         visible={tripHistoryVisible}
@@ -2359,6 +2529,11 @@ export default function HomeScreen() {
           (activeTripMatch.organizer?.userId === user?._id ? 'organizer' : 'companion') 
           : 'companion'
         }
+        currentUserId={user?._id}
+        onTripCompleted={() => {
+          clearRouteFromMap();
+          setTripHistoryVisible(true);
+        }}
       />
 
       {/* Sender Acceptance Notification Modal */}
@@ -2523,52 +2698,25 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   
-  // Find Companion Section - Compact
-  findCompanionSection: {
-    padding: 15,
-    backgroundColor: "#f8fafc",
-  },
-  companionContainer: {
-    backgroundColor: "white",
-    borderRadius: 15,
-    padding: 16,
-    alignItems: "center",
-    shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.1)",
-  },
-  companionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1f2937",
-    marginBottom: 6,
-    textAlign: "center",
-    display: "none", // Hide title to make it more compact
-  },
-  companionSubtext: {
-    fontSize: 12,
-    color: "#6b7280",
-    textAlign: "center",
-    marginBottom: 12,
-    display: "none", // Hide subtitle to make it more compact
-  },
+  // Floating Find Companion Button
   findCompanionButton: {
     backgroundColor: "#8B5CF6",
     paddingHorizontal: 28,
-    paddingVertical: 12,
-    borderRadius: 25,
+    paddingVertical: 16,
+    borderRadius: 30,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginVertical: 20,
+    marginHorizontal: 20,
     shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
     borderWidth: 0,
+    minWidth: 200,
   },
   findButtonContent: {
     flexDirection: "row",
@@ -2584,11 +2732,18 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   statusButton: {
-    marginTop: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    alignSelf: "center",
+    marginHorizontal: 20,
+    marginBottom: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     backgroundColor: "#f3f4f6",
-    borderRadius: 12,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statusButtonText: {
     color: "#8B5CF6",
