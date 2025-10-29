@@ -2999,7 +2999,17 @@ export default function HomeScreen() {
         }
         currentUserId={user?._id}
         onTripCompleted={() => {
+          console.log('🎉 [HOME] Trip completed, refreshing active matches...');
           clearRouteFromMap();
+          // Refresh active matches to remove completed trip from list
+          activeMatches.refresh?.();
+          
+          // Additional refresh after a short delay to ensure backend has processed
+          setTimeout(() => {
+            console.log('🔄 [HOME] Secondary refresh after trip completion...');
+            activeMatches.refresh?.();
+          }, 1000);
+          
           setTripHistoryVisible(true);
         }}
       />
