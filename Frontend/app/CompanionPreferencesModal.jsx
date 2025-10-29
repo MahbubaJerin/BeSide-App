@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Destination Cards
+  // Destination Cards - Responsive positioning
   destinationCards: {
     position: 'absolute',
     top: isSmallScreen ? '12%' : isMediumScreen ? '15%' : '18%',

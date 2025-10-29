@@ -795,7 +795,7 @@ exports.getTripHistory = catchAsync(async (req, res, next) => {
     const historyRequests = await TripRequest.find({
         "user.userId": userId,
         status: { $in: ["completed", "cancelled", "expired", "declined"] }
-    }).sort({ createdAt: -1 }).limit(25);
+    }).sort({ createdAt: -1 });
 
     // Get completed trip matches (these are the actual completed trips)
     const TripMatch = require('../models/tripMatchModel');
@@ -805,10 +805,10 @@ exports.getTripHistory = catchAsync(async (req, res, next) => {
             { 'companion.userId': userId }
         ],
         status: { $in: ['completed', 'cancelled'] }
-    }).sort({ createdAt: -1 }).limit(25);
+    }).sort({ createdAt: -1 });
 
     // Combine and sort by date (most recent first)
-    const combinedHistory = [
+    const allHistory = [
         ...historyRequests.map(req => ({
             type: 'request',
             id: req._id,
@@ -821,7 +821,8 @@ exports.getTripHistory = catchAsync(async (req, res, next) => {
             plannedTime: req.plannedTime,
             createdAt: req.createdAt,
             completedAt: req.completedAt,
-            companionInfo: null
+            companionInfo: null,
+            dbRecord: req
         })),
         ...completedMatches.map(match => ({
             type: 'match',
@@ -837,16 +838,47 @@ exports.getTripHistory = catchAsync(async (req, res, next) => {
             createdAt: match.createdAt,
             completedAt: match.completedAt || match.progression?.completed,
             companionInfo: userId === match.organizer.userId ? match.companion : match.organizer,
-            meetingPoint: match.meetingPoint
+            meetingPoint: match.meetingPoint,
+            dbRecord: match
         }))
-    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 30);
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    // Keep only the last 10 trips
+    const recentHistory = allHistory.slice(0, 10);
+    const oldRecords = allHistory.slice(10);
+
+    // Auto-delete old records from database
+    if (oldRecords.length > 0) {
+        console.log(`🗑️ [CLEANUP] Auto-deleting ${oldRecords.length} old trip records for user ${userId}`);
+        
+        const oldRequestIds = oldRecords.filter(r => r.type === 'request').map(r => r.id);
+        const oldMatchIds = oldRecords.filter(r => r.type === 'match').map(r => r.id);
+
+        // Delete old trip requests
+        if (oldRequestIds.length > 0) {
+            await TripRequest.deleteMany({ _id: { $in: oldRequestIds } });
+            console.log(`✅ [CLEANUP] Deleted ${oldRequestIds.length} old trip requests`);
+        }
+
+        // Delete old trip matches
+        if (oldMatchIds.length > 0) {
+            await TripMatch.deleteMany({ _id: { $in: oldMatchIds } });
+            console.log(`✅ [CLEANUP] Deleted ${oldMatchIds.length} old trip matches`);
+        }
+    }
+
+    // Return only the cleaned data (without dbRecord references)
+    const cleanHistory = recentHistory.map(item => {
+        const { dbRecord, ...cleanItem } = item;
+        return cleanItem;
+    });
 
     res.status(200).json({
         status: "success",
-        results: combinedHistory.length,
+        results: cleanHistory.length,
         data: { 
-            requests: historyRequests, // Keep for backward compatibility
-            history: combinedHistory // New combined history
+            requests: historyRequests.slice(0, 10), // Keep for backward compatibility
+            history: cleanHistory // New combined history (max 10 items)
         }
     });
 });
