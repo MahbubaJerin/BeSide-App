@@ -75,6 +75,19 @@ const tripMatchSchema = new mongoose.Schema({
     timestamp: { type: Date }
   },
   
+  // Full message history
+  messages: [{
+    messageId: { type: String, required: true },
+    content: { type: String, required: true },
+    senderId: { type: String, required: true },
+    senderName: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
+    readBy: [{
+      userId: { type: String },
+      readAt: { type: Date }
+    }]
+  }],
+  
   // Safety and tracking
   safety: {
     emergencyContactsShared: { type: Boolean, default: false },
@@ -276,6 +289,40 @@ tripMatchSchema.methods.getOtherUser = function(currentUserId) {
 tripMatchSchema.methods.includesUser = function(userId) {
   const userIdStr = userId.toString();
   return this.organizer.userId.toString() === userIdStr || this.companion.userId.toString() === userIdStr;
+};
+
+// Instance method to add a message safely
+tripMatchSchema.methods.addMessage = function(senderId, senderName, content) {
+  const messageId = `MSG${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+  const newMessage = {
+    messageId,
+    content,
+    senderId: senderId.toString(),
+    senderName,
+    timestamp: new Date(),
+    readBy: [{
+      userId: senderId.toString(),
+      readAt: new Date()
+    }]
+  };
+  
+  // Initialize messages array if it doesn't exist (for backward compatibility)
+  if (!this.messages) {
+    this.messages = [];
+  }
+  
+  // Add the new message
+  this.messages.push(newMessage);
+  
+  // Update lastMessage for backward compatibility
+  this.lastMessage = {
+    content,
+    senderId: senderId.toString(),
+    senderName,
+    timestamp: new Date()
+  };
+  
+  return newMessage;
 };
 
 const TripMatch = mongoose.model('TripMatch', tripMatchSchema);
