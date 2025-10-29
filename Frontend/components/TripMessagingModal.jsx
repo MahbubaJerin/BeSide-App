@@ -143,11 +143,13 @@ export default function TripMessagingModal({
                 </ThemedText>
               </View>
             ) : (
-              messages.map((message) => {
+              messages.map((message, index) => {
                 const isMine = isMyMessage(message);
+                // Use combination of messageId and index to ensure uniqueness
+                const uniqueKey = `${message.messageId}-${index}`;
                 return (
                   <View
-                    key={message.messageId}
+                    key={uniqueKey}
                     style={[
                       styles.messageContainer,
                       isMine ? styles.myMessageContainer : styles.theirMessageContainer,
