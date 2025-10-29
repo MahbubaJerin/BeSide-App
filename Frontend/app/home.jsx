@@ -2384,17 +2384,46 @@ export default function HomeScreen() {
       <Modal transparent animationType="slide" visible={modalVisible}>
         <View style={styles.popupOverlay}>
           <View style={styles.popupBox}>
-            <ThemedText type="subtitle">Oops!</ThemedText>
-            <ThemedText type="default">You're not verified yet.</ThemedText>
-            <ThemedButton
-              title="Verify Now"
-              type="primary"
+            <View style={styles.popupIconContainer}>
+              <View style={styles.popupIconCircle}>
+                <Ionicons name="shield-checkmark-outline" size={48} color="#8B5CF6" />
+              </View>
+            </View>
+            <ThemedText type="subtitle" style={styles.popupTitle}>Verification Required</ThemedText>
+            <ThemedText type="default" style={styles.popupMessage}>
+              To ensure safety for all users, please verify your identity before finding a companion.
+            </ThemedText>
+            <View style={styles.popupFeatures}>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <ThemedText style={styles.featureText}>Quick & Secure</ThemedText>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <ThemedText style={styles.featureText}>One-Time Process</ThemedText>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <ThemedText style={styles.featureText}>Privacy Protected</ThemedText>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.verifyNowButton}
               onPress={() => {
                 setModalVisible(false);
                 router.push("/verify");
               }}
-              style={styles.verifyButton}
-            />
+              activeOpacity={0.8}
+            >
+              <Ionicons name="shield-checkmark" size={24} color="white" />
+              <ThemedText style={styles.verifyNowText}>Verify My Identity</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.popupCancelButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <ThemedText style={styles.popupCancelText}>Maybe Later</ThemedText>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -2874,14 +2903,102 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   popupBox: {
-    backgroundColor: Colors.light.surface,
-    padding: 24,
+    backgroundColor: 'white',
+    borderRadius: 24,
+    width: Dimensions.get("window").width * 0.85,
+    padding: 0,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  popupIconContainer: {
+    backgroundColor: '#F3E8FF',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E9D5FF',
+  },
+  popupIconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  popupTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 24,
+    marginHorizontal: 24,
+  },
+  popupMessage: {
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginTop: 12,
+    marginHorizontal: 24,
+    opacity: 0.8,
+  },
+  popupFeatures: {
+    marginTop: 24,
+    marginHorizontal: 24,
+    gap: 12,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  featureText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  verifyNowButton: {
+    backgroundColor: '#8B5CF6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
     borderRadius: 14,
-    width: Dimensions.get("window").width * 0.8,
-    alignItems: "center",
+    marginHorizontal: 24,
+    marginTop: 24,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  verifyNowText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: 'white',
+  },
+  popupCancelButton: {
+    paddingVertical: 16,
+    marginHorizontal: 24,
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  popupCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+    opacity: 0.6,
   },
   verifyButton: { marginTop: 20, width: "80%" },
   userCard: {
