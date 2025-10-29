@@ -67,8 +67,6 @@ export default function CompanionPreferencesModal({
       setLoading(false);
       setShowDestinationSearch(false);
       setShowMeetingPointSearch(false);
-      setRouteDistance("4.2 km");
-      setRouteDuration("15 min");
       setRegion({
         latitude: -37.8136,
         longitude: 144.9631,
@@ -377,7 +375,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Destination Cards - Responsive positioning
+  // Destination Cards
   destinationCards: {
     position: 'absolute',
     top: isSmallScreen ? '12%' : isMediumScreen ? '15%' : '18%',
