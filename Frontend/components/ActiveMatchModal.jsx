@@ -51,6 +51,10 @@ export default function ActiveMatchModal({
     if (matches && matches.length > 0) {
       console.log(`📋 [ACTIVE MATCH MODAL] Caching ${matches.length} matches`);
       setCachedMatches(matches);
+    } else if (matches && matches.length === 0) {
+      // Clear cache when matches array is explicitly empty (after refresh)
+      console.log(`🗑️ [ACTIVE MATCH MODAL] Clearing cached matches - refresh detected`);
+      setCachedMatches([]);
     }
   }, [matches]);
 
@@ -202,17 +206,17 @@ export default function ActiveMatchModal({
               
               if (result.status === "success") {
                 console.log("✅ [CANCEL] Trip cancelled successfully");
+                
+                // Refresh immediately after successful cancellation
+                if (onRefresh) {
+                  console.log("🔄 [CANCEL] Refreshing active matches...");
+                  onRefresh();
+                }
+                
                 Alert.alert(
                   "Trip Cancelled",
                   "The trip has been cancelled. Your companion has been notified.",
-                  [
-                    {
-                      text: "OK",
-                      onPress: () => {
-                        if (onRefresh) onRefresh();
-                      }
-                    }
-                  ]
+                  [{ text: "OK" }]
                 );
               } else {
                 throw new Error(result.message || "Failed to cancel trip");

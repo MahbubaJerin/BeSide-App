@@ -870,8 +870,9 @@ export default function HomeScreen() {
           });
           
           // Refresh matches
-          if (activeMatches?.refreshMatches) {
-            activeMatches.refreshMatches();
+          if (activeMatches?.refresh) {
+            console.log("🔄 [REAL-TIME] Refreshing matches after cancellation...");
+            activeMatches.refresh();
           }
           
           Alert.alert(
@@ -2560,7 +2561,17 @@ export default function HomeScreen() {
         }
         currentUserId={user?._id}
         onTripCompleted={() => {
+          console.log('🎉 [HOME] Trip completed, refreshing active matches...');
           clearRouteFromMap();
+          // Refresh active matches to remove completed trip from list
+          activeMatches.refresh?.();
+          
+          // Additional refresh after a short delay to ensure backend has processed
+          setTimeout(() => {
+            console.log('🔄 [HOME] Secondary refresh after trip completion...');
+            activeMatches.refresh?.();
+          }, 1000);
+          
           setTripHistoryVisible(true);
         }}
       />
