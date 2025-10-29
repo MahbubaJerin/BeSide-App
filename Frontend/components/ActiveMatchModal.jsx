@@ -55,6 +55,10 @@ export default function ActiveMatchModal({
     if (matches && matches.length > 0) {
       console.log(`📋 [ACTIVE MATCH MODAL] Caching ${matches.length} matches`);
       setCachedMatches(matches);
+    } else if (matches && matches.length === 0) {
+      // Clear cache when matches array is explicitly empty (after refresh)
+      console.log(`🗑️ [ACTIVE MATCH MODAL] Clearing cached matches - refresh detected`);
+      setCachedMatches([]);
     }
   }, [matches]);
 
