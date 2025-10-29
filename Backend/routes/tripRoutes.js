@@ -240,4 +240,24 @@ router.post(
   tripController.endTripMatch
 );
 
+// ===== MESSAGING SYSTEM ROUTES =====
+
+// Send message in trip match
+router.post(
+  "/match/:matchId/messages",
+  tripController.sendMessage
+);
+
+// Get messages for trip match
+router.get(
+  "/match/:matchId/messages",
+  tripController.getMessages
+);
+
+// Mark specific message as read
+router.post(
+  "/match/:matchId/messages/:messageId/read",
+  tripController.markMessageRead
+);
+
 module.exports = router;

@@ -18,6 +18,7 @@ import { Colors } from "@/constants/Colors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BASE_URL } from "../config";
 import NavigationModal from "./NavigationModal";
+import TripMessagingModal from "./TripMessagingModal";
 
 export default function ActiveMatchModal({
   visible,
@@ -31,6 +32,7 @@ export default function ActiveMatchModal({
   onBothArrived, // NEW: Callback when both users arrive
 }) {
   const [navigationModalVisible, setNavigationModalVisible] = useState(false);
+  const [messagingModalVisible, setMessagingModalVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
 
   const getStatusColor = (status) => {
@@ -305,7 +307,7 @@ export default function ActiveMatchModal({
                       </View>
                     </View>
 
-                    {/* Action Buttons - Simplified */}
+                    {/* Action Buttons - Three buttons */}
                     <View style={styles.actionButtonsContainer}>
                       <View style={styles.buttonRow}>
                         <TouchableOpacity
@@ -316,15 +318,26 @@ export default function ActiveMatchModal({
                           }}
                           disabled={!match.meetingPoint}
                         >
-                          <Ionicons name="navigate-outline" size={18} color="#fff" />
+                          <Ionicons name="navigate-outline" size={16} color="#fff" />
                           <Text style={styles.actionButtonText}>Navigate</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.actionButton, styles.messageButton]}
+                          onPress={() => {
+                            setSelectedMatch(match);
+                            setMessagingModalVisible(true);
+                          }}
+                        >
+                          <Ionicons name="chatbubble-outline" size={16} color="#fff" />
+                          <Text style={styles.actionButtonText}>Message</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
                           style={[styles.actionButton, styles.cancelButton]}
                           onPress={() => handleCancelMatch(match.matchId)}
                         >
-                          <Ionicons name="close-circle-outline" size={18} color="#fff" />
+                          <Ionicons name="close-circle-outline" size={16} color="#fff" />
                           <Text style={styles.actionButtonText}>Cancel</Text>
                         </TouchableOpacity>
                       </View>
@@ -357,6 +370,16 @@ export default function ActiveMatchModal({
               userRole={getUserRole(selectedMatch)}
               arrivalStatus={arrivalStatus} // Pass arrival status
               onBothArrived={onBothArrived} // Pass both arrived callback
+            />
+          )}
+
+          {/* Messaging Modal */}
+          {selectedMatch && (
+            <TripMessagingModal
+              visible={messagingModalVisible}
+              onClose={() => setMessagingModalVisible(false)}
+              tripMatch={selectedMatch}
+              currentUserId={currentUserId}
             />
           )}
         </View>
@@ -547,6 +570,10 @@ const styles = StyleSheet.create({
   navigationButton: {
     backgroundColor: "#2ca07b", // Secondary teal/green
     shadowColor: "#2ca07b",
+  },
+  messageButton: {
+    backgroundColor: "#8b5cf6", // Purple for messaging
+    shadowColor: "#8b5cf6",
   },
   cancelButton: {
     backgroundColor: "#e32002", // Danger red

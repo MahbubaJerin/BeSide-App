@@ -1237,3 +1237,172 @@ exports.endTripMatch = catchAsync(async (req, res, next) => {
     }
   });
 });
+
+// ===== MESSAGING SYSTEM =====
+
+// Send a message in trip match
+exports.sendMessage = catchAsync(async (req, res, next) => {
+  const { matchId } = req.params;
+  const { message } = req.body;
+  const userId = req.user._id.toString();
+
+  console.log(`💬 [SEND MESSAGE] User ${req.user.userName} sending message to match ${matchId}`);
+
+  // Validate message content
+  if (!message || message.trim().length === 0) {
+    return next(new AppError("Message content is required", 400));
+  }
+
+  if (message.length > 500) {
+    return next(new AppError("Message too long. Maximum 500 characters allowed", 400));
+  }
+
+  // Find the trip match
+  const tripMatch = await TripMatch.findOne({ matchId });
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  if (tripMatch.organizer.userId !== userId && tripMatch.companion.userId !== userId) {
+    return next(new AppError("You are not part of this trip match", 403));
+  }
+
+  // Add message using the instance method
+  const newMessage = tripMatch.addMessage(userId, req.user.userName, message.trim());
+  await tripMatch.save();
+
+  // Send real-time notification to the other user
+  const { sendEventToUser } = require('./realtimeController');
+  const otherUserId = tripMatch.organizer.userId === userId ? 
+    tripMatch.companion.userId : tripMatch.organizer.userId;
+  
+  const eventData = {
+    matchId: matchId,
+    message: newMessage,
+    senderName: req.user.userName,
+    timestamp: new Date().toISOString()
+  };
+
+  sendEventToUser(otherUserId, 'new_message', eventData);
+
+  console.log(`✅ [MESSAGE SENT] Message delivered for match ${matchId}`);
+
+  res.status(201).json({
+    status: "success",
+    message: "Message sent successfully",
+    data: {
+      message: newMessage
+    }
+  });
+});
+
+// Get messages for trip match
+exports.getMessages = catchAsync(async (req, res, next) => {
+  const { matchId } = req.params;
+  const userId = req.user._id.toString();
+  const { lastMessageId } = req.query; // For pagination
+
+  console.log(`📖 [GET MESSAGES] User ${req.user.userName} getting messages for match ${matchId}`);
+
+  // Find the trip match
+  const tripMatch = await TripMatch.findOne({ matchId });
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  if (tripMatch.organizer.userId !== userId && tripMatch.companion.userId !== userId) {
+    return next(new AppError("You are not part of this trip match", 403));
+  }
+
+  // Initialize messages array if it doesn't exist (backward compatibility)
+  if (!tripMatch.messages) {
+    tripMatch.messages = [];
+  }
+
+  let messages = tripMatch.messages;
+
+  // If lastMessageId is provided, only return newer messages
+  if (lastMessageId) {
+    const lastMessageIndex = messages.findIndex(msg => msg.messageId === lastMessageId);
+    if (lastMessageIndex !== -1) {
+      messages = messages.slice(lastMessageIndex + 1);
+    }
+  }
+
+  // Mark messages as read by current user
+  let hasNewReads = false;
+  messages.forEach(message => {
+    if (message.senderId !== userId) {
+      const existingRead = message.readBy.find(read => read.userId === userId);
+      if (!existingRead) {
+        message.readBy.push({
+          userId: userId,
+          readAt: new Date()
+        });
+        hasNewReads = true;
+      }
+    }
+  });
+
+  // Save if we added any read receipts
+  if (hasNewReads) {
+    await tripMatch.save();
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      messages: messages,
+      totalMessages: tripMatch.messages.length,
+      hasMoreMessages: lastMessageId ? true : false // Simple implementation
+    }
+  });
+});
+
+// Mark message as read (alternative endpoint for explicit read marking)
+exports.markMessageRead = catchAsync(async (req, res, next) => {
+  const { matchId, messageId } = req.params;
+  const userId = req.user._id.toString();
+
+  // Find the trip match
+  const tripMatch = await TripMatch.findOne({ matchId });
+  if (!tripMatch) {
+    return next(new AppError("Trip match not found", 404));
+  }
+
+  // Verify user is part of this match
+  if (tripMatch.organizer.userId !== userId && tripMatch.companion.userId !== userId) {
+    return next(new AppError("You are not part of this trip match", 403));
+  }
+
+  // Find the message and mark as read
+  const message = tripMatch.messages.find(msg => msg.messageId === messageId);
+  if (!message) {
+    return next(new AppError("Message not found", 404));
+  }
+
+  // Don't mark own messages as read
+  if (message.senderId === userId) {
+    return res.status(200).json({
+      status: "success",
+      message: "Cannot mark own message as read"
+    });
+  }
+
+  // Add read receipt if not already read
+  const existingRead = message.readBy.find(read => read.userId === userId);
+  if (!existingRead) {
+    message.readBy.push({
+      userId: userId,
+      readAt: new Date()
+    });
+    await tripMatch.save();
+  }
+
+  res.status(200).json({
+    status: "success",
+    message: "Message marked as read"
+  });
+});
