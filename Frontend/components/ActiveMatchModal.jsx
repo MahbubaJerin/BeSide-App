@@ -1,5 +1,6 @@
 // Frontend/components/ActiveMatchModal.jsx
 import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +13,8 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { ThemedButton } from "@/components/ThemedButton";
 import { ThemedText } from "@/components/ThemedText";
@@ -21,6 +24,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BASE_URL } from "../config";
 import NavigationModal from "./NavigationModal";
 import TripMessagingModal from "./TripMessagingModal";
+
+const { width } = Dimensions.get('window');
 
 export default function ActiveMatchModal({
   visible,
@@ -50,10 +55,6 @@ export default function ActiveMatchModal({
     if (matches && matches.length > 0) {
       console.log(`📋 [ACTIVE MATCH MODAL] Caching ${matches.length} matches`);
       setCachedMatches(matches);
-    } else if (matches && matches.length === 0) {
-      // Clear cache when matches array is explicitly empty (after refresh)
-      console.log(`🗑️ [ACTIVE MATCH MODAL] Clearing cached matches - refresh detected`);
-      setCachedMatches([]);
     }
   }, [matches]);
 
@@ -491,7 +492,7 @@ export default function ActiveMatchModal({
               currentUserId={currentUserId}
             />
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -729,8 +730,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#1c52c8", // Primary blue
-    paddingVertical: 12,
+    backgroundColor: "#8B5CF6",
+    paddingVertical: 14,
     paddingHorizontal: 12,
     borderRadius: 12,
     gap: 6,
@@ -743,15 +744,15 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: "#fff",
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   navigationButton: {
     backgroundColor: "#10B981",
     shadowColor: "#10B981",
   },
   messageButton: {
-    backgroundColor: "#8b5cf6", // Purple for messaging
-    shadowColor: "#8b5cf6",
+    backgroundColor: "#C77DFF",
+    shadowColor: "#C77DFF",
   },
   cancelButton: {
     backgroundColor: "#EF4444",
