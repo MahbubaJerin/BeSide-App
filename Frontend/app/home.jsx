@@ -2090,37 +2090,34 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Compact Find Companion Section - Now appears after map */}
-      <View style={styles.findCompanionSection}>
-        <View style={styles.companionContainer}>
-          <TouchableOpacity 
-            style={styles.findCompanionButton}
-            onPress={handleFindCompanion}
-            disabled={isSearching}
-          >
-            <View style={styles.findButtonContent}>
-              <Ionicons name="people" size={24} color="white" />
-              <ThemedText style={styles.findButtonText}>
-                {isSearching ? 'Searching...' : 'Find Companion'}
-              </ThemedText>
-            </View>
-            {isSearching && (
-              <View style={styles.searchingIndicator}>
-                <Ionicons name="radio-button-on" size={12} color="white" />
-              </View>
-            )}
-          </TouchableOpacity>
-          
-          {senderRequestStatus?.status === 'pending' && (
-            <TouchableOpacity 
-              style={styles.statusButton}
-              onPress={() => setSentRequestStatusVisible(true)}
-            >
-              <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
-            </TouchableOpacity>
-          )}
+      {/* Floating Find Companion Button */}
+      <TouchableOpacity 
+        style={styles.findCompanionButton}
+        onPress={handleFindCompanion}
+        disabled={isSearching}
+      >
+        <View style={styles.findButtonContent}>
+          <Ionicons name="people" size={24} color="white" />
+          <ThemedText style={styles.findButtonText}>
+            {isSearching ? 'Searching...' : 'Find Companion'}
+          </ThemedText>
         </View>
-      </View>
+        {isSearching && (
+          <View style={styles.searchingIndicator}>
+            <Ionicons name="radio-button-on" size={12} color="white" />
+          </View>
+        )}
+      </TouchableOpacity>
+      
+      {/* Status Button - Also floating if needed */}
+      {senderRequestStatus?.status === 'pending' && (
+        <TouchableOpacity 
+          style={styles.statusButton}
+          onPress={() => setSentRequestStatusVisible(true)}
+        >
+          <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
+        </TouchableOpacity>
+      )}
 
       {/* Show searching status when active */}
       {isSearching && (
@@ -2701,52 +2698,25 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   
-  // Find Companion Section - Compact
-  findCompanionSection: {
-    padding: 15,
-    backgroundColor: "#f8fafc",
-  },
-  companionContainer: {
-    backgroundColor: "white",
-    borderRadius: 15,
-    padding: 16,
-    alignItems: "center",
-    shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.1)",
-  },
-  companionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1f2937",
-    marginBottom: 6,
-    textAlign: "center",
-    display: "none", // Hide title to make it more compact
-  },
-  companionSubtext: {
-    fontSize: 12,
-    color: "#6b7280",
-    textAlign: "center",
-    marginBottom: 12,
-    display: "none", // Hide subtitle to make it more compact
-  },
+  // Floating Find Companion Button
   findCompanionButton: {
     backgroundColor: "#8B5CF6",
     paddingHorizontal: 28,
-    paddingVertical: 12,
-    borderRadius: 25,
+    paddingVertical: 16,
+    borderRadius: 30,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginVertical: 20,
+    marginHorizontal: 20,
     shadowColor: "#8B5CF6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
     borderWidth: 0,
+    minWidth: 200,
   },
   findButtonContent: {
     flexDirection: "row",
@@ -2762,11 +2732,18 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   statusButton: {
-    marginTop: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    alignSelf: "center",
+    marginHorizontal: 20,
+    marginBottom: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     backgroundColor: "#f3f4f6",
-    borderRadius: 12,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statusButtonText: {
     color: "#8B5CF6",
