@@ -65,16 +65,9 @@ export const useMessaging = (matchId, intervalMs = 3000, enabled = true) => {
         setNetworkError(null);
 
         if (lastMessageId.current && newMessages.length > 0) {
-          // Incremental update - append new messages, avoiding duplicates
-          setMessages(prev => {
-            const existingIds = new Set(prev.map(m => m.messageId));
-            const uniqueNewMessages = newMessages.filter(m => !existingIds.has(m.messageId));
-            return [...prev, ...uniqueNewMessages];
-          });
-          
-          if (newMessages.length > 0) {
-            setHasNewMessages(true);
-          }
+          // Incremental update - append new messages
+          setMessages(prev => [...prev, ...newMessages]);
+          setHasNewMessages(true);
           
           // Count unread messages (messages not sent by current user)
           const currentUserId = await AsyncStorage.getItem("userId");
@@ -149,19 +142,11 @@ export const useMessaging = (matchId, intervalMs = 3000, enabled = true) => {
       if (result.status === "success") {
         // Add the new message to local state immediately for better UX
         const newMessage = result.data.message;
-        
-        // Only add if not already present (avoid duplicates)
-        setMessages(prev => {
-          const exists = prev.some(m => m.messageId === newMessage.messageId);
-          if (exists) return prev;
-          return [...prev, newMessage];
-        });
-        
+        setMessages(prev => [...prev, newMessage]);
         lastMessageId.current = newMessage.messageId;
         
-        // Trigger a fresh fetch after a delay to get any messages we might have missed
-        // But don't do it immediately to avoid race conditions
-        setTimeout(() => fetchMessages(), 2000);
+        // Trigger a fresh fetch to get any messages we might have missed
+        setTimeout(() => fetchMessages(), 1000);
         
         return true;
       } else {
