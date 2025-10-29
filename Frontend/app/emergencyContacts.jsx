@@ -92,66 +92,116 @@ export default function EmergencyContacts() {
 
   const openDial = (phone) => phone && Linking.openURL(`tel:${phone}`).catch(() => {});
   const openMail = (email) => email && Linking.openURL(`mailto:${email}`).catch(() => {});
+  const openSMS = (phone) => {
+    if (!phone) return;
+    
+    // Basic SMS for regular use
+    Linking.openURL(`sms:${phone}`).catch(() => {
+      Alert.alert('Error', 'Unable to open messaging app');
+    });
+  };
+
+  const sendEmergencySMS = (phone, contactName) => {
+    if (!phone) return;
+
+    Alert.alert(
+      'Send Emergency Text',
+      `Send an emergency alert to ${contactName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Send Quick Alert', 
+          onPress: () => {
+            const emergencyMessage = `🚨 EMERGENCY ALERT 🚨\n\nI need immediate help! This is an automated emergency message from BeSide app.\n\nPlease call me or emergency services if you cannot reach me.\n\nTime: ${new Date().toLocaleString()}`;
+            const encodedMessage = encodeURIComponent(emergencyMessage);
+            Linking.openURL(`sms:${phone}?body=${encodedMessage}`).catch(() => {
+              Alert.alert('Error', 'Unable to open messaging app');
+            });
+          }
+        },
+        { 
+          text: 'Open Messaging', 
+          onPress: () => openSMS(phone)
+        }
+      ]
+    );
+  };
 
   const renderItem = ({ item }) => (
     <View style={styles.card}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{initials(item.name)}</Text>
-      </View>
-
-      <View style={{ flex: 1 }}>
-        <View style={styles.nameRow}>
-          <Text style={styles.name}>{item.name}</Text>
-          {item.isPrimary ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Primary</Text>
-            </View>
-          ) : null}
+      {/* Contact Header */}
+      <View style={styles.contactHeader}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{initials(item.name)}</Text>
+        </View>
+        
+        <View style={styles.contactInfo}>
+          <View style={styles.nameRow}>
+            <Text style={styles.name}>{item.name}</Text>
+            {item.isPrimary && (
+              <View style={styles.primaryBadge}>
+                <Ionicons name="star" size={12} color="#FFD700" />
+                <Text style={styles.primaryBadgeText}>Primary</Text>
+              </View>
+            )}
+          </View>
+          {!!item.relation && <Text style={styles.relation}>{item.relation}</Text>}
         </View>
 
-        {!!item.relation && <Text style={styles.meta}>{item.relation}</Text>}
+        {/* Edit/Delete Actions */}
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={styles.actionIcon}
+            onPress={() =>
+              router.push({ pathname: '/emergencyContacts.add', params: { mode: 'edit', id: item._id } })
+            }
+          >
+            <Ionicons name="pencil" size={18} color={palette.primary} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.actionIcon}
+            onPress={() => onDelete(item._id)}
+          >
+            <Ionicons name="trash-outline" size={18} color={palette.danger} />
+          </TouchableOpacity>
+        </View>
+      </View>
 
+      {/* Quick Action Buttons */}
+      <View style={styles.quickActions}>
         <Pressable
           onPress={() => openDial(item.phone)}
-          android_ripple={{ color: '#dfe8f8', radius: 130 }}
-          style={styles.infoRow}
+          style={[styles.quickActionButton, styles.callButton]}
         >
-          <Ionicons name="call-outline" size={18} color={palette.primary} />
-          <Text numberOfLines={1} style={styles.phoneText}>{item.phone || '—'}</Text>
+          <Ionicons name="call" size={20} color="#FFF" />
+          <Text style={styles.quickActionText}>Call</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => openSMS(item.phone)}
+          onLongPress={() => sendEmergencySMS(item.phone, item.name)}
+          style={[styles.quickActionButton, styles.textButton]}
+        >
+          <Ionicons name="chatbubble" size={20} color="#FFF" />
+          <Text style={styles.quickActionText}>Text</Text>
         </Pressable>
 
         {!!item.email && (
           <Pressable
             onPress={() => openMail(item.email)}
-            android_ripple={{ color: '#dfe8f8', radius: 130 }}
-            style={styles.infoRow}
+            style={[styles.quickActionButton, styles.emailButton]}
           >
-            <Ionicons name="mail-outline" size={18} color={palette.sub} />
-            <Text numberOfLines={1} style={styles.metaLink}>{item.email}</Text>
+            <Ionicons name="mail" size={20} color="#FFF" />
+            <Text style={styles.quickActionText}>Email</Text>
           </Pressable>
         )}
       </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={[styles.chip, styles.chipDark]}
-          onPress={() =>
-            router.push({ pathname: '/emergencyContacts.add', params: { mode: 'edit', id: item._id } })
-          }
-        >
-          <MaterialIcons name="edit" size={16} color="#FFF" />
-          <Text style={styles.chipText}>Edit</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.9}
-          style={[styles.chip, styles.chipDanger]}
-          onPress={() => onDelete(item._id)}
-        >
-          <MaterialIcons name="delete-outline" size={16} color="#FFF" />
-          <Text style={styles.chipText}>Delete</Text>
-        </TouchableOpacity>
+      {/* Emergency Alert Helper */}
+      <View style={styles.emergencyHint}>
+        <Ionicons name="information-circle-outline" size={14} color={palette.sub} />
+        <Text style={styles.emergencyHintText}>Hold "Text" for emergency alert</Text>
       </View>
     </View>
   );
@@ -234,81 +284,160 @@ const styles = StyleSheet.create({
   loadingText: { marginTop: 8, color: palette.sub },
 
   listContent: {
-    paddingHorizontal: CARD_PADDING,
     paddingTop: 12,
-    paddingBottom: 120,
+    paddingBottom: 100,
   },
 
   card: {
+    backgroundColor: palette.card,
+    borderRadius: 20,
+    padding: 20,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(44,123,229,0.08)',
+    ...Platform.select({
+      ios: { 
+        shadowColor: '#000', 
+        shadowOpacity: 0.08, 
+        shadowRadius: 12, 
+        shadowOffset: { width: 0, height: 6 } 
+      },
+      android: { elevation: 4 },
+    }),
+  },
+
+  contactHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    backgroundColor: palette.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(44,123,229,0.06)',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-      android: { elevation: 2 },
-    }),
-    width: width - CARD_PADDING * 2,
-    minHeight: 96,
+    marginBottom: 16,
   },
 
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#E8F2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
-    backgroundColor: '#E3EEFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: palette.primary,
   },
-  avatarText: { fontWeight: '800', color: palette.primary },
+  avatarText: { 
+    fontWeight: '800', 
+    color: palette.primary, 
+    fontSize: 18 
+  },
 
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  name: { fontSize: 17, fontWeight: '800', color: palette.text },
-  badge: {
-    backgroundColor: '#EEF5FF',
+  contactInfo: {
+    flex: 1,
+  },
+
+  nameRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 4,
+  },
+  name: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: palette.text,
+    marginRight: 8,
+  },
+
+  primaryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8DC',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  badgeText: { color: palette.primary, fontSize: 12, fontWeight: '700' },
-
-  meta: { marginTop: 4, color: palette.sub, fontSize: 14 },
-
-  infoRow: {
-    marginTop: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    borderRadius: 8,
-  },
-  phoneText: { color: palette.primary, fontWeight: '700', fontSize: 15 },
-  metaLink: { color: palette.sub, fontSize: 14, flexShrink: 1 },
-
-  actions: {
-    marginLeft: 10,
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: 12,
-    minWidth: 92,
+    gap: 4,
+  },
+  primaryBadgeText: { 
+    color: '#B8860B', 
+    fontSize: 11, 
+    fontWeight: '600' 
+  },
+
+  relation: { 
+    color: palette.sub, 
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+
+  cardActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+
+  actionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(44,123,229,0.08)',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  chipDark: { backgroundColor: palette.dark },
-  chipDanger: { backgroundColor: palette.danger },
-  chipText: { color: '#fff', fontWeight: '800' },
+
+  quickActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  quickActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    gap: 6,
+    ...Platform.select({
+      ios: { 
+        shadowColor: '#000', 
+        shadowOpacity: 0.1, 
+        shadowRadius: 4, 
+        shadowOffset: { width: 0, height: 2 } 
+      },
+      android: { elevation: 2 },
+    }),
+  },
+
+  callButton: {
+    backgroundColor: '#22C55E',
+  },
+  textButton: {
+    backgroundColor: '#3B82F6',
+  },
+  emailButton: {
+    backgroundColor: '#8B5CF6',
+  },
+
+  quickActionText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  emergencyHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(59,130,246,0.05)',
+    borderRadius: 12,
+  },
+
+  emergencyHintText: {
+    color: palette.sub,
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
 
   primary: {
     marginTop: 14,
@@ -325,7 +454,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 24,
+    bottom: 80,
     backgroundColor: palette.primary,
     width: 56,
     height: 56,
