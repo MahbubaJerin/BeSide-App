@@ -42,12 +42,6 @@ const NavigationModal = ({
       if (arrivalStatus.bothUsersArrived && !wasBothArrived) {
         console.log("🚀 [NAVIGATION MODAL] Real-time event - both users arrived!");
         
-        // Trigger the callback for the first person who already pressed "Almost There"
-        if (onBothArrived) {
-          console.log("🚀 [NAVIGATION MODAL] Triggering final journey callback from real-time event...");
-          onBothArrived(tripMatch);
-        }
-        
         Alert.alert(
           '🎉 Both Users Have Arrived!',
           'Great! Both you and your companion have arrived at the meeting point. Starting your trip together now!',
@@ -55,7 +49,16 @@ const NavigationModal = ({
             text: 'Let\'s Go!', 
             style: 'default',
             onPress: () => {
-              onClose(); // Close NavigationModal
+              // First close the NavigationModal
+              onClose();
+              
+              // Then trigger the final journey callback after a small delay
+              setTimeout(() => {
+                if (onBothArrived) {
+                  console.log("🚀 [NAVIGATION MODAL] Triggering final journey callback from real-time event...");
+                  onBothArrived(tripMatch);
+                }
+              }, 300); // 300ms delay to ensure modal is fully closed
             }
           }]
         );
@@ -93,10 +96,6 @@ const NavigationModal = ({
             console.log("🚀 [POLLING] Both users arrived! Triggering final journey...");
             setBothArrived(true);
             
-            if (onBothArrived) {
-              onBothArrived(match);
-            }
-            
             Alert.alert(
               '🎉 Both Users Have Arrived!',
               'Great! Both you and your companion have arrived at the meeting point. Starting your trip together now!',
@@ -104,7 +103,16 @@ const NavigationModal = ({
                 text: 'Let\'s Go!', 
                 style: 'default',
                 onPress: () => {
-                  onClose(); // Close NavigationModal
+                  // First close the NavigationModal
+                  onClose();
+                  
+                  // Then trigger the final journey callback after a small delay
+                  setTimeout(() => {
+                    if (onBothArrived) {
+                      console.log("🚀 [POLLING] Triggering final journey callback...");
+                      onBothArrived(match);
+                    }
+                  }, 300); // 300ms delay to ensure modal is fully closed
                 }
               }]
             );
@@ -173,12 +181,6 @@ const NavigationModal = ({
         // Both users have arrived - close this modal and trigger final journey
         setHasArrived(true);
         
-        // Immediately trigger the final journey
-        if (onBothArrived) {
-          console.log("🚀 [NAVIGATION MODAL] Both arrived! Triggering final journey callback...");
-          onBothArrived(tripMatch);
-        }
-        
         Alert.alert(
           '🎉 Both Users Have Arrived!',
           'Great! Both you and your companion have arrived at the meeting point. Starting your trip together now!',
@@ -186,7 +188,16 @@ const NavigationModal = ({
             text: 'Let\'s Go!', 
             style: 'default',
             onPress: () => {
-              onClose(); // Close NavigationModal
+              // First close the NavigationModal
+              onClose();
+              
+              // Then trigger the final journey callback after a small delay
+              setTimeout(() => {
+                if (onBothArrived) {
+                  console.log("🚀 [NAVIGATION MODAL] Both arrived! Triggering final journey callback...");
+                  onBothArrived(tripMatch);
+                }
+              }, 300); // 300ms delay to ensure modal is fully closed
             }
           }]
         );
