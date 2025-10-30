@@ -1,4 +1,7 @@
 {
-    "java.compile.nullAnalysis.mode": "automatic",
-    "jira-plugin.workingProject": ""
+  "java.compile.nullAnalysis.mode": "automatic",
+  "jira-plugin.workingProject": "",
+  "workbench.colorCustomizations": {
+    "editorInfo.foreground": "#0080ff6a"
+  }
 }

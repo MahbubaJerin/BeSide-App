@@ -1,0 +1,66 @@
+appId: com.anonymous.Frontend
+---
+# Step 1 — Launch and reach Home
+- launchApp:
+        clearState: true
+- waitForAnimationToEnd
+- tapOn: { id: "welcomeLoginButton" }
+- waitForAnimationToEnd
+- tapOn: { id: "loginButton" } # directly press login, skip inputs
+- waitForAnimationToEnd
+- assertVisible: "Safe Journey Companion"
+
+# Step 2 — Verify Home screen UI
+- assertVisible: "Find Companion"
+- assertVisible: "History"
+- assertVisible: "SOS"
+
+# Step 3 — Find Companion
+- tapOn: "Find Companion"
+- waitForAnimationToEnd
+- tapOn: "✕"
+- back
+
+# Step 4 — History
+- tapOn: "History"
+- waitForAnimationToEnd
+- takeScreenshot:
+        path: /Users/nameranayat/Desktop/home_test/history_modal.png
+- back
+
+# Step 5 — Emergency
+- tapOn: "Emergency"
+- waitForAnimationToEnd
+- assertVisible: "Emergency"
+- back
+
+# Step 6 — SOS
+- tapOn: "SOS"
+- waitForAnimationToEnd
+- tapOn: "OK"
+
+# Step 7 — Location icon
+- tapOn:
+        id: "location"
+- waitForAnimationToEnd
+
+# Step 8 — Bottom navigation
+- tapOn: "notifications-outline"
+- waitForAnimationToEnd
+- back
+- tapOn: "car-outline"
+- waitForAnimationToEnd
+- back
+- tapOn: "location-outline"
+- waitForAnimationToEnd
+- tapOn: "person-outline"
+- waitForAnimationToEnd
+- back
+- tapOn: "shield-outline"
+- waitForAnimationToEnd
+- back
+
+# Step 9 — Verify map
+- assertVisible: "You are here"
+- takeScreenshot:
+        path: /Users/nameranayat/Desktop/home_test/final_home.png

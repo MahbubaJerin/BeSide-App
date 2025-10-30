@@ -89,7 +89,10 @@ function useLocationTracking() {
         if (askPermission) {
           const { status } = await Location.requestForegroundPermissionsAsync();
           if (status !== "granted") {
-            Alert.alert("Permission required", "Please enable location access.");
+            Alert.alert(
+              "Permission required",
+              "Please enable location access."
+            );
             return false;
           }
         }
@@ -171,12 +174,17 @@ function useCompanionSearch() {
       if (res.ok && json?.status === "success") {
         const foundCompanions = json.data?.companions || [];
         setCompanions(foundCompanions);
-        console.log(`👥 [COMPANION SEARCH] Found ${foundCompanions.length} nearby companions within ${searchRadius}m`);
+        console.log(
+          `👥 [COMPANION SEARCH] Found ${foundCompanions.length} nearby companions within ${searchRadius}m`
+        );
         if (typeof json.data?.searchRadius === "number") {
           setSearchRadius(json.data.searchRadius);
         }
       } else {
-        console.log('⚠️ [COMPANION SEARCH] Search failed:', json?.message || 'Unknown error');
+        console.log(
+          "⚠️ [COMPANION SEARCH] Search failed:",
+          json?.message || "Unknown error"
+        );
       }
     } catch (e) {
       console.log("❌ [COMPANION SEARCH] Error:", e?.message || e);
@@ -236,29 +244,109 @@ const placeholderImage = require("../assets/images/placeholder2.jpg");
 const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 const customMapStyle = [
-  { featureType: "all", elementType: "geometry", stylers: [{ visibility: "on" }] },
+  {
+    featureType: "all",
+    elementType: "geometry",
+    stylers: [{ visibility: "on" }],
+  },
   { featureType: "all", elementType: "labels.text.fill" },
-  { featureType: "all", elementType: "labels.text.stroke", stylers: [{ lightness: "-37" }] },
-  { featureType: "all", elementType: "labels.icon", stylers: [{ visibility: "on" }] },
-  { featureType: "administrative", elementType: "geometry.fill", stylers: [{ color: "#fefefe" }, { lightness: "20" }] },
-  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#fefefe" }, { lightness: "17" }, { weight: "1.2" }] },
-  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f5f5f5" }, { lightness: "20" }] },
-  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#f5f5f5" }, { lightness: "21" }] },
-  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#dedede" }, { lightness: "21" }] },
-  { featureType: "road.highway", elementType: "geometry.fill", stylers: [{ color: "#ffffff" }, { lightness: "17" }] },
-  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#ffffff" }, { lightness: "29" }, { weight: "0.2" }] },
-  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#ffffff" }, { lightness: "18" }] },
-  { featureType: "road.local", elementType: "geometry", stylers: [{ color: "#ffffff" }, { lightness: "16" }] },
-  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#f2f2f2" }, { lightness: "19" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#e9e9e9" }, { lightness: "17" }] },
+  {
+    featureType: "all",
+    elementType: "labels.text.stroke",
+    stylers: [{ lightness: "-37" }],
+  },
+  {
+    featureType: "all",
+    elementType: "labels.icon",
+    stylers: [{ visibility: "on" }],
+  },
+  {
+    featureType: "administrative",
+    elementType: "geometry.fill",
+    stylers: [{ color: "#fefefe" }, { lightness: "20" }],
+  },
+  {
+    featureType: "administrative",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#fefefe" }, { lightness: "17" }, { weight: "1.2" }],
+  },
+  {
+    featureType: "landscape",
+    elementType: "geometry",
+    stylers: [{ color: "#f5f5f5" }, { lightness: "20" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "geometry",
+    stylers: [{ color: "#f5f5f5" }, { lightness: "21" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#dedede" }, { lightness: "21" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry.fill",
+    stylers: [{ color: "#ffffff" }, { lightness: "17" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#ffffff" }, { lightness: "29" }, { weight: "0.2" }],
+  },
+  {
+    featureType: "road.arterial",
+    elementType: "geometry",
+    stylers: [{ color: "#ffffff" }, { lightness: "18" }],
+  },
+  {
+    featureType: "road.local",
+    elementType: "geometry",
+    stylers: [{ color: "#ffffff" }, { lightness: "16" }],
+  },
+  {
+    featureType: "transit",
+    elementType: "geometry",
+    stylers: [{ color: "#f2f2f2" }, { lightness: "19" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#e9e9e9" }, { lightness: "17" }],
+  },
 ];
 
 // Hardcoded users (demo pins)
 const hardcodedUsers = [
-  { userName: "AliceSmith", latitude: -33.8688, longitude: 151.2093, userImage: placeholderImage, genderPreference: "Woman" },
-  { userName: "BobJohnson", latitude: -33.865, longitude: 151.205, userImage: placeholderImage, genderPreference: "Man" },
-  { userName: "CharlieNonbinary", latitude: -33.872, longitude: 151.215, userImage: placeholderImage, genderPreference: "LGBTQ+" },
-  { userName: "DanaOther", latitude: -33.86, longitude: 151.2, userImage: placeholderImage, genderPreference: "Other" },
+  {
+    userName: "AliceSmith",
+    latitude: -33.8688,
+    longitude: 151.2093,
+    userImage: placeholderImage,
+    genderPreference: "Woman",
+  },
+  {
+    userName: "BobJohnson",
+    latitude: -33.865,
+    longitude: 151.205,
+    userImage: placeholderImage,
+    genderPreference: "Man",
+  },
+  {
+    userName: "CharlieNonbinary",
+    latitude: -33.872,
+    longitude: 151.215,
+    userImage: placeholderImage,
+    genderPreference: "LGBTQ+",
+  },
+  {
+    userName: "DanaOther",
+    latitude: -33.86,
+    longitude: 151.2,
+    userImage: placeholderImage,
+    genderPreference: "Other",
+  },
 ];
 
 export default function HomeScreen() {
@@ -271,7 +359,8 @@ export default function HomeScreen() {
   const [photoUploadVisible, setPhotoUploadVisible] = useState(false);
   const [consentVisible, setConsentVisible] = useState(false);
   const [preferencesVisible, setPreferencesVisible] = useState(false);
-  const [sentRequestStatusVisible, setSentRequestStatusVisible] = useState(false);
+  const [sentRequestStatusVisible, setSentRequestStatusVisible] =
+    useState(false);
   const [tripHistoryVisible, setTripHistoryVisible] = useState(false);
   const [enhancedConsentVisible, setEnhancedConsentVisible] = useState(false);
   const [twoStepTripVisible, setTwoStepTripVisible] = useState(false);
@@ -281,14 +370,20 @@ export default function HomeScreen() {
 
   // Enhanced persistent search hook
   const persistentSearch = usePersistentSearch();
-  const [requestNotificationVisible, setRequestNotificationVisible] = useState(false);
+  const [requestNotificationVisible, setRequestNotificationVisible] =
+    useState(false);
   const [activeMatchModalVisible, setActiveMatchModalVisible] = useState(false);
-  const [finalJourneyModalVisible, setFinalJourneyModalVisible] = useState(false);
+  const [finalJourneyModalVisible, setFinalJourneyModalVisible] =
+    useState(false);
   const [currentTripMatch, setCurrentTripMatch] = useState(null);
   const [senderAcceptanceVisible, setSenderAcceptanceVisible] = useState(false);
   const [acceptanceData, setAcceptanceData] = useState(null);
 
-  const [consent, setConsent] = useState({ noTouch: false, respectful: false, safety: false });
+  const [consent, setConsent] = useState({
+    noTouch: false,
+    respectful: false,
+    safety: false,
+  });
   const [photoUrl, setPhotoUrl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [shouldResetModal, setShouldResetModal] = useState(false);
@@ -302,13 +397,13 @@ export default function HomeScreen() {
     hasArrivedAtMeetingPoint: false,
     distanceToMeetingPoint: null,
     canStartFinalJourney: false,
-    bothUsersArrived: false
+    bothUsersArrived: false,
   });
 
   const [tripStatus, setTripStatus] = useState({
     userReady: false,
     bothUsersReady: false,
-    tripStarted: false
+    tripStarted: false,
   });
 
   const loadingAnimation = useRef(new Animated.Value(0)).current;
@@ -327,11 +422,11 @@ export default function HomeScreen() {
   const tripNotifications = useTripNotifications();
   // Disable real-time updates for now (backend endpoint not active in RN)
   const realTimeUpdates = useRealTimeUpdates(false);
-  const { 
-    openGoogleMapsNavigation, 
+  const {
+    openGoogleMapsNavigation,
     getNavigationInstructions,
     calculateDistance,
-    checkArrivalAtMeetingPoint 
+    checkArrivalAtMeetingPoint,
   } = useRouteCalculation();
 
   // State for sender notifications
@@ -341,34 +436,36 @@ export default function HomeScreen() {
   useEffect(() => {
     if (realTimeUpdates.addEventHandler) {
       // Handler for when trip is completed by both users
-      realTimeUpdates.addEventHandler('trip_completed', (data) => {
-        console.log('🎉 [REAL-TIME] Trip completed:', data);
-        
+      realTimeUpdates.addEventHandler("trip_completed", (data) => {
+        console.log("🎉 [REAL-TIME] Trip completed:", data);
+
         // Clear all preferences and route data on trip completion
         resetAllPreferencesAndRoute();
-        
+
         // Refresh active matches to remove completed trip
         activeMatches.refresh();
-        
+
         // Show completion alert
         Alert.alert(
-          '🎉 Trip Completed!',
-          data.message || 'Both users have confirmed the trip has ended.',
-          [{ 
-            text: 'View Trip History', 
-            onPress: () => setTripHistoryVisible(true)
-          }]
+          "🎉 Trip Completed!",
+          data.message || "Both users have confirmed the trip has ended.",
+          [
+            {
+              text: "View Trip History",
+              onPress: () => setTripHistoryVisible(true),
+            },
+          ]
         );
-        
+
         // Close any open modals
         setFinalJourneyModalVisible(false);
         setActiveTripMatch(null);
       });
 
       // Handler for when one user ends trip (waiting for other)
-      realTimeUpdates.addEventHandler('trip_ending_waiting', (data) => {
-        console.log('⏳ [REAL-TIME] Trip ending - waiting:', data);
-        
+      realTimeUpdates.addEventHandler("trip_ending_waiting", (data) => {
+        console.log("⏳ [REAL-TIME] Trip ending - waiting:", data);
+
         // Refresh active matches to update status
         activeMatches.refresh();
       });
@@ -377,8 +474,8 @@ export default function HomeScreen() {
     // Cleanup event handlers
     return () => {
       if (realTimeUpdates.removeEventHandler) {
-        realTimeUpdates.removeEventHandler('trip_completed');
-        realTimeUpdates.removeEventHandler('trip_ending_waiting');
+        realTimeUpdates.removeEventHandler("trip_completed");
+        realTimeUpdates.removeEventHandler("trip_ending_waiting");
       }
     };
   }, [realTimeUpdates, activeMatches]);
@@ -388,42 +485,55 @@ export default function HomeScreen() {
     if (activeTripMatch && activeMatches.matches) {
       // Find the updated match data
       const updatedMatch = activeMatches.matches.find(
-        match => match.matchId === activeTripMatch.matchId
+        (match) => match.matchId === activeTripMatch.matchId
       );
-      
+
       if (updatedMatch) {
-        console.log('🔄 [ACTIVE TRIP MATCH] Updating active trip match with latest data');
+        console.log(
+          "🔄 [ACTIVE TRIP MATCH] Updating active trip match with latest data"
+        );
         setActiveTripMatch(updatedMatch);
       } else if (activeTripMatch.matchId) {
         // Match no longer in active list (might be completed or cancelled)
-        console.log('🏁 [ACTIVE TRIP MATCH] Match no longer active, checking reason...');
-        
+        console.log(
+          "🏁 [ACTIVE TRIP MATCH] Match no longer active, checking reason..."
+        );
+
         // Always clear route from map when trip ends (completion or cancellation)
         clearRouteFromMap();
-        
+
         // Check if trip was completed
         if (finalJourneyModalVisible) {
           // Show completion alert for the first user who is still in the modal
           Alert.alert(
-            '🎉 Trip Completed!',
-            'Both users have confirmed the trip has ended. Thank you for traveling with BeSide!',
-            [{ 
-              text: 'View Trip History', 
-              onPress: () => {
-                setFinalJourneyModalVisible(false);
-                setActiveTripMatch(null);
-                setTripHistoryVisible(true);
-              }
-            }]
+            "🎉 Trip Completed!",
+            "Both users have confirmed the trip has ended. Thank you for traveling with BeSide!",
+            [
+              {
+                text: "View Trip History",
+                onPress: () => {
+                  setFinalJourneyModalVisible(false);
+                  setActiveTripMatch(null);
+                  setTripHistoryVisible(true);
+                },
+              },
+            ]
           );
         } else {
           // Trip was likely cancelled, just clean up
-          console.log('🧹 [ROUTE CLEANUP] Trip cancelled or ended, route cleared from map');
+          console.log(
+            "🧹 [ROUTE CLEANUP] Trip cancelled or ended, route cleared from map"
+          );
           setActiveTripMatch(null);
         }
       }
     }
-  }, [activeMatches.matches, activeTripMatch, finalJourneyModalVisible, clearRouteFromMap]);
+  }, [
+    activeMatches.matches,
+    activeTripMatch,
+    finalJourneyModalVisible,
+    clearRouteFromMap,
+  ]);
 
   // Safe modal management functions
   const safeCloseModal = useCallback((modalSetter) => {
@@ -432,13 +542,13 @@ export default function HomeScreen() {
         modalSetter(false);
       }
     } catch (error) {
-      console.error('Error closing modal:', error);
+      console.error("Error closing modal:", error);
     }
   }, []);
 
   // Clear all route-related data from map
   const clearRouteFromMap = useCallback(() => {
-    console.log('🗺️ [ROUTE CLEANUP] Clearing all route data from map');
+    console.log("🗺️ [ROUTE CLEANUP] Clearing all route data from map");
     setRouteCoordinates([]);
     setCurrentNavigationRoute(null);
     setStartMarker(null);
@@ -447,56 +557,58 @@ export default function HomeScreen() {
 
   // Helper function to completely reset all preferences and state
   const resetAllPreferencesAndRoute = useCallback(() => {
-    console.log('🧹 [RESET ALL] Clearing all preferences, consent, and route data');
-    
+    console.log(
+      "🧹 [RESET ALL] Clearing all preferences, consent, and route data"
+    );
+
     // Clear route and map markers
     setRouteCoordinates([]);
     setStartMarker(null);
     setEndMarker(null);
     setShowRadius(false);
-    
+
     // Clear consent form data
     setConsent({ noTouch: false, respectful: false, safety: false });
-    
+
     // Clear photo
     setPhotoUrl(null);
-    
+
     // Clear trip request data
     setCurrentTripRequestId(null);
     setSelectedUser(null);
-    
+
     // Clear modal states
     setConsentVisible(false);
     setPhotoUploadVisible(false);
     setPreferencesVisible(false);
-    
+
     // Clear any navigation routes
     setCurrentNavigationRoute(null);
-    
+
     // Trigger modal reset
     setShouldResetModal(true);
     setTimeout(() => setShouldResetModal(false), 100); // Reset flag after modal processes it
-    
-    console.log('✅ [RESET ALL] All preferences and route data cleared');
+
+    console.log("✅ [RESET ALL] All preferences and route data cleared");
   }, []);
 
   // Helper function to reset just route and visual elements (lighter reset)
   const resetRouteAndVisuals = useCallback(() => {
-    console.log('🧹 [RESET ROUTE] Clearing route and visual elements only');
-    
+    console.log("🧹 [RESET ROUTE] Clearing route and visual elements only");
+
     setRouteCoordinates([]);
     setStartMarker(null);
     setEndMarker(null);
     setShowRadius(false);
     setCurrentNavigationRoute(null);
-    
-    console.log('✅ [RESET ROUTE] Route and visual elements cleared');
+
+    console.log("✅ [RESET ROUTE] Route and visual elements cleared");
   }, []);
 
   const resetAllModals = useCallback(() => {
     try {
       if (!isMounted.current) return;
-      
+
       setModalVisible(false);
       setPhotoUploadVisible(false);
       setConsentVisible(false);
@@ -509,7 +621,7 @@ export default function HomeScreen() {
       setActiveMatchModalVisible(false);
       setAvailabilityModalVisible(false);
     } catch (error) {
-      console.error('Error resetting modals:', error);
+      console.error("Error resetting modals:", error);
     }
   }, []);
 
@@ -523,8 +635,14 @@ export default function HomeScreen() {
       if (!routeInfo) return;
 
       const normalizePoint = (point) =>
-        point && typeof point.latitude === "number" && typeof point.longitude === "number"
-          ? { latitude: point.latitude, longitude: point.longitude, address: point.address }
+        point &&
+        typeof point.latitude === "number" &&
+        typeof point.longitude === "number"
+          ? {
+              latitude: point.latitude,
+              longitude: point.longitude,
+              address: point.address,
+            }
           : null;
 
       const meetingSource =
@@ -533,15 +651,17 @@ export default function HomeScreen() {
         routeInfo.startLocation;
       const meetingPoint = normalizePoint(meetingSource);
       const destinationPoint = normalizePoint(routeInfo.destinationLocation);
-      const receiverPoint = normalizePoint(routeInfo.receiverLocation) || normalizePoint(currentLocation);
+      const receiverPoint =
+        normalizePoint(routeInfo.receiverLocation) ||
+        normalizePoint(currentLocation);
 
       // Calculate receiver's route: Current Location → Meeting Point → Destination
       if (receiverPoint && meetingPoint && destinationPoint) {
         try {
-          console.log('🗺️ [RECEIVER ROUTE] Calculating route with waypoint...');
-          console.log('  From:', receiverPoint);
-          console.log('  Via (Meeting Point):', meetingPoint);
-          console.log('  To:', destinationPoint);
+          console.log("🗺️ [RECEIVER ROUTE] Calculating route with waypoint...");
+          console.log("  From:", receiverPoint);
+          console.log("  Via (Meeting Point):", meetingPoint);
+          console.log("  To:", destinationPoint);
 
           // Use Google Directions API with waypoint
           const url =
@@ -565,8 +685,12 @@ export default function HomeScreen() {
                 c.longitude >= -180 &&
                 c.longitude <= 180
             );
-            
-            console.log('✅ [RECEIVER ROUTE] Route calculated with', validCoords.length, 'points');
+
+            console.log(
+              "✅ [RECEIVER ROUTE] Route calculated with",
+              validCoords.length,
+              "points"
+            );
             setRouteCoordinates(validCoords);
 
             // Fit map to show entire route
@@ -577,7 +701,9 @@ export default function HomeScreen() {
               });
             }
           } else {
-            console.log('⚠️ [RECEIVER ROUTE] No route found, using original route');
+            console.log(
+              "⚠️ [RECEIVER ROUTE] No route found, using original route"
+            );
             // Fallback to original route if available
             const routePoints = Array.isArray(routeInfo.routeCoordinates)
               ? routeInfo.routeCoordinates.filter(
@@ -590,7 +716,7 @@ export default function HomeScreen() {
             setRouteCoordinates(routePoints);
           }
         } catch (error) {
-          console.error('❌ [RECEIVER ROUTE] Error calculating route:', error);
+          console.error("❌ [RECEIVER ROUTE] Error calculating route:", error);
           // Fallback to original route
           const routePoints = Array.isArray(routeInfo.routeCoordinates)
             ? routeInfo.routeCoordinates.filter(
@@ -645,13 +771,22 @@ export default function HomeScreen() {
         // Will be fitted by the route calculation above
       } else if (meetingPoint && destinationPoint) {
         fitTargets.push(
-          { latitude: meetingPoint.latitude, longitude: meetingPoint.longitude },
-          { latitude: destinationPoint.latitude, longitude: destinationPoint.longitude }
+          {
+            latitude: meetingPoint.latitude,
+            longitude: meetingPoint.longitude,
+          },
+          {
+            latitude: destinationPoint.latitude,
+            longitude: destinationPoint.longitude,
+          }
         );
         if (receiverPoint) {
-          fitTargets.push({ latitude: receiverPoint.latitude, longitude: receiverPoint.longitude });
+          fitTargets.push({
+            latitude: receiverPoint.latitude,
+            longitude: receiverPoint.longitude,
+          });
         }
-        
+
         if (fitTargets.length > 0 && mapRef.current) {
           mapRef.current.fitToCoordinates(fitTargets, {
             edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
@@ -663,11 +798,17 @@ export default function HomeScreen() {
       setCurrentNavigationRoute({
         origin: receiverPoint || undefined,
         destination: destinationPoint
-          ? { latitude: destinationPoint.latitude, longitude: destinationPoint.longitude }
+          ? {
+              latitude: destinationPoint.latitude,
+              longitude: destinationPoint.longitude,
+            }
           : undefined,
         destinationAddress: destinationPoint?.address || "Destination",
         meetingPoint: meetingPoint
-          ? { latitude: meetingPoint.latitude, longitude: meetingPoint.longitude }
+          ? {
+              latitude: meetingPoint.latitude,
+              longitude: meetingPoint.longitude,
+            }
           : undefined,
         meetingPointAddress:
           routeInfo.meetingPoint?.address ||
@@ -701,14 +842,14 @@ export default function HomeScreen() {
       setUserLocation({
         latitude: currentLocation.latitude,
         longitude: currentLocation.longitude,
-        address: 'Current location'
+        address: "Current location",
       });
     }
   }, [currentLocation]);
 
   // Get the current active request from matches - using the getActiveRequest method
   const [activeRequest, setActiveRequest] = useState(null);
-  
+
   // Update active request when matches change - with debouncing to avoid excessive calls
   useEffect(() => {
     const updateActiveRequest = async () => {
@@ -719,14 +860,14 @@ export default function HomeScreen() {
             setActiveRequest(request);
           }
         } catch (error) {
-          console.error('Error getting active request:', error);
+          console.error("Error getting active request:", error);
           if (isMounted.current) {
             setActiveRequest(null);
           }
         }
       }
     };
-    
+
     // Debounce the call to avoid excessive requests
     const timeoutId = setTimeout(updateActiveRequest, 1000);
     return () => clearTimeout(timeoutId);
@@ -735,35 +876,43 @@ export default function HomeScreen() {
   // Auto-open active match modal when new matches are detected (for sender when request is accepted)
   const [previousMatchCount, setPreviousMatchCount] = useState(0);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  
+
   useEffect(() => {
     const currentMatchCount = activeMatches?.matches?.length || 0;
-    
+
     // Show success when new matches are detected (but NOT on initial load)
-    if (currentMatchCount > previousMatchCount && currentMatchCount > 0 && isMounted.current && !isInitialLoad) {
+    if (
+      currentMatchCount > previousMatchCount &&
+      currentMatchCount > 0 &&
+      isMounted.current &&
+      !isInitialLoad
+    ) {
       setRequestNotificationVisible(false);
       setSentRequestStatusVisible(false);
-      
+
       // Clear expiration timeout since match was created
       if (expirationTimeoutRef.current) {
         console.log("✅ Match created, clearing expiration timeout");
         clearTimeout(expirationTimeoutRef.current);
         expirationTimeoutRef.current = null;
       }
-      
+
       Alert.alert(
         "Match Created! 🎉",
         "You've successfully matched with a companion! Your trip routes and meeting point are now displayed on the map.",
         [{ text: "Great!" }]
       );
     }
-    
+
     // Mark initial load as complete after first check
     if (isInitialLoad && currentMatchCount >= 0) {
-      console.log('📥 [HOME] Initial load complete, existing matches:', currentMatchCount);
+      console.log(
+        "📥 [HOME] Initial load complete, existing matches:",
+        currentMatchCount
+      );
       setIsInitialLoad(false);
     }
-    
+
     if (isMounted.current) {
       setPreviousMatchCount(currentMatchCount);
     }
@@ -775,84 +924,84 @@ export default function HomeScreen() {
 
     // Listen to real-time events
     const handleRealtimeEvent = (eventType, eventData) => {
-      console.log('🏠 [HOME] Real-time event received:', eventType, eventData);
-      
+      console.log("🏠 [HOME] Real-time event received:", eventType, eventData);
+
       // Pass events to active matches handler
       activeMatches.handleTripEvent(eventType, eventData);
-      
+
       // Handle specific events for UI updates
       switch (eventType) {
-        case 'request_response':
-          if (eventData.response === 'accepted') {
+        case "request_response":
+          if (eventData.response === "accepted") {
             // New match created - show sender acceptance modal
-            console.log("🎉 [HOME] Received acceptance event data:", JSON.stringify(eventData, null, 2));
-            
+            console.log(
+              "🎉 [HOME] Received acceptance event data:",
+              JSON.stringify(eventData, null, 2)
+            );
+
             const modalData = {
               receiverName: eventData.responderName,
               receiverPhoto: eventData.responderPhoto,
               receiverLocation: eventData.receiverLocation,
               destination: eventData.destination,
-              transportMode: eventData.transportMode
+              transportMode: eventData.transportMode,
             };
-            
-            console.log("🎉 [HOME] Prepared modal data:", JSON.stringify(modalData, null, 2));
+
+            console.log(
+              "🎉 [HOME] Prepared modal data:",
+              JSON.stringify(modalData, null, 2)
+            );
             setAcceptanceData(modalData);
             setSenderAcceptanceVisible(true);
-          } else if (eventData.response === 'declined') {
+          } else if (eventData.response === "declined") {
             // Request declined - clear all preferences and route data
             setTimeout(() => {
-              Alert.alert(
-                "Request Declined",
-                eventData.detailedMessage,
-                [
-                  { 
-                    text: "OK", 
-                    onPress: () => {
-                      // Reset all preferences and route data when request is declined
-                      resetAllPreferencesAndRoute();
-                    }
-                  }
-                ]
-              );
+              Alert.alert("Request Declined", eventData.detailedMessage, [
+                {
+                  text: "OK",
+                  onPress: () => {
+                    // Reset all preferences and route data when request is declined
+                    resetAllPreferencesAndRoute();
+                  },
+                },
+              ]);
             }, 500);
           }
           break;
-          
-        case 'request_status_update':
+
+        case "request_status_update":
           // Show status updates to sender (request sent, awaiting responses, etc.)
-          if (eventData.status === 'request_sent') {
+          if (eventData.status === "request_sent") {
             setTimeout(() => {
-              Alert.alert(
-                "Request Sent 📤",
-                eventData.detailedMessage,
-                [
-                  { text: "View Status", onPress: () => setSentRequestModalVisible(true) },
-                  { text: "OK" }
-                ]
-              );
+              Alert.alert("Request Sent 📤", eventData.detailedMessage, [
+                {
+                  text: "View Status",
+                  onPress: () => setSentRequestModalVisible(true),
+                },
+                { text: "OK" },
+              ]);
             }, 1000);
           }
           break;
-          
-        case 'meeting_point_set':
+
+        case "meeting_point_set":
           Alert.alert(
             "Meeting Point Set 📍",
             `${eventData.setByName} set the meeting point: ${eventData.meetingPoint?.name}`,
             [{ text: "OK" }]
           );
           break;
-          
-        case 'trip_started':
-          Alert.alert(
-            "Trip Started 🚀",
-            eventData.message,
-            [{ text: "OK" }]
-          );
+
+        case "trip_started":
+          Alert.alert("Trip Started 🚀", eventData.message, [{ text: "OK" }]);
           break;
-          
-        case 'trip_cancelled':
-          console.log("❌ [REAL-TIME] Trip cancelled event received:", eventData);
-          
+
+        case "trip_cancelled":
+          console.log(
+            "❌ [REAL-TIME] Trip cancelled event received:",
+            eventData
+          );
+
           // Clear all preferences, route data, and trip state
           resetAllPreferencesAndRoute();
           setActiveRequest(null);
@@ -861,20 +1010,22 @@ export default function HomeScreen() {
             hasArrivedAtMeetingPoint: false,
             distanceToMeetingPoint: null,
             canStartFinalJourney: false,
-            bothUsersArrived: false
+            bothUsersArrived: false,
           });
           setTripStatus({
             userReady: false,
             bothUsersReady: false,
-            tripStarted: false
+            tripStarted: false,
           });
-          
+
           // Refresh matches
           if (activeMatches?.refresh) {
-            console.log("🔄 [REAL-TIME] Refreshing matches after cancellation...");
+            console.log(
+              "🔄 [REAL-TIME] Refreshing matches after cancellation..."
+            );
             activeMatches.refresh();
           }
-          
+
           Alert.alert(
             "Trip Cancelled ❌",
             eventData.message || `${eventData.cancelledBy} cancelled the trip.`,
@@ -882,47 +1033,66 @@ export default function HomeScreen() {
           );
           break;
 
-        case 'user_arrived':
+        case "user_arrived":
           console.log("📍 [REAL-TIME] User arrived event received:", eventData);
           console.log("📍 [DEBUG] Both arrived:", eventData.bothArrived);
-          console.log("📍 [DEBUG] Active matches:", activeMatches?.matches?.length);
-          
+          console.log(
+            "📍 [DEBUG] Active matches:",
+            activeMatches?.matches?.length
+          );
+
           // Update arrival status for both users
-          setArrivalStatus(prev => ({
+          setArrivalStatus((prev) => ({
             ...prev,
             bothUsersArrived: eventData.bothArrived || false,
-            canStartFinalJourney: eventData.canStartTrip || false
+            canStartFinalJourney: eventData.canStartTrip || false,
           }));
-          
+
           // If both users have arrived, start final journey automatically
           if (eventData.bothArrived) {
-            console.log("🚀 [DEBUG] Both users arrived! Starting transition to final journey...");
-            
+            console.log(
+              "🚀 [DEBUG] Both users arrived! Starting transition to final journey..."
+            );
+
             // First, refresh active matches to get the latest data
             if (activeMatches?.refresh) {
               console.log("🔄 [DEBUG] Refreshing active matches...");
               activeMatches.refresh(); // Remove await since this is not an async function
             }
-            
+
             // Store the current trip match for the final journey modal
             if (eventData.matchId) {
-              console.log("🔍 [DEBUG] Looking for match with ID:", eventData.matchId);
-              const tripMatch = activeMatches?.matches?.find(m => m.matchId === eventData.matchId);
-              console.log("🔍 [DEBUG] Found trip match:", tripMatch ? "YES" : "NO");
-              
+              console.log(
+                "🔍 [DEBUG] Looking for match with ID:",
+                eventData.matchId
+              );
+              const tripMatch = activeMatches?.matches?.find(
+                (m) => m.matchId === eventData.matchId
+              );
+              console.log(
+                "🔍 [DEBUG] Found trip match:",
+                tripMatch ? "YES" : "NO"
+              );
+
               if (tripMatch) {
-                console.log("🎯 [DEBUG] Setting active trip match and opening final journey modal");
+                console.log(
+                  "🎯 [DEBUG] Setting active trip match and opening final journey modal"
+                );
                 setActiveTripMatch(tripMatch); // Set for FinalJourneyModal
                 setActiveMatchModalVisible(false); // Close active match modal
                 setFinalJourneyModalVisible(true); // Open final journey modal
               } else {
-                console.log("❌ [DEBUG] Trip match not found, trying to refresh and retry...");
+                console.log(
+                  "❌ [DEBUG] Trip match not found, trying to refresh and retry..."
+                );
                 // Fallback: refresh and retry after a delay
                 setTimeout(() => {
                   if (activeMatches?.refresh) {
                     activeMatches.refresh();
                     setTimeout(() => {
-                      const refreshedMatch = activeMatches?.matches?.find(m => m.matchId === eventData.matchId);
+                      const refreshedMatch = activeMatches?.matches?.find(
+                        (m) => m.matchId === eventData.matchId
+                      );
                       if (refreshedMatch) {
                         setActiveTripMatch(refreshedMatch);
                         setActiveMatchModalVisible(false);
@@ -935,32 +1105,33 @@ export default function HomeScreen() {
             } else {
               console.log("❌ [DEBUG] No matchId in event data");
             }
-            
+
             Alert.alert(
               "Trip Started! 🚀",
               "Both companions have arrived! Starting your final journey together.",
               [{ text: "Let's Go!" }]
             );
           } else {
-            Alert.alert(
-              "Companion Update 📍",
-              eventData.message,
-              [{ text: "OK" }]
-            );
+            Alert.alert("Companion Update 📍", eventData.message, [
+              { text: "OK" },
+            ]);
           }
           break;
 
-        case 'final_journey_status':
-          console.log("🚀 [REAL-TIME] Final journey status event received:", eventData);
-          
+        case "final_journey_status":
+          console.log(
+            "🚀 [REAL-TIME] Final journey status event received:",
+            eventData
+          );
+
           // Update trip status for both users
-          setTripStatus(prev => ({
+          setTripStatus((prev) => ({
             ...prev,
             userReady: prev.userReady, // Keep current user's ready status
             bothUsersReady: eventData.bothReady || false,
-            tripStarted: eventData.tripStarted || false
+            tripStarted: eventData.tripStarted || false,
           }));
-          
+
           // Show appropriate alert based on journey status
           if (eventData.bothReady && eventData.tripStarted) {
             Alert.alert(
@@ -972,23 +1143,21 @@ export default function HomeScreen() {
                   onPress: () => {
                     // Close any open navigation modal to show the route on home screen
                     setNavigationVisible(false);
-                  }
+                  },
                 },
-                { text: "OK" }
+                { text: "OK" },
               ]
             );
           } else {
-            Alert.alert(
-              "Trip Status Update",
-              eventData.message,
-              [{ text: "OK" }]
-            );
+            Alert.alert("Trip Status Update", eventData.message, [
+              { text: "OK" },
+            ]);
           }
           break;
 
-        case 'trip_ended':
+        case "trip_ended":
           console.log("🏁 [REAL-TIME] Trip ended event received:", eventData);
-          
+
           // Clear all trip-related state
           setCurrentNavigationRoute(null);
           setRouteCoordinates([]);
@@ -1000,22 +1169,23 @@ export default function HomeScreen() {
             hasArrivedAtMeetingPoint: false,
             distanceToMeetingPoint: null,
             canStartFinalJourney: false,
-            bothUsersArrived: false
+            bothUsersArrived: false,
           });
           setTripStatus({
             userReady: false,
             bothUsersReady: false,
-            tripStarted: false
+            tripStarted: false,
           });
-          
+
           // Refresh matches to remove completed match
           if (activeMatches?.refreshMatches) {
             activeMatches.refreshMatches();
           }
-          
+
           Alert.alert(
             "Trip Completed! 🎉",
-            eventData.message || "Your companion has completed the trip. Thank you for using BeSide!",
+            eventData.message ||
+              "Your companion has completed the trip. Thank you for using BeSide!",
             [{ text: "Great!" }]
           );
           break;
@@ -1034,12 +1204,12 @@ export default function HomeScreen() {
   // Clear active matches on logout
   useEffect(() => {
     const clearMatchesOnLogout = async () => {
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem("token");
       if (!token && activeMatches?.clearMatches) {
         activeMatches.clearMatches();
       }
     };
-    
+
     clearMatchesOnLogout();
   }, [activeMatches?.clearMatches]);
 
@@ -1054,38 +1224,45 @@ export default function HomeScreen() {
         if (!token) return;
 
         const API_URL = BASE_URL.replace(/\/+$/, "");
-        const response = await fetch(`${API_URL}/api/v1/trip/sent-requests-status`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await fetch(
+          `${API_URL}/api/v1/trip/sent-requests-status`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
 
         if (response.ok) {
           const result = await response.json();
-          const myRequest = result.data.requests.find(req => req.tripReqId === currentTripRequestId);
-          
+          const myRequest = result.data.requests.find(
+            (req) => req.tripReqId === currentTripRequestId
+          );
+
           if (myRequest && myRequest.status !== senderRequestStatus?.status) {
             // Only update state if component is still mounted
             if (isMounted.current) {
               setSenderRequestStatus(myRequest);
-              
+
               // Show notification if status changed
-              if (myRequest.status === 'accepted') {
+              if (myRequest.status === "accepted") {
                 Alert.alert(
                   "Request Accepted! 🎉",
-                  `${myRequest.acceptedBy?.userName || 'Someone'} has accepted your companion request! You can now set a meeting point.`,
+                  `${
+                    myRequest.acceptedBy?.userName || "Someone"
+                  } has accepted your companion request! You can now set a meeting point.`,
                   [{ text: "OK" }]
                 );
-              } else if (myRequest.status === 'expired') {
+              } else if (myRequest.status === "expired") {
                 // Request expired - clear all preferences and route
                 Alert.alert(
                   "Request Expired ⏰",
                   "Your companion request has expired. You can start a new search with fresh preferences.",
                   [
-                    { 
-                      text: "OK", 
+                    {
+                      text: "OK",
                       onPress: () => {
                         resetAllPreferencesAndRoute();
-                      }
-                    }
+                      },
+                    },
                   ]
                 );
               }
@@ -1093,7 +1270,7 @@ export default function HomeScreen() {
           }
         }
       } catch (error) {
-        console.error('Error polling sender status:', error);
+        console.error("Error polling sender status:", error);
       }
     };
 
@@ -1102,7 +1279,7 @@ export default function HomeScreen() {
 
     // Then poll every 15 seconds while request is active
     const pollInterval = setInterval(pollStatus, 15000);
-    
+
     return () => clearInterval(pollInterval);
   }, [currentTripRequestId]); // Removed pollSenderStatus dependency
 
@@ -1112,16 +1289,38 @@ export default function HomeScreen() {
         try {
           setIsLoadingUser(true);
           const stored = await AsyncStorage.getItem("user");
+          // inside load() in useFocusEffect, replace the existing 'if (stored) { ... } else { router.replace("/login"); }' check
           if (stored) {
             const parsed = JSON.parse(stored);
             setUser(parsed);
             setIsLoadingUser(false);
             await locationTracking.startTracking(true);
+          } else if (__DEV__) {
+            // DEV BYPASS: seed a demo user + token for UI testing on Home screen.
+            // Remove this block after testing.
+            const demoUser = {
+              _id: "demo-user-id",
+              userName: "DemoUser",
+              isVerified: true,
+              userImage: null,
+            };
+            try {
+              await AsyncStorage.setItem("user", JSON.stringify(demoUser));
+              await AsyncStorage.setItem("token", "demo-mock-token");
+              setUser(demoUser);
+              setIsLoadingUser(false);
+              // start location tracking but avoid asking permission during automated runs
+              await locationTracking.startTracking(false).catch(() => {});
+              console.log("⚠️ DEV BYPASS enabled: seeded demo user and token");
+            } catch (e) {
+              console.error("DEV BYPASS failed:", e);
+              router.replace("/login");
+            }
           } else {
             router.replace("/login");
           }
         } catch (error) {
-          console.error('Error loading user data:', error);
+          console.error("Error loading user data:", error);
           setIsLoadingUser(false);
           router.replace("/login");
         }
@@ -1132,14 +1331,14 @@ export default function HomeScreen() {
           locationTracking.stopTracking();
           companionSearch.cleanup();
           resetAllModals(); // Ensure all modals are closed when leaving
-          
+
           // Clear expiration timeout on unmount
           if (expirationTimeoutRef.current) {
             clearTimeout(expirationTimeoutRef.current);
             expirationTimeoutRef.current = null;
           }
         } catch (error) {
-          console.error('Error during cleanup:', error);
+          console.error("Error during cleanup:", error);
         }
       };
     }, [resetAllModals])
@@ -1149,8 +1348,16 @@ export default function HomeScreen() {
     if (isSearching) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(loadingAnimation, { toValue: 1, duration: 2000, useNativeDriver: true }),
-          Animated.timing(loadingAnimation, { toValue: 0, duration: 0, useNativeDriver: true }),
+          Animated.timing(loadingAnimation, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(loadingAnimation, {
+            toValue: 0,
+            duration: 0,
+            useNativeDriver: true,
+          }),
         ])
       ).start();
     } else {
@@ -1170,7 +1377,7 @@ export default function HomeScreen() {
 
       const isNear = distance <= 50; // 50 meters threshold
 
-      setArrivalStatus(prev => ({
+      setArrivalStatus((prev) => ({
         ...prev,
         isNearMeetingPoint: isNear,
         distanceToMeetingPoint: Math.round(distance),
@@ -1181,7 +1388,7 @@ export default function HomeScreen() {
   const handleLogout = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
-      
+
       // Call cleanup endpoint before logging out
       if (token) {
         await fetch(`${BASE_URL}/api/v1/trip/cleanup-user-data`, {
@@ -1221,16 +1428,16 @@ export default function HomeScreen() {
 
       if (response.ok) {
         const result = await response.json();
-        
-        setArrivalStatus(prev => ({
+
+        setArrivalStatus((prev) => ({
           ...prev,
           hasArrivedAtMeetingPoint: true,
-          bothUsersArrived: result.data.canStartFinalJourney || false
+          bothUsersArrived: result.data.canStartFinalJourney || false,
         }));
-        
+
         Alert.alert(
           "Arrival Confirmed",
-          result.data.canStartFinalJourney 
+          result.data.canStartFinalJourney
             ? "Both companions have arrived! You can now navigate to your final destination."
             : "You've marked yourself as arrived at the meeting point. Waiting for your companion to arrive.",
           [{ text: "OK" }]
@@ -1261,14 +1468,14 @@ export default function HomeScreen() {
 
       if (response.ok) {
         const result = await response.json();
-        
+
         // Update local trip status
         setTripStatus({
           userReady: true,
           bothUsersReady: result.data.bothUsersReady,
-          tripStarted: result.data.bothUsersReady
+          tripStarted: result.data.bothUsersReady,
         });
-        
+
         if (result.data.bothUsersReady) {
           // Both users are ready - show confirmation and start route
           Alert.alert(
@@ -1277,9 +1484,9 @@ export default function HomeScreen() {
             [
               {
                 text: "Open Google Maps",
-                onPress: () => handleStartFinalJourney()
+                onPress: () => handleStartFinalJourney(),
               },
-              { text: "OK" }
+              { text: "OK" },
             ]
           );
         } else {
@@ -1302,17 +1509,19 @@ export default function HomeScreen() {
       setCurrentNavigationRoute({
         destination: {
           latitude: activeRequest.destinationLocation.latitude,
-          longitude: activeRequest.destinationLocation.longitude
+          longitude: activeRequest.destinationLocation.longitude,
         },
         origin: currentLocation,
-        destinationAddress: activeRequest.destinationLocation.address || activeRequest.destination,
+        destinationAddress:
+          activeRequest.destinationLocation.address ||
+          activeRequest.destination,
         routeInfo: null,
-        companion: null // No longer meeting, now traveling together
+        companion: null, // No longer meeting, now traveling together
       });
 
       // Start route calculation to final destination - using navigation to Google Maps instead
       // since this is for the final journey together
-      console.log('🚀 Starting final journey to destination');
+      console.log("🚀 Starting final journey to destination");
     }
   };
 
@@ -1330,16 +1539,19 @@ export default function HomeScreen() {
               const token = await AsyncStorage.getItem("token");
               if (!token || !activeRequest) return;
 
-              const response = await fetch(`${BASE_URL}/api/v1/trip/cancelTrip`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                  requestId: activeRequest._id,
-                }),
-              });
+              const response = await fetch(
+                `${BASE_URL}/api/v1/trip/cancelTrip`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    requestId: activeRequest._id,
+                  }),
+                }
+              );
 
               if (response.ok) {
                 Alert.alert(
@@ -1347,7 +1559,7 @@ export default function HomeScreen() {
                   "The trip has been cancelled successfully. Your companion has been notified.",
                   [{ text: "OK" }]
                 );
-                
+
                 // Reset all states including preferences and route data
                 resetAllPreferencesAndRoute();
                 setActiveRequest(null);
@@ -1356,20 +1568,20 @@ export default function HomeScreen() {
                   hasArrivedAtMeetingPoint: false,
                   distanceToMeetingPoint: null,
                   canStartFinalJourney: false,
-                  bothUsersArrived: false
+                  bothUsersArrived: false,
                 });
                 setTripStatus({
                   userReady: false,
                   bothUsersReady: false,
-                  tripStarted: false
+                  tripStarted: false,
                 });
               }
             } catch (error) {
               console.error("Error cancelling trip:", error);
               Alert.alert("Error", "Failed to cancel trip. Please try again.");
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
@@ -1388,19 +1600,22 @@ export default function HomeScreen() {
               if (!token) return;
 
               // Check if this is a trip match (new system) or legacy trip request
-              const activeTripMatch = activeMatches?.matches?.find(match => 
-                match.status === 'in-progress' || match.tripStarted
+              const activeTripMatch = activeMatches?.matches?.find(
+                (match) => match.status === "in-progress" || match.tripStarted
               );
 
               if (activeTripMatch) {
                 // Handle trip match ending
-                const response = await fetch(`${BASE_URL}/api/v1/trip/match/${activeTripMatch.matchId}/end-trip`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                });
+                const response = await fetch(
+                  `${BASE_URL}/api/v1/trip/match/${activeTripMatch.matchId}/end-trip`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                  }
+                );
 
                 if (response.ok) {
                   Alert.alert(
@@ -1411,16 +1626,19 @@ export default function HomeScreen() {
                 }
               } else if (activeRequest) {
                 // Handle legacy trip request ending
-                const response = await fetch(`${BASE_URL}/api/v1/trip/endTrip`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({
-                    requestId: activeRequest._id,
-                  }),
-                });
+                const response = await fetch(
+                  `${BASE_URL}/api/v1/trip/endTrip`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                      requestId: activeRequest._id,
+                    }),
+                  }
+                );
 
                 if (response.ok) {
                   Alert.alert(
@@ -1430,7 +1648,7 @@ export default function HomeScreen() {
                   );
                 }
               }
-                
+
               // Reset all states and preferences regardless of which system was used
               resetAllPreferencesAndRoute();
               setActiveRequest(null);
@@ -1439,25 +1657,24 @@ export default function HomeScreen() {
                 hasArrivedAtMeetingPoint: false,
                 distanceToMeetingPoint: null,
                 canStartFinalJourney: false,
-                bothUsersArrived: false
+                bothUsersArrived: false,
               });
               setTripStatus({
                 userReady: false,
                 bothUsersReady: false,
-                tripStarted: false
+                tripStarted: false,
               });
-              
+
               // Refresh matches to remove completed match
               if (activeMatches?.refreshMatches) {
                 activeMatches.refreshMatches();
               }
-
             } catch (error) {
               console.error("Error ending trip:", error);
               Alert.alert("Error", "Failed to end trip. Please try again.");
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
@@ -1469,12 +1686,19 @@ export default function HomeScreen() {
       const storedUser = await AsyncStorage.getItem("user");
       const token = await AsyncStorage.getItem("token");
       if (!storedUser || !token) {
-        console.log("❌ [FIND COMPANION] No user/token found, redirecting to login");
+        console.log(
+          "❌ [FIND COMPANION] No user/token found, redirecting to login"
+        );
         router.replace("/login");
         return;
       }
       const parsed = JSON.parse(storedUser);
-      console.log("👤 [FIND COMPANION] User:", parsed.userName, "ID:", parsed._id);
+      console.log(
+        "👤 [FIND COMPANION] User:",
+        parsed.userName,
+        "ID:",
+        parsed._id
+      );
 
       if (!parsed.isVerified) {
         console.log("⚠️ [FIND COMPANION] User not verified");
@@ -1483,7 +1707,10 @@ export default function HomeScreen() {
       }
       if (!currentLocation) {
         console.log("❌ [FIND COMPANION] No current location");
-        Alert.alert("Location Required", "Please enable location services to find companions.");
+        Alert.alert(
+          "Location Required",
+          "Please enable location services to find companions."
+        );
         return;
       }
 
@@ -1508,7 +1735,10 @@ export default function HomeScreen() {
   };
 
   // NEW: Send trip request to nearby users
-  const sendTripRequestToNearby = async (startCoordinates, tripReqId = null) => {
+  const sendTripRequestToNearby = async (
+    startCoordinates,
+    tripReqId = null
+  ) => {
     try {
       console.log("📡 [SEND TO NEARBY] Starting...");
       const token = await AsyncStorage.getItem("token");
@@ -1521,7 +1751,9 @@ export default function HomeScreen() {
         console.log("❌ [SEND TO NEARBY] Missing token or trip request ID");
         Alert.alert(
           "Debug Error",
-          `Missing: ${!token ? "Token" : ""} ${!requestId ? "Trip Request ID" : ""}`
+          `Missing: ${!token ? "Token" : ""} ${
+            !requestId ? "Trip Request ID" : ""
+          }`
         );
         return;
       }
@@ -1529,12 +1761,21 @@ export default function HomeScreen() {
       const API_URL = BASE_URL.replace(/\/+$/, "");
       const requestBody = {
         tripReqId: requestId,
-        startCoordinates: { longitude: startCoordinates.longitude, latitude: startCoordinates.latitude },
+        startCoordinates: {
+          longitude: startCoordinates.longitude,
+          latitude: startCoordinates.latitude,
+        },
         searchRadius: 500,
       };
 
-      console.log("📤 [SEND TO NEARBY] Request body:", JSON.stringify(requestBody, null, 2));
-      console.log("📤 [SEND TO NEARBY] Calling API:", `${API_URL}/api/v1/trip/send-to-nearby`);
+      console.log(
+        "📤 [SEND TO NEARBY] Request body:",
+        JSON.stringify(requestBody, null, 2)
+      );
+      console.log(
+        "📤 [SEND TO NEARBY] Calling API:",
+        `${API_URL}/api/v1/trip/send-to-nearby`
+      );
 
       const response = await fetch(`${API_URL}/api/v1/trip/send-to-nearby`, {
         method: "POST",
@@ -1547,22 +1788,29 @@ export default function HomeScreen() {
 
       console.log("📥 [SEND TO NEARBY] Response status:", response.status);
       const result = await response.json();
-      console.log("📋 [SEND TO NEARBY] Result:", JSON.stringify(result, null, 2));
+      console.log(
+        "📋 [SEND TO NEARBY] Result:",
+        JSON.stringify(result, null, 2)
+      );
 
       if (result.status === "success") {
-        console.log(`✅ [SEND TO NEARBY] Success! Sent to ${result.data.recipientCount} users`);
+        console.log(
+          `✅ [SEND TO NEARBY] Success! Sent to ${result.data.recipientCount} users`
+        );
         Alert.alert(
           "Request Sent! 🚀",
           `Your companion request has been sent to ${result.data.recipientCount} active users within 500m radius.\n\nThe request is valid for 2 minutes. You'll be notified when someone accepts your request.`,
           [{ text: "OK" }]
         );
-        
+
         // Stop any searching animation since request is sent
         await companionSearch.stopSearch();
       } else {
         console.log("❌ [SEND TO NEARBY] Failed:", result.message);
         Alert.alert("API Error", result.message || "Failed to send request");
-        throw new Error(result.message || "Failed to send request to nearby users");
+        throw new Error(
+          result.message || "Failed to send request to nearby users"
+        );
       }
     } catch (error) {
       console.error("❌ [SEND TO NEARBY] Error:", error);
@@ -1573,7 +1821,7 @@ export default function HomeScreen() {
   const handlePreferencesSubmit = async (preferences) => {
     try {
       console.log("📝 [PREFERENCES] Received preferences:", preferences);
-      
+
       const storedUser = await AsyncStorage.getItem("user");
       const token = await AsyncStorage.getItem("token");
       if (!storedUser || !token) {
@@ -1600,10 +1848,10 @@ export default function HomeScreen() {
             : "transit"
         }` +
         `&key=${GOOGLE_MAPS_KEY}`;
-      console.log('🗺️ [ROUTE CALC] Making Google Maps API call');
+      console.log("🗺️ [ROUTE CALC] Making Google Maps API call");
       const routeResponse = await fetch(url);
       const routeData = await routeResponse.json();
-      
+
       let validCoords = [];
       if (routeData.routes && routeData.routes[0]) {
         const points = routeData.routes[0].overview_polyline.points;
@@ -1616,7 +1864,7 @@ export default function HomeScreen() {
             c.longitude <= 180
         );
         setRouteCoordinates(validCoords);
-        
+
         if (validCoords.length > 0) {
           mapRef.current?.fitToCoordinates(validCoords, {
             edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
@@ -1626,70 +1874,110 @@ export default function HomeScreen() {
       }
 
       // NOW create trip request with ALL data (photo, preferences, route)
-      console.log("📤 [CREATE REQUEST] Creating trip request with complete data...");
-      
+      console.log(
+        "📤 [CREATE REQUEST] Creating trip request with complete data..."
+      );
+
       const API_URL = BASE_URL.replace(/\/+$/, "");
       const formData = new FormData();
-      
+
       // Add user data
-      formData.append("user", JSON.stringify({
-        userId: parsed._id,
-        userName: parsed.userName,
-        userImage: parsed.userImage || "default.jpg"
-      }));
-      
+      formData.append(
+        "user",
+        JSON.stringify({
+          userId: parsed._id,
+          userName: parsed.userName,
+          userImage: parsed.userImage || "default.jpg",
+        })
+      );
+
       // Add trip details
-      formData.append("destination", preferences.destinationAddress || "Destination");
-      formData.append("destinationType", preferences.transport === "car" ? "By Car" : 
-                      preferences.transport === "walk" ? "By Walk" : "By Transit");
+      formData.append(
+        "destination",
+        preferences.destinationAddress || "Destination"
+      );
+      formData.append(
+        "destinationType",
+        preferences.transport === "car"
+          ? "By Car"
+          : preferences.transport === "walk"
+          ? "By Walk"
+          : "By Transit"
+      );
       formData.append("date", new Date().toISOString());
       formData.append("time", new Date().toLocaleTimeString());
-      formData.append("genderPreference", preferences.genderPreference || "any");
-      
+      formData.append(
+        "genderPreference",
+        preferences.genderPreference || "any"
+      );
+
       // Add locations
-      formData.append("startLocation", JSON.stringify({
-        latitude: preferences.startCoordinates.latitude,
-        longitude: preferences.startCoordinates.longitude,
-        address: preferences.startAddress || "Start location"
-      }));
-      
-      formData.append("destinationLocation", JSON.stringify({
-        latitude: preferences.destinationCoordinates.latitude,
-        longitude: preferences.destinationCoordinates.longitude,
-        address: preferences.destinationAddress || "Destination"
-      }));
-      
+      formData.append(
+        "startLocation",
+        JSON.stringify({
+          latitude: preferences.startCoordinates.latitude,
+          longitude: preferences.startCoordinates.longitude,
+          address: preferences.startAddress || "Start location",
+        })
+      );
+
+      formData.append(
+        "destinationLocation",
+        JSON.stringify({
+          latitude: preferences.destinationCoordinates.latitude,
+          longitude: preferences.destinationCoordinates.longitude,
+          address: preferences.destinationAddress || "Destination",
+        })
+      );
+
       if (validCoords.length > 0) {
         formData.append("routeCoordinates", JSON.stringify(validCoords));
       }
-      
-      formData.append("transportMode", preferences.transport === "car" ? "driving" : 
-                      preferences.transport === "walk" ? "walking" : "transit");
-      
+
+      formData.append(
+        "transportMode",
+        preferences.transport === "car"
+          ? "driving"
+          : preferences.transport === "walk"
+          ? "walking"
+          : "transit"
+      );
+
       // Add photo if available
       if (photoUrl) {
         formData.append("photo", {
           uri: photoUrl,
           type: "image/jpeg",
-          name: `selfie-${Date.now()}.jpg`
+          name: `selfie-${Date.now()}.jpg`,
         });
       }
-      
-      const createResponse = await fetch(`${API_URL}/api/v1/trip/createTripReq`, {
-        method: "POST",
-        body: formData,
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      
-      console.log("📥 [CREATE REQUEST] Response status:", createResponse.status);
+
+      const createResponse = await fetch(
+        `${API_URL}/api/v1/trip/createTripReq`,
+        {
+          method: "POST",
+          body: formData,
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      console.log(
+        "📥 [CREATE REQUEST] Response status:",
+        createResponse.status
+      );
       const createResult = await createResponse.json();
-      console.log("📋 [CREATE REQUEST] Result:", JSON.stringify(createResult, null, 2));
+      console.log(
+        "📋 [CREATE REQUEST] Result:",
+        JSON.stringify(createResult, null, 2)
+      );
 
       if (createResult.status !== "success") {
         console.log("❌ [CREATE REQUEST] Failed:", createResult.message);
-        throw new Error(createResult.message || "Failed to create trip request");
+        throw new Error(
+          createResult.message || "Failed to create trip request"
+        );
       }
-      
+
       const tripReqId = createResult.data.tripRequest.tripReqId;
       console.log("✅ [CREATE REQUEST] Success! Trip Request ID:", tripReqId);
       setCurrentTripRequestId(tripReqId);
@@ -1697,59 +1985,64 @@ export default function HomeScreen() {
       // NOW send to nearby users (receivers will get complete info)
       // Pass tripReqId directly since state update is async
       await sendTripRequestToNearby(preferences.startCoordinates, tripReqId);
-      
+
       // Set expiration timeout
       if (expirationTimeoutRef.current) {
         clearTimeout(expirationTimeoutRef.current);
       }
-      
+
       expirationTimeoutRef.current = setTimeout(async () => {
         try {
           const token = await AsyncStorage.getItem("token");
           if (token && tripReqId) {
             // Check if a match was created before showing expiration
-            const matchResponse = await fetch(`${BASE_URL.replace(/\/+$/, '')}/api/v1/trip/active-matches`, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
+            const matchResponse = await fetch(
+              `${BASE_URL.replace(/\/+$/, "")}/api/v1/trip/active-matches`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
               }
-            });
-            
+            );
+
             const matchResult = await matchResponse.json();
             const hasActiveMatch = matchResult?.data?.matches?.length > 0;
-            
+
             // Only expire and show alert if no match was created
             if (!hasActiveMatch) {
               await fetch(`${BASE_URL}/api/v1/trip/${tripReqId}/expire`, {
-                method: 'PUT',
+                method: "PUT",
                 headers: {
-                  'Authorization': `Bearer ${token}`,
-                  'Content-Type': 'application/json'
-                }
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
               });
-              
+
               Alert.alert(
                 "Request Expired ⏰",
                 "Your companion request has expired after 2 minutes. You can send a new request if needed.",
                 [
-                  { 
-                    text: "OK", 
+                  {
+                    text: "OK",
                     onPress: () => {
                       // Clear all preferences and route when request expires
                       resetAllPreferencesAndRoute();
-                    }
-                  }
+                    },
+                  },
                 ]
               );
             } else {
-              console.log("✅ Match was created, skipping expiration notification");
+              console.log(
+                "✅ Match was created, skipping expiration notification"
+              );
             }
           }
         } catch (error) {
-          console.error('Error handling request expiration:', error);
+          console.error("Error handling request expiration:", error);
         }
       }, 2 * 60 * 1000); // 2 minutes
-      
+
       // Close preferences modal
       setPreferencesVisible(false);
     } catch (error) {
@@ -1761,7 +2054,7 @@ export default function HomeScreen() {
   // Enhanced cancel search - gives user options for what to clear
   const cancelSearch = async () => {
     await companionSearch.stopSearch();
-    
+
     // Ask user what they want to do with their preferences and route
     Alert.alert(
       "Search Cancelled",
@@ -1773,22 +2066,22 @@ export default function HomeScreen() {
           onPress: () => {
             // Complete reset - clear everything
             resetAllPreferencesAndRoute();
-          }
+          },
         },
         {
           text: "Clear Route Only",
           onPress: () => {
             // Just clear route and visual elements, keep consent and photo
             resetRouteAndVisuals();
-          }
+          },
         },
         {
           text: "Keep Everything",
           onPress: () => {
             // Just stop searching, keep all data for next time
             setShowRadius(false);
-          }
-        }
+          },
+        },
       ]
     );
   };
@@ -1833,7 +2126,10 @@ export default function HomeScreen() {
 
       const result = await res.json();
       if (result.status === "success") {
-        Alert.alert("Success", "Request sent to " + (selectedUser.userName || "user"));
+        Alert.alert(
+          "Success",
+          "Request sent to " + (selectedUser.userName || "user")
+        );
         setSelectedUser(null);
       } else {
         throw new Error(result.message || "Failed to send request");
@@ -1873,14 +2169,17 @@ export default function HomeScreen() {
   };
 
   const decodePolyline = (encoded) =>
-    polyline.decode(encoded).map(([latitude, longitude]) => ({ latitude, longitude }));
+    polyline
+      .decode(encoded)
+      .map(([latitude, longitude]) => ({ latitude, longitude }));
 
   const [availability, setAvailability] = useState(true);
-  const [availabilityModalVisible, setAvailabilityModalVisible] = useState(false);
+  const [availabilityModalVisible, setAvailabilityModalVisible] =
+    useState(false);
 
   // Component mount tracking to prevent state updates after unmount
   const isMounted = useRef(true);
-  
+
   useEffect(() => {
     return () => {
       isMounted.current = false;
@@ -1889,11 +2188,16 @@ export default function HomeScreen() {
 
   // Remove excessive rendering logs to reduce noise
   // console.log("🏠 [HOME RENDER] Rendering home screen...");
-  
+
   // Show loading state while user data is being fetched
   if (isLoadingUser || !user) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View
+        style={[
+          styles.container,
+          { justifyContent: "center", alignItems: "center" },
+        ]}
+      >
         <ThemedText type="default">Loading...</ThemedText>
       </View>
     );
@@ -1910,31 +2214,51 @@ export default function HomeScreen() {
               <Ionicons name="person-circle" size={40} color="white" />
             </View>
             <View>
-              <ThemedText style={styles.userName}>{user?.userName || 'Your Name'}</ThemedText>
-              <ThemedText style={styles.userSubtext}>Safe Journey Companion</ThemedText>
+              <ThemedText style={styles.userName}>
+                {user?.userName || "Your Name"}
+              </ThemedText>
+              <ThemedText style={styles.userSubtext}>
+                Safe Journey Companion
+              </ThemedText>
             </View>
           </View>
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerButton} onPress={handleCurrentLocation}>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={handleCurrentLocation}
+            >
               <Ionicons name="location" size={20} color="white" />
             </TouchableOpacity>
           </View>
         </View>
-        
+
         {/* Compact Service Cards */}
         <View style={styles.serviceCards}>
-          <TouchableOpacity style={styles.compactServiceCard} onPress={() => setTripHistoryVisible(true)}>
+          <TouchableOpacity
+            style={styles.compactServiceCard}
+            onPress={() => setTripHistoryVisible(true)}
+          >
             <Ionicons name="time-outline" size={20} color="#8B5CF6" />
             <ThemedText style={styles.compactCardText}>History</ThemedText>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.compactServiceCard} onPress={() => router.push('/emergencyContacts')}>
+
+          <TouchableOpacity
+            style={styles.compactServiceCard}
+            onPress={() => router.push("/emergencyContacts")}
+          >
             <Ionicons name="call-outline" size={20} color="#8B5CF6" />
             <ThemedText style={styles.compactCardText}>Emergency</ThemedText>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.compactServiceCard} onPress={() => handleSOS("000")}>
-            <Ionicons name="shield-checkmark-outline" size={20} color="#8B5CF6" />
+
+          <TouchableOpacity
+            style={styles.compactServiceCard}
+            onPress={() => handleSOS("000")}
+          >
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={20}
+              color="#8B5CF6"
+            />
             <ThemedText style={styles.compactCardText}>SOS</ThemedText>
           </TouchableOpacity>
         </View>
@@ -1942,7 +2266,9 @@ export default function HomeScreen() {
 
       {/* Compact Map - Now appears first */}
       <View style={styles.compactMapContainer}>
-        {currentLocation && currentLocation.latitude && currentLocation.longitude ? (
+        {currentLocation &&
+        currentLocation.latitude &&
+        currentLocation.longitude ? (
           <MapView
             ref={mapRef}
             provider={PROVIDER_GOOGLE}
@@ -1982,12 +2308,20 @@ export default function HomeScreen() {
             {startMarker && (
               <Marker coordinate={startMarker}>
                 <View style={styles.markerContainer}>
-                  <MaterialCommunityIcons name="account-multiple" size={30} color="#10b981" />
+                  <MaterialCommunityIcons
+                    name="account-multiple"
+                    size={30}
+                    color="#10b981"
+                  />
                 </View>
                 <Callout>
                   <View style={{ width: 160 }}>
-                    <ThemedText type="defaultSemiBold">Meeting Point</ThemedText>
-                    <ThemedText type="caption">{startMarker.address || "Where you'll meet"}</ThemedText>
+                    <ThemedText type="defaultSemiBold">
+                      Meeting Point
+                    </ThemedText>
+                    <ThemedText type="caption">
+                      {startMarker.address || "Where you'll meet"}
+                    </ThemedText>
                   </View>
                 </Callout>
               </Marker>
@@ -1996,19 +2330,29 @@ export default function HomeScreen() {
             {endMarker && (
               <Marker coordinate={endMarker}>
                 <View style={styles.markerContainer}>
-                  <MaterialCommunityIcons name="flag-checkered" size={30} color="#F44336" />
+                  <MaterialCommunityIcons
+                    name="flag-checkered"
+                    size={30}
+                    color="#F44336"
+                  />
                 </View>
                 <Callout>
                   <View style={{ width: 160 }}>
                     <ThemedText type="defaultSemiBold">Destination</ThemedText>
-                    <ThemedText type="caption">{endMarker.address || "Final destination"}</ThemedText>
+                    <ThemedText type="caption">
+                      {endMarker.address || "Final destination"}
+                    </ThemedText>
                   </View>
                 </Callout>
               </Marker>
             )}
 
             {routeCoordinates.length > 0 && (
-              <Polyline coordinates={routeCoordinates} strokeWidth={4} strokeColor="#2196F3" />
+              <Polyline
+                coordinates={routeCoordinates}
+                strokeWidth={4}
+                strokeColor="#2196F3"
+              />
             )}
 
             {showRadius && currentLocation && (
@@ -2024,7 +2368,10 @@ export default function HomeScreen() {
             {companions.map((c) => (
               <Marker
                 key={String(c.userId)}
-                coordinate={{ latitude: c.location.latitude, longitude: c.location.longitude }}
+                coordinate={{
+                  latitude: c.location.latitude,
+                  longitude: c.location.longitude,
+                }}
                 onPress={() =>
                   setSelectedUser({
                     userId: c.userId,
@@ -2037,7 +2384,12 @@ export default function HomeScreen() {
                   })
                 }
               >
-                <View style={[styles.userMarkerContainer, c.isSearching && styles.searchingMarker]}>
+                <View
+                  style={[
+                    styles.userMarkerContainer,
+                    c.isSearching && styles.searchingMarker,
+                  ]}
+                >
                   <MaterialCommunityIcons
                     name={c.isSearching ? "account-search" : "account"}
                     size={24}
@@ -2047,12 +2399,16 @@ export default function HomeScreen() {
                 <Callout>
                   <View style={{ width: 160 }}>
                     <ThemedText type="defaultSemiBold">{c.userName}</ThemedText>
-                    <ThemedText type="caption">{Math.round(c.distance)}m away</ThemedText>
+                    <ThemedText type="caption">
+                      {Math.round(c.distance)}m away
+                    </ThemedText>
                     <ThemedText type="caption">
                       {c.isSearching ? "🔍 Searching" : "📍 Available"}
                     </ThemedText>
                     {c.userInfo?.gender && (
-                      <ThemedText type="caption">Gender: {c.userInfo.gender}</ThemedText>
+                      <ThemedText type="caption">
+                        Gender: {c.userInfo.gender}
+                      </ThemedText>
                     )}
                   </View>
                 </Callout>
@@ -2076,8 +2432,12 @@ export default function HomeScreen() {
                 >
                   <Callout>
                     <View style={{ width: 140 }}>
-                      <ThemedText type="defaultSemiBold">{u.userName}</ThemedText>
-                      <ThemedText type="caption">Gender: {u.genderPreference}</ThemedText>
+                      <ThemedText type="defaultSemiBold">
+                        {u.userName}
+                      </ThemedText>
+                      <ThemedText type="caption">
+                        Gender: {u.genderPreference}
+                      </ThemedText>
                     </View>
                   </Callout>
                 </Marker>
@@ -2086,13 +2446,15 @@ export default function HomeScreen() {
           </MapView>
         ) : (
           <View style={styles.loadingMapContainer}>
-            <ThemedText type="default" style={styles.loadingMapText}>Loading map...</ThemedText>
+            <ThemedText type="default" style={styles.loadingMapText}>
+              Loading map...
+            </ThemedText>
           </View>
         )}
       </View>
 
       {/* Floating Find Companion Button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.findCompanionButton}
         onPress={handleFindCompanion}
         disabled={isSearching}
@@ -2100,7 +2462,7 @@ export default function HomeScreen() {
         <View style={styles.findButtonContent}>
           <Ionicons name="people" size={24} color="white" />
           <ThemedText style={styles.findButtonText}>
-            {isSearching ? 'Searching...' : 'Find Companion'}
+            {isSearching ? "Searching..." : "Find Companion"}
           </ThemedText>
         </View>
         {isSearching && (
@@ -2109,14 +2471,16 @@ export default function HomeScreen() {
           </View>
         )}
       </TouchableOpacity>
-      
+
       {/* Status Button - Also floating if needed */}
-      {senderRequestStatus?.status === 'pending' && (
-        <TouchableOpacity 
+      {senderRequestStatus?.status === "pending" && (
+        <TouchableOpacity
           style={styles.statusButton}
           onPress={() => setSentRequestStatusVisible(true)}
         >
-          <ThemedText style={styles.statusButtonText}>View Request Status</ThemedText>
+          <ThemedText style={styles.statusButtonText}>
+            View Request Status
+          </ThemedText>
         </TouchableOpacity>
       )}
 
@@ -2127,14 +2491,19 @@ export default function HomeScreen() {
           {persistentSearch.isSearchActive && (
             <View style={styles.searchStatusContainer}>
               <View style={styles.searchStatusInfo}>
-                <ThemedText style={styles.searchStatusTitle}>🔍 Search Active</ThemedText>
+                <ThemedText style={styles.searchStatusTitle}>
+                  🔍 Search Active
+                </ThemedText>
                 <ThemedText style={styles.searchStatusTime}>
-                  Expires in: {persistentSearch.formatRemainingTime(persistentSearch.remainingTime)}
+                  Expires in:{" "}
+                  {persistentSearch.formatRemainingTime(
+                    persistentSearch.remainingTime
+                  )}
                 </ThemedText>
               </View>
             </View>
           )}
-          
+
           <View style={styles.loadingBarContainer}>
             <Animated.View
               style={[
@@ -2153,15 +2522,23 @@ export default function HomeScreen() {
             />
           </View>
           <View style={styles.searchingInfo}>
-            <ThemedText type="defaultSemiBold">Searching for companions...</ThemedText>
+            <ThemedText type="defaultSemiBold">
+              Searching for companions...
+            </ThemedText>
             <ThemedText type="caption">
               {companions.length > 0
                 ? `${companions.length} people found in your area`
                 : "Looking for people nearby..."}
             </ThemedText>
-            {companionSearch.loading && <ThemedText type="caption">Updating...</ThemedText>}
+            {companionSearch.loading && (
+              <ThemedText type="caption">Updating...</ThemedText>
+            )}
           </View>
-          <ThemedButton title="Cancel Search" onPress={cancelSearch} style={styles.cancelButton} />
+          <ThemedButton
+            title="Cancel Search"
+            onPress={cancelSearch}
+            style={styles.cancelButton}
+          />
         </View>
       )}
 
@@ -2170,13 +2547,13 @@ export default function HomeScreen() {
         <View style={styles.navigationContainer}>
           <View style={styles.navigationInfo}>
             <ThemedText type="defaultSemiBold" style={styles.navigationTitle}>
-              {arrivalStatus.bothUsersArrived 
+              {arrivalStatus.bothUsersArrived
                 ? `🎯 Final Destination: ${currentNavigationRoute.destinationAddress}`
                 : `🗺️ Navigation to ${currentNavigationRoute.destinationAddress}`}
             </ThemedText>
             {currentNavigationRoute.routeInfo && (
               <ThemedText type="caption" style={styles.navigationDetails}>
-                Distance: {currentNavigationRoute.routeInfo.distance} • 
+                Distance: {currentNavigationRoute.routeInfo.distance} •
                 Duration: {currentNavigationRoute.routeInfo.duration}
               </ThemedText>
             )}
@@ -2185,28 +2562,49 @@ export default function HomeScreen() {
                 Meeting {currentNavigationRoute.companion}
               </ThemedText>
             )}
-            {arrivalStatus.isNearMeetingPoint && !arrivalStatus.hasArrivedAtMeetingPoint && (
-              <ThemedText type="caption" style={[styles.navigationDetails, { color: Colors.light.tint }]}>
-                📍 Near meeting point ({arrivalStatus.distanceToMeetingPoint}m away)
-              </ThemedText>
-            )}
-            {arrivalStatus.hasArrivedAtMeetingPoint && !arrivalStatus.bothUsersArrived && (
-              <ThemedText type="caption" style={[styles.navigationDetails, { color: '#4CAF50' }]}>
-                ✅ Arrived - Waiting for companion
-              </ThemedText>
-            )}
+            {arrivalStatus.isNearMeetingPoint &&
+              !arrivalStatus.hasArrivedAtMeetingPoint && (
+                <ThemedText
+                  type="caption"
+                  style={[
+                    styles.navigationDetails,
+                    { color: Colors.light.tint },
+                  ]}
+                >
+                  📍 Near meeting point ({arrivalStatus.distanceToMeetingPoint}m
+                  away)
+                </ThemedText>
+              )}
+            {arrivalStatus.hasArrivedAtMeetingPoint &&
+              !arrivalStatus.bothUsersArrived && (
+                <ThemedText
+                  type="caption"
+                  style={[styles.navigationDetails, { color: "#4CAF50" }]}
+                >
+                  ✅ Arrived - Waiting for companion
+                </ThemedText>
+              )}
             {arrivalStatus.bothUsersArrived && !tripStatus.userReady && (
-              <ThemedText type="caption" style={[styles.navigationDetails, { color: '#FF6B35' }]}>
+              <ThemedText
+                type="caption"
+                style={[styles.navigationDetails, { color: "#FF6B35" }]}
+              >
                 🎉 Both companions arrived! Ready to start trip
               </ThemedText>
             )}
             {tripStatus.userReady && !tripStatus.bothUsersReady && (
-              <ThemedText type="caption" style={[styles.navigationDetails, { color: '#FFA500' }]}>
+              <ThemedText
+                type="caption"
+                style={[styles.navigationDetails, { color: "#FFA500" }]}
+              >
                 ⏳ You're ready - Waiting for companion to start trip
               </ThemedText>
             )}
             {tripStatus.bothUsersReady && (
-              <ThemedText type="caption" style={[styles.navigationDetails, { color: '#4CAF50' }]}>
+              <ThemedText
+                type="caption"
+                style={[styles.navigationDetails, { color: "#4CAF50" }]}
+              >
                 🚀 Trip started! Navigate to destination together
               </ThemedText>
             )}
@@ -2214,89 +2612,123 @@ export default function HomeScreen() {
           <View style={styles.navigationButtons}>
             {/* Show different buttons based on arrival status */}
             {arrivalStatus.bothUsersArrived && !tripStatus.userReady && (
-              <ThemedButton 
-                title="🚀 Start Trip" 
+              <ThemedButton
+                title="🚀 Start Trip"
                 onPress={handleStartTrip}
-                style={[styles.navigationButton, { backgroundColor: '#FF6B35' }]} 
+                style={[
+                  styles.navigationButton,
+                  { backgroundColor: "#FF6B35" },
+                ]}
               />
             )}
             {tripStatus.userReady && !tripStatus.bothUsersReady && (
-              <ThemedButton 
-                title="⏳ Waiting for Companion" 
+              <ThemedButton
+                title="⏳ Waiting for Companion"
                 disabled={true}
-                style={[styles.navigationButton, { backgroundColor: '#FFA500', opacity: 0.7 }]} 
+                style={[
+                  styles.navigationButton,
+                  { backgroundColor: "#FFA500", opacity: 0.7 },
+                ]}
               />
             )}
             {tripStatus.bothUsersReady && (
-              <ThemedButton 
-                title="🗺️ Navigate to Destination" 
+              <ThemedButton
+                title="🗺️ Navigate to Destination"
                 onPress={handleStartFinalJourney}
-                style={[styles.navigationButton, { backgroundColor: '#4CAF50' }]} 
+                style={[
+                  styles.navigationButton,
+                  { backgroundColor: "#4CAF50" },
+                ]}
               />
             )}
-            {arrivalStatus.isNearMeetingPoint && !arrivalStatus.hasArrivedAtMeetingPoint && (
-              <ThemedButton 
-                title="✅ Arrived" 
-                onPress={handleMarkArrived}
-                style={[styles.navigationButton, { backgroundColor: '#4CAF50' }]} 
-              />
-            )}
-            <ThemedButton 
-              title="📱 Open Maps" 
+            {arrivalStatus.isNearMeetingPoint &&
+              !arrivalStatus.hasArrivedAtMeetingPoint && (
+                <ThemedButton
+                  title="✅ Arrived"
+                  onPress={handleMarkArrived}
+                  style={[
+                    styles.navigationButton,
+                    { backgroundColor: "#4CAF50" },
+                  ]}
+                />
+              )}
+            <ThemedButton
+              title="📱 Open Maps"
               onPress={() => {
                 try {
                   openGoogleMapsNavigation(
                     currentNavigationRoute.destination,
                     currentNavigationRoute.origin,
-                    'walking'
+                    "walking"
                   );
                 } catch (error) {
-                  Alert.alert('Navigation Error', 'Could not open navigation app. Please ensure Google Maps is installed.');
+                  Alert.alert(
+                    "Navigation Error",
+                    "Could not open navigation app. Please ensure Google Maps is installed."
+                  );
                 }
-              }} 
-              style={styles.navigationButton} 
+              }}
+              style={styles.navigationButton}
             />
             {tripStatus.tripStarted ? (
-              <ThemedButton 
-                title="🏁 End Trip" 
+              <ThemedButton
+                title="🏁 End Trip"
                 onPress={handleEndTrip}
-                style={[styles.navigationButton, { backgroundColor: '#4CAF50' }]} 
+                style={[
+                  styles.navigationButton,
+                  { backgroundColor: "#4CAF50" },
+                ]}
               />
             ) : (
-              <ThemedButton 
-                title="❌ Cancel" 
+              <ThemedButton
+                title="❌ Cancel"
                 onPress={handleCancelTrip}
-                style={[styles.navigationButton, { backgroundColor: '#FF4444' }]} 
+                style={[
+                  styles.navigationButton,
+                  { backgroundColor: "#FF4444" },
+                ]}
               />
             )}
-            <ThemedButton 
-              title="✕" 
+            <ThemedButton
+              title="✕"
               onPress={() => {
                 setCurrentNavigationRoute(null);
                 setRouteCoordinates([]);
                 setStartMarker(null);
                 setEndMarker(null);
-              }} 
-              style={styles.closeNavigationButton} 
+              }}
+              style={styles.closeNavigationButton}
             />
           </View>
         </View>
       )}
 
       {/* Modern Bottom Navigation */}
-      <View style={[styles.bottomNavigation, { paddingBottom: insets.bottom || 10 }]}>
-        <TouchableOpacity 
-          style={styles.bottomNavItem} 
+      <View
+        style={[
+          styles.bottomNavigation,
+          { paddingBottom: insets.bottom || 10 },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.bottomNavItem}
           onPress={() => {
             console.log("🔔 Opening Notifications Modal");
-            console.log(`📊 Current requests count: ${requestPolling.pendingRequests?.length || 0}`);
+            console.log(
+              `📊 Current requests count: ${
+                requestPolling.pendingRequests?.length || 0
+              }`
+            );
             console.log(`📊 Requests data:`, requestPolling.pendingRequests);
             try {
               setRequestNotificationVisible(true);
               requestPolling.markAsViewed();
             } catch (error) {
               console.error("❌ Error opening notifications:", error);
-              Alert.alert("Error", "Could not open notifications. Please try again.");
+              Alert.alert(
+                "Error",
+                "Could not open notifications. Please try again."
+              );
             }
           }}
         >
@@ -2311,8 +2743,8 @@ export default function HomeScreen() {
             )}
           </View>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.bottomNavItem}
           onPress={() => {
             console.log("🚗 Opening Active Trips Modal");
@@ -2331,51 +2763,73 @@ export default function HomeScreen() {
             )}
           </View>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.bottomNavItem}
           onPress={handleCurrentLocation}
         >
           <Ionicons name="location-outline" size={24} color="#8B5CF6" />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.bottomNavItem}
           onPress={() => router.push("/profile")}
         >
           <Ionicons name="person-outline" size={24} color="#8B5CF6" />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.bottomNavItem}
-          onPress={() => router.push('/emergencyContacts')}
+          onPress={() => router.push("/emergencyContacts")}
         >
           <Ionicons name="shield-outline" size={24} color="#8B5CF6" />
         </TouchableOpacity>
       </View>
 
       {/* User Card */}
-      <Modal transparent animationType="slide" visible={!!selectedUser} onRequestClose={() => setSelectedUser(null)}>
+      <Modal
+        transparent
+        animationType="slide"
+        visible={!!selectedUser}
+        onRequestClose={() => setSelectedUser(null)}
+      >
         <View style={styles.popupOverlay}>
           <View style={styles.userCard}>
             {selectedUser?.userImage && (
-              <Image source={selectedUser.userImage} style={styles.userImage} resizeMode="cover" />
+              <Image
+                source={selectedUser.userImage}
+                style={styles.userImage}
+                resizeMode="cover"
+              />
             )}
             <ThemedText type="subtitle">{selectedUser?.userName}</ThemedText>
-            <ThemedText type="caption">Distance: {(selectedUser?.distance || 0).toFixed(2)} km</ThemedText>
+            <ThemedText type="caption">
+              Distance: {(selectedUser?.distance || 0).toFixed(2)} km
+            </ThemedText>
             {selectedUser?.genderPreference ? (
-              <ThemedText type="caption">Gender Preference: {selectedUser?.genderPreference}</ThemedText>
+              <ThemedText type="caption">
+                Gender Preference: {selectedUser?.genderPreference}
+              </ThemedText>
             ) : null}
             <ThemedButton
               title="View Profile"
-              onPress={() => router.push(`/profile?userName=${selectedUser?.userName}`)}
+              onPress={() =>
+                router.push(`/profile?userName=${selectedUser?.userName}`)
+              }
               style={styles.cardButton}
             />
-            <ThemedButton title="Send Request" onPress={() => handleSendRequest(selectedUser)} style={styles.cardButton} />
+            <ThemedButton
+              title="Send Request"
+              onPress={() => handleSendRequest(selectedUser)}
+              style={styles.cardButton}
+            />
             <ThemedButton
               title="Close"
               onPress={() => setSelectedUser(null)}
-              style={[styles.cardButton, { backgroundColor: Colors.light.danger }]}
+              style={[
+                styles.cardButton,
+                { backgroundColor: Colors.light.danger },
+              ]}
             />
           </View>
         </View>
@@ -2387,25 +2841,38 @@ export default function HomeScreen() {
           <View style={styles.popupBox}>
             <View style={styles.popupIconContainer}>
               <View style={styles.popupIconCircle}>
-                <Ionicons name="shield-checkmark-outline" size={48} color="#8B5CF6" />
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={48}
+                  color="#8B5CF6"
+                />
               </View>
             </View>
-            <ThemedText type="subtitle" style={styles.popupTitle}>Verification Required</ThemedText>
+            <ThemedText type="subtitle" style={styles.popupTitle}>
+              Verification Required
+            </ThemedText>
             <ThemedText type="default" style={styles.popupMessage}>
-              To ensure safety for all users, please verify your identity before finding a companion.
+              To ensure safety for all users, please verify your identity before
+              finding a companion.
             </ThemedText>
             <View style={styles.popupFeatures}>
               <View style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                <ThemedText style={styles.featureText}>Quick & Secure</ThemedText>
+                <ThemedText style={styles.featureText}>
+                  Quick & Secure
+                </ThemedText>
               </View>
               <View style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                <ThemedText style={styles.featureText}>One-Time Process</ThemedText>
+                <ThemedText style={styles.featureText}>
+                  One-Time Process
+                </ThemedText>
               </View>
               <View style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                <ThemedText style={styles.featureText}>Privacy Protected</ThemedText>
+                <ThemedText style={styles.featureText}>
+                  Privacy Protected
+                </ThemedText>
               </View>
             </View>
             <TouchableOpacity
@@ -2417,13 +2884,17 @@ export default function HomeScreen() {
               activeOpacity={0.8}
             >
               <Ionicons name="shield-checkmark" size={24} color="white" />
-              <ThemedText style={styles.verifyNowText}>Verify My Identity</ThemedText>
+              <ThemedText style={styles.verifyNowText}>
+                Verify My Identity
+              </ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.popupCancelButton}
               onPress={() => setModalVisible(false)}
             >
-              <ThemedText style={styles.popupCancelText}>Maybe Later</ThemedText>
+              <ThemedText style={styles.popupCancelText}>
+                Maybe Later
+              </ThemedText>
             </TouchableOpacity>
           </View>
         </View>
@@ -2431,7 +2902,7 @@ export default function HomeScreen() {
 
       {/* Emergency close button for stuck modals */}
       {requestNotificationVisible && (
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.emergencyCloseButton}
           onPress={forceCloseNotificationModal}
         >
@@ -2480,10 +2951,10 @@ export default function HomeScreen() {
         onRefetch={requestPolling.refetch}
         onRequestAccepted={(payload) => {
           console.log("✅ [RECEIVER] Request accepted:", payload);
-          
+
           // Close the request modal immediately
           setRequestNotificationVisible(false);
-          
+
           // Update route on map if available
           if (payload?.routeData) {
             handleNotificationRouteUpdate({
@@ -2494,10 +2965,10 @@ export default function HomeScreen() {
               tripRequest: payload.tripRequest,
             });
           }
-          
+
           // Refresh active matches to show the new trip
           activeMatches.refresh?.();
-          
+
           // Automatically show the active match modal after a brief delay
           setTimeout(() => {
             setActiveMatchModalVisible(true);
@@ -2529,16 +3000,26 @@ export default function HomeScreen() {
         onUpdateStatus={async (matchId, status) => {
           try {
             await activeMatches.updateMatchStatus(matchId, status);
-            Alert.alert("Success", `Trip ${status === 'in-progress' ? 'started' : status} successfully!`);
+            Alert.alert(
+              "Success",
+              `Trip ${
+                status === "in-progress" ? "started" : status
+              } successfully!`
+            );
           } catch (error) {
-            Alert.alert("Error", error.message || "Failed to update trip status");
+            Alert.alert(
+              "Error",
+              error.message || "Failed to update trip status"
+            );
           }
         }}
         onViewDetails={(match) => {
           // For now, just show an alert. Later we can integrate TripMatchCoordinationModal
           Alert.alert(
             "Trip Details",
-            `Match ID: ${match.matchId}\nStatus: ${match.status}\nDestination: ${match.tripDetails?.destination || 'Unknown'}`,
+            `Match ID: ${match.matchId}\nStatus: ${
+              match.status
+            }\nDestination: ${match.tripDetails?.destination || "Unknown"}`,
             [{ text: "OK" }]
           );
         }}
@@ -2555,23 +3036,26 @@ export default function HomeScreen() {
           setActiveTripMatch(null);
         }}
         tripMatch={activeTripMatch}
-        userRole={activeTripMatch ? 
-          (activeTripMatch.organizer?.userId === user?._id ? 'organizer' : 'companion') 
-          : 'companion'
+        userRole={
+          activeTripMatch
+            ? activeTripMatch.organizer?.userId === user?._id
+              ? "organizer"
+              : "companion"
+            : "companion"
         }
         currentUserId={user?._id}
         onTripCompleted={() => {
-          console.log('🎉 [HOME] Trip completed, refreshing active matches...');
+          console.log("🎉 [HOME] Trip completed, refreshing active matches...");
           clearRouteFromMap();
           // Refresh active matches to remove completed trip from list
           activeMatches.refresh?.();
-          
+
           // Additional refresh after a short delay to ensure backend has processed
           setTimeout(() => {
-            console.log('🔄 [HOME] Secondary refresh after trip completion...');
+            console.log("🔄 [HOME] Secondary refresh after trip completion...");
             activeMatches.refresh?.();
           }, 1000);
-          
+
           setTripHistoryVisible(true);
         }}
       />
@@ -2597,14 +3081,21 @@ export default function HomeScreen() {
         onSubmit={(consentData) => {
           // Handle receiver consent submission
           if (selectedRequest) {
-            activeMatches.completeReceiverConsent(selectedRequest.tripReqId, user._id)
+            activeMatches
+              .completeReceiverConsent(selectedRequest.tripReqId, user._id)
               .then(() => {
-                Alert.alert("Success", "Consent completed! You can now proceed with the trip.");
+                Alert.alert(
+                  "Success",
+                  "Consent completed! You can now proceed with the trip."
+                );
                 setEnhancedConsentVisible(false);
                 setTwoStepTripVisible(true); // Open meeting point selection
               })
               .catch((error) => {
-                Alert.alert("Error", "Failed to complete consent: " + error.message);
+                Alert.alert(
+                  "Error",
+                  "Failed to complete consent: " + error.message
+                );
               });
           }
         }}
@@ -2645,17 +3136,18 @@ export default function HomeScreen() {
             setActiveTripMatch(null);
           }}
           onNavigationStart={() => {
-            console.log('🗺️ Navigation started for trip:', activeTripMatch?.id);
+            console.log("🗺️ Navigation started for trip:", activeTripMatch?.id);
           }}
           onTripComplete={() => {
-            console.log('🏁 Trip completed for:', activeTripMatch?.id);
+            console.log("🏁 Trip completed for:", activeTripMatch?.id);
             setNavigationVisible(false);
             setActiveTripMatch(null);
-            
+
             // Clear destination and reset journey state
-            const { clearDestination, setJourneyState } = useLocationStore.getState();
+            const { clearDestination, setJourneyState } =
+              useLocationStore.getState();
             clearDestination();
-            setJourneyState('idle');
+            setJourneyState("idle");
           }}
         />
       </Modal>
@@ -2665,7 +3157,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8fafc" },
-  
+
   // Purple Gradient Header
   gradientHeader: {
     backgroundColor: "#8B5CF6",
@@ -2715,7 +3207,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginLeft: 10,
   },
-  
+
   // Compact Service Cards
   serviceCards: {
     flexDirection: "row",
@@ -2737,7 +3229,7 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontWeight: "500",
   },
-  
+
   // Floating Find Companion Button
   findCompanionButton: {
     backgroundColor: "#8B5CF6",
@@ -2790,7 +3282,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
   },
-  
+
   // Compact Map - Takes more space
   compactMapContainer: {
     flex: 2,
@@ -2805,12 +3297,12 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-  compactMap: { 
-    width: "100%", 
+  compactMap: {
+    width: "100%",
     height: "100%",
     minHeight: 300,
   },
-  
+
   // Bottom Navigation
   bottomNavigation: {
     flexDirection: "row",
@@ -2861,7 +3353,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
   },
-  
+
   // Loading states
   loadingMapContainer: {
     flex: 1,
@@ -2917,33 +3409,33 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
   },
   popupBox: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 24,
     width: Dimensions.get("window").width * 0.85,
     padding: 0,
-    overflow: 'hidden',
-    shadowColor: '#000',
+    overflow: "hidden",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 10,
   },
   popupIconContainer: {
-    backgroundColor: '#F3E8FF',
+    backgroundColor: "#F3E8FF",
     paddingVertical: 32,
     paddingHorizontal: 24,
-    alignItems: 'center',
+    alignItems: "center",
     borderBottomWidth: 1,
-    borderBottomColor: '#E9D5FF',
+    borderBottomColor: "#E9D5FF",
   },
   popupIconCircle: {
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#8B5CF6',
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#8B5CF6",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -2951,14 +3443,14 @@ const styles = StyleSheet.create({
   },
   popupTitle: {
     fontSize: 24,
-    fontWeight: '700',
-    textAlign: 'center',
+    fontWeight: "700",
+    textAlign: "center",
     marginTop: 24,
     marginHorizontal: 24,
   },
   popupMessage: {
     fontSize: 15,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 22,
     marginTop: 12,
     marginHorizontal: 24,
@@ -2970,25 +3462,25 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   featureText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   verifyNowButton: {
-    backgroundColor: '#8B5CF6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#8B5CF6",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 10,
     paddingVertical: 16,
     borderRadius: 14,
     marginHorizontal: 24,
     marginTop: 24,
-    shadowColor: '#8B5CF6',
+    shadowColor: "#8B5CF6",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -2996,8 +3488,8 @@ const styles = StyleSheet.create({
   },
   verifyNowText: {
     fontSize: 17,
-    fontWeight: '700',
-    color: 'white',
+    fontWeight: "700",
+    color: "white",
   },
   popupCancelButton: {
     paddingVertical: 16,
@@ -3007,8 +3499,8 @@ const styles = StyleSheet.create({
   },
   popupCancelText: {
     fontSize: 15,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: "600",
+    textAlign: "center",
     opacity: 0.6,
   },
   verifyButton: { marginTop: 20, width: "80%" },
@@ -3058,25 +3550,39 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   searchingInfo: { alignItems: "center", marginBottom: 10 },
-  cancelButton: { backgroundColor: Colors.light.danger, borderColor: Colors.light.danger, marginBottom: 25 },
+  cancelButton: {
+    backgroundColor: Colors.light.danger,
+    borderColor: Colors.light.danger,
+    marginBottom: 25,
+  },
   destinationSearchContainer: {
     paddingHorizontal: 16,
     marginBottom: 16,
   },
   destinationInputContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.light.tint,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  logoContainer: { width: 60, height: 60, justifyContent: "center", alignItems: "center" },
+  logoContainer: {
+    width: 60,
+    height: 60,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   logo: { width: 45, height: 45, borderRadius: 10 },
-  titleText: { fontSize: 22, fontWeight: "bold", color: Colors.light.text, letterSpacing: 0.5 },
+  titleText: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: Colors.light.text,
+    letterSpacing: 0.5,
+  },
   topIconButton: {
     padding: 10,
     borderRadius: 12,
@@ -3106,7 +3612,11 @@ const styles = StyleSheet.create({
   },
   navButton: { alignItems: "center", justifyContent: "center" },
   navLabel: { color: "#fff", fontSize: 12, marginTop: 4 },
-  notificationIconContainer: { position: "relative", alignItems: "center", justifyContent: "center" },
+  notificationIconContainer: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   notificationBadge: {
     position: "absolute",
     top: -8,
@@ -3121,7 +3631,7 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   badgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
-  
+
   // Network status indicators
   errorIndicator: {
     position: "absolute",
@@ -3139,7 +3649,7 @@ const styles = StyleSheet.create({
     color: "#ffaa00",
     fontWeight: "bold",
   },
-  
+
   // Enhanced persistent search styles
   searchStatusContainer: {
     backgroundColor: Colors.light.tint + "10",
@@ -3163,19 +3673,19 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
     opacity: 0.8,
   },
-  
+
   // Navigation styles
   navigationContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 120,
     left: 16,
     right: 16,
     backgroundColor: Colors.light.surface,
     borderRadius: 12,
     padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
@@ -3187,7 +3697,7 @@ const styles = StyleSheet.create({
   },
   navigationTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.light.text,
     marginBottom: 4,
   },
@@ -3198,8 +3708,8 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   navigationButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   navigationButton: {
     backgroundColor: Colors.light.tint,
@@ -3209,25 +3719,25 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   closeNavigationButton: {
-    backgroundColor: '#FF5722',
+    backgroundColor: "#FF5722",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
     minWidth: 40,
   },
-  
+
   // Emergency close button styles
   emergencyCloseButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 100,
     right: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 25,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
+    flexDirection: "row",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
@@ -3237,7 +3747,7 @@ const styles = StyleSheet.create({
   emergencyCloseText: {
     marginLeft: 8,
     fontSize: 14,
-    fontWeight: '600',
-    color: '#ff4444',
+    fontWeight: "600",
+    color: "#ff4444",
   },
-})
+});
