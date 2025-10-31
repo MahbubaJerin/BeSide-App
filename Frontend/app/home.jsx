@@ -387,7 +387,6 @@ export default function HomeScreen() {
   const [photoUrl, setPhotoUrl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [shouldResetModal, setShouldResetModal] = useState(false);
-  const [shouldResetModal, setShouldResetModal] = useState(false);
 
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [startMarker, setStartMarker] = useState(null);

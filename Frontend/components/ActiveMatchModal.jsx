@@ -37,7 +37,6 @@ export default function ActiveMatchModal({
 }) {
   const [navigationModalVisible, setNavigationModalVisible] = useState(false);
   const [messagingModalVisible, setMessagingModalVisible] = useState(false);
-  const [messagingModalVisible, setMessagingModalVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [cachedMatches, setCachedMatches] = useState([]);
   

@@ -30,7 +30,6 @@ export default function TripHistoryModal({ visible, onClose }) {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
-  const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     if (visible) {
