@@ -1,0 +1,18 @@
+appId: null
+---
+- tapOn:
+    id: "android:id/content"
+- tapOn: ""
+- tapOn:
+    point: "50%,31%"
+- tapOn:
+    point: "50%,49%"
+- tapOn: "📭"
+- tapOn: "No trip requests"
+- tapOn: "New companion requests from nearby users will appear here."
+- assertVisible: "Close"
+- tapOn: "✕"
+- tapOn: ""
+- tapOn:
+    point: "50%,49%"
+- tapOn: "Close"

@@ -1,0 +1,128 @@
+appId: null
+---
+- tapOn:
+    id: "android:id/content"
+- tapOn: ", Find Companion"
+- tapOn:
+    point: "50%,18%"
+- tapOn:
+    point: "50%,63%"
+- tapOn: "Safety First"
+- tapOn:
+    point: "50%,18%"
+- tapOn: "Review and accept our community guidelines"
+- tapOn:
+    point: "50%,22%"
+- tapOn: "Agreements"
+- tapOn: "0 of 3"
+- tapOn: "Please read and accept each guideline to ensure a safe experience"
+- tapOn: ""
+- tapOn:
+    point: "50%,39%"
+- tapOn:
+    point: "50%,60%"
+- tapOn:
+    point: "19%,52%"
+- tapOn: "No Physical Contact"
+- tapOn: "I agree to maintain appropriate physical boundaries throughout the entire\
+    \ journey"
+- tapOn: ", More Info"
+- tapOn:
+    point: "82%,65%"
+- tapOn:
+    point: "60%,65%"
+- tapOn: "This means no handshakes, hugs, or any form of physical contact. Personal\
+    \ space and boundaries are crucial for safe travel companionship."
+- tapOn:
+    point: "50%,48%"
+- tapOn:
+    point: "19%,47%"
+- tapOn: "I will be respectful and maintain professional conduct"
+- tapOn: "Respectful Behavior"
+- tapOn: ", More Info"
+- tapOn: "Treat your companion with respect, avoid inappropriate topics, and maintain\
+    \ courteous communication throughout your shared journey."
+- tapOn:
+    point: "82%,40%"
+- tapOn:
+    point: "60%,37%"
+- tapOn:
+    point: "50%,46%"
+- tapOn:
+    point: "19%,44%"
+- tapOn: "Safety Guidelines"
+- tapOn:
+    point: "50%,49%"
+- tapOn: "I understand and agree to follow all safety rules"
+- tapOn: ", More Info"
+- tapOn: "BeSide is for safe travel companionship only. Report any concerning behavior\
+    \ and prioritize your safety at all times."
+- tapOn:
+    point: "82%,41%"
+- tapOn:
+    point: "50%,63%"
+- tapOn: ""
+- tapOn: "BeSide is designed for safe travel companionship only. Any violation of\
+    \ these guidelines may result in account suspension."
+- tapOn: "Important Notice"
+- tapOn:
+    point: "50%,63%"
+- assertVisible: "✓ I Accept All Terms"
+- assertVisible: "Cancel"
+- tapOn: "✓ I Accept All Terms"
+- tapOn:
+    point: "50%,19%"
+- tapOn: "📸"
+- tapOn: "Verify Your Identity"
+- tapOn: "Take a real-time selfie to verify your identity for this trip"
+- assertVisible: "✕"
+- tapOn:
+    point: "50%,43%"
+- tapOn: "📸 Take Selfie"
+- tapOn: "✨ Upload & Continue"
+- tapOn: "🔒 Your photo is encrypted and used only for verification"
+- tapOn:
+    point: "50%,8%"
+- assertVisible: ""
+- tapOn: "Meeting Point & Destination"
+- tapOn: "Google Map"
+- tapOn: ", Meeting Point, Where you'll meet"
+- tapOn:
+    point: "50%,54%"
+- tapOn: "Choose Destination"
+- tapOn: "Search destination..."
+- tapOn: "Choose Meeting Point"
+- assertVisible:
+    text: ""
+    index: 1
+- tapOn: ""
+- tapOn: "Search for meeting point..."
+- tapOn:
+    point: "50%,76%"
+- tapOn: "Transport Mode"
+- tapOn: "Companion Gender"
+- tapOn: "Would you like to talk?"
+- tapOn:
+    point: "88%,79%"
+- tapOn: "Any"
+- assertVisible: "Female"
+- assertVisible: "Male"
+- assertVisible: ""
+- assertVisible: ""
+- assertVisible: ""
+- assertVisible: ""
+- assertVisible: "Find Companion"
+- tapOn: "Find Companion"
+- tapOn:
+    point: "50%,36%"
+- tapOn:
+    id: "android:id/message"
+- assertVisible:
+    id: "host.exp.exponent:id/buttonPanel"
+- assertVisible:
+    id: "android:id/button1"
+- tapOn:
+    id: "android:id/button1"
+- tapOn: "Map Marker"
+- tapOn: "Google Map"
+- tapOn: "Map Marker"
