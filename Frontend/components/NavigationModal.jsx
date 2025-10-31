@@ -22,8 +22,6 @@ const NavigationModal = ({
   userRole = 'companion', // 'organizer' or 'companion'
   arrivalStatus, // Real-time arrival status from parent
   onBothArrived, // NEW: Callback when both users arrive
-  arrivalStatus, // Real-time arrival status from parent
-  onBothArrived, // NEW: Callback when both users arrive
 }) => {
   const [isNavigating, setIsNavigating] = useState(false);
   const [tripStatus, setTripStatus] = useState('active');
@@ -34,7 +32,6 @@ const NavigationModal = ({
   useEffect(() => {
     // Update local state when arrivalStatus changes from parent
     if (arrivalStatus) {
-      const wasBothArrived = bothArrived; // Track previous state
       const wasBothArrived = bothArrived; // Track previous state
       setBothArrived(arrivalStatus.bothUsersArrived || false);
       

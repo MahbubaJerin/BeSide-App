@@ -40,7 +40,6 @@ import RequestNotificationModal from "@/components/RequestNotificationModal";
 import SenderAcceptanceNotificationModal from "@/components/SenderAcceptanceNotificationModal";
 import ActiveMatchModal from "@/components/ActiveMatchModal";
 import FinalJourneyModal from "@/components/FinalJourneyModal";
-import FinalJourneyModal from "@/components/FinalJourneyModal";
 import BeSideLogo from "../assets/images/BeSide.png";
 import { BASE_URL } from "../config";
 import { useRequestPolling } from "../hooks/useRequestPolling";

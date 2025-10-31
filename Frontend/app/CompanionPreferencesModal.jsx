@@ -28,7 +28,6 @@ export default function CompanionPreferencesModal({
   prefillStart = null,
   prefillDestination = null,
   shouldReset = false, // New prop to trigger reset
-  shouldReset = false, // New prop to trigger reset
 }) {
   const [talk, setTalk] = useState(false);
 

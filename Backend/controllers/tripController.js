@@ -1192,37 +1192,6 @@ exports.endTripMatch = catchAsync(async (req, res, next) => {
   } else {
     console.log(`⏳ [WAITING] User ${req.user.userName} ended trip, waiting for other user`);
   }
-  // Check if user has already ended the trip
-  if (tripMatch.endedUsers.includes(userId)) {
-    return res.status(200).json({
-      status: "success",
-      message: "You have already ended this trip",
-      data: {
-        tripMatch,
-        userEnded: true,
-        waitingForOther: !tripMatch.tripEnded,
-        bothEnded: tripMatch.tripEnded
-      }
-    });
-  }
-
-  // Add user to endedUsers array
-  tripMatch.endedUsers.push(userId);
-
-  // Check if both users have ended the trip
-  const bothUsersEnded = tripMatch.endedUsers.length === 2;
-
-  if (bothUsersEnded) {
-    // Both users have ended - mark trip as completed
-    tripMatch.status = 'completed';
-    tripMatch.tripEnded = true;
-    tripMatch.tripEndedAt = new Date();
-    tripMatch.progression.completed = new Date();
-
-    console.log(`🎉 [TRIP COMPLETED] Both users have ended trip ${matchId}`);
-  } else {
-    console.log(`⏳ [WAITING] User ${req.user.userName} ended trip, waiting for other user`);
-  }
 
   await tripMatch.save();
 

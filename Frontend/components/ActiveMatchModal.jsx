@@ -1,6 +1,5 @@
 // Frontend/components/ActiveMatchModal.jsx
 import React, { useState, useRef, useEffect } from "react";
-import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,8 +10,6 @@ import {
   RefreshControl,
   Image,
   Alert,
-  Animated,
-  Dimensions,
   Animated,
   Dimensions,
 } from "react-native";
@@ -39,7 +36,6 @@ export default function ActiveMatchModal({
   onBothArrived, // NEW: Callback when both users arrive
 }) {
   const [navigationModalVisible, setNavigationModalVisible] = useState(false);
-  const [messagingModalVisible, setMessagingModalVisible] = useState(false);
   const [messagingModalVisible, setMessagingModalVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [cachedMatches, setCachedMatches] = useState([]);
