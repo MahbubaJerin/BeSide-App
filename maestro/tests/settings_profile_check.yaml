@@ -1,0 +1,15 @@
+appId: null
+---
+- assertVisible:
+    id: "android:id/content"
+- tapOn: "Open Settings"
+- tapOn:
+    point: "64%,8%"
+- tapOn:
+    point: "64%,51%"
+- assertVisible: "PROFILE"
+- assertVisible: "ACCOUNT"
+- assertVisible: ", Edit Profile"
+- assertVisible: ", Profile Visibility"
+- assertVisible: ", Delete Account"
+- assertVisible: ", Logout"

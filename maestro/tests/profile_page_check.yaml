@@ -1,0 +1,35 @@
+appId: null
+---
+- assertVisible:
+    id: "android:id/content"
+- tapOn: ""
+- assertVisible:
+    id: "android:id/content"
+    index: 0
+- tapOn:
+    point: "50%,50%"
+- assertVisible: "Go back"
+- assertVisible: "Profile"
+- assertVisible: "Change profile photo"
+- assertVisible: "luluorange3@gmail.com"
+- assertVisible: "Verified"
+- assertVisible: "Name"
+- assertVisible: "Lulu Orange"
+- assertVisible: "Username"
+- assertVisible:
+    text: "lululemom"
+    index: 0
+- assertVisible: "Availability"
+- assertVisible: "Active"
+- assertVisible: "Date of Birth"
+- assertVisible: "Select your date of birth"
+- assertVisible: "User ID"
+- assertVisible: "AU-XX-XXX-A2374C"
+- tapOn: "Gender"
+- assertVisible: "male"
+- assertVisible: "Mobile Number"
+- assertVisible: "0412346598"
+- assertVisible: ""
+- assertVisible: ""
+- assertVisible: "Location"
+- assertVisible: "12 Osburn Place, Epping VIC, Australia"

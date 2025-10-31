@@ -1,0 +1,21 @@
+appId: null
+---
+- tapOn:
+    point: "50%,11%"
+- assertVisible: ""
+- assertVisible: "lululemom"
+- assertVisible: "Safe Journey Companion"
+- tapOn: ""
+- assertVisible: ", History"
+- assertVisible: ", Emergency"
+- assertVisible: ", SOS"
+- assertVisible: "Google Map"
+- assertVisible:
+    id: "android:id/content"
+- assertVisible: ""
+- assertVisible: ""
+- assertVisible: ""
+- assertVisible: ""
+- assertVisible: ""
+- assertVisible: "Find Companion"
+- assertVisible: ""

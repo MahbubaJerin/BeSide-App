@@ -1,0 +1,30 @@
+appId: null
+---
+- tapOn:
+    point: "56%,83%"
+- tapOn:
+    point: "50%,49%"
+- assertVisible: "Cancel Request"
+- tapOn:
+    point: "50%,46%"
+- assertVisible: "PENDING"
+- tapOn:
+    point: "50%,39%"
+- tapOn:
+    point: "50%,44%"
+- tapOn:
+    point: "50%,48%"
+- assertVisible: "Expired"
+- assertVisible:
+    id: "android:id/button1"
+- assertVisible:
+    id: "host.exp.exponent:id/alert_title"
+- assertVisible:
+    id: "android:id/message"
+- assertVisible:
+    id: "host.exp.exponent:id/buttonPanel"
+- tapOn: "OK"
+- assertVisible: "Close"
+- tapOn: "Close"
+- tapOn: "✕"
+- tapOn: "Close"

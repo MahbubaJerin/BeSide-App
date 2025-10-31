@@ -1,0 +1,38 @@
+appId: null
+---
+- tapOn: "Open Settings"
+- assertVisible: ", Edit Profile"
+- tapOn: ", Edit Profile"
+- tapOn:
+    point: "50%,29%"
+- assertVisible:
+    id: "host.exp.exponent:id/alert_title"
+- assertVisible:
+    id: "android:id/message"
+- tapOn:
+    id: "android:id/button3"
+- tapOn: "GALLERY"
+- tapOn: "CANCEL"
+- tapOn:
+    text: "lululemom"
+    index: 1
+- tapOn: "0412346598"
+- tapOn: "12 Osburn Place, Epping VIC, Australia"
+- tapOn:
+    point: "50%,49%"
+- assertVisible: "Cancel"
+- assertVisible: "Save Profile"
+- tapOn: "Save Profile"
+- tapOn: "Success"
+- tapOn: "Profile updated successfully"
+- tapOn:
+    point: "50%,49%"
+- tapOn:
+    id: "android:id/button1"
+- tapOn:
+    point: "79%,92%"
+- tapOn: ""
+- tapOn: ", Edit Profile"
+- tapOn: "Cancel"
+- tapOn:
+    id: "android:id/content"

@@ -1,0 +1,10 @@
+appId: null
+---
+- assertVisible: "BeSide logo"
+- assertVisible: "Your journey, made safer. Join us today"
+- assertVisible: "Your privacy is respected. Your safety is our priority."
+- assertVisible: "Brought to you by — the BeSide team"
+- tapOn:
+    id: "welcomeLoginButton"
+- tapOn:
+    id: "welcomeRegisterButton"

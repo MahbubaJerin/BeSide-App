@@ -1,0 +1,18 @@
+appId: null
+---
+- assertVisible:
+    id: "android:id/content"
+- tapOn: ", History"
+- tapOn:
+    point: "50%,11%"
+- assertVisible: "Trip History"
+- assertVisible: "Your recent journey memories"
+- tapOn:
+    point: "50%,56%"
+- tapOn:
+    point: "50%,46%"
+- assertVisible: ""
+- assertVisible: "No trips yet"
+- assertVisible: "Your completed and cancelled trips will appear here"
+- assertVisible: "Start your first journey to build your travel history!"
+- tapOn: ""

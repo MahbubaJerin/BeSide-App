@@ -1,0 +1,40 @@
+appId: null
+---
+- assertVisible: "Trip History"
+- tapOn:
+    point: "50%,11%"
+- tapOn:
+    point: "50%,56%"
+- tapOn:
+    point: "19%,28%"
+- tapOn:
+    point: "50%,28%"
+- tapOn:
+    point: "81%,28%"
+- tapOn:
+    point: "50%,49%"
+- tapOn: "🗑️ Only your last 10 trips are kept for privacy"
+- tapOn:
+    point: "50%,48%"
+- tapOn:
+    point: "50%,56%"
+- tapOn:
+    point: "15%,42%"
+- tapOn: "170 Russell Street, Melbourne VIC, Australia"
+- tapOn: "From: 12 Collins Street, Melbourne VIC, Australia"
+- tapOn: "By Walk destination"
+- tapOn: "Request expired"
+- tapOn:
+    point: "82%,42%"
+- tapOn: "Expired"
+- tapOn: "Completed"
+- tapOn: "With Companion"
+- tapOn:
+    text: "0"
+    index: 1
+- tapOn:
+    text: "0"
+    index: 0
+- tapOn: "1"
+- tapOn: "Total Trips"
+- tapOn: ""
