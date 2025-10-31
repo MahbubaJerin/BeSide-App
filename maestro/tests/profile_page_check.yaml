@@ -1,13 +1,22 @@
-appId: null
+appId: com.anonymous.BeSide
 ---
+- launchApp
+- tapOn: { id: "welcomeLoginButton" }
+- tapOn: { id: "usernameInput" }
+- inputText: "lululemom"
+- tapOn: { id: "passwordInput" }
+- inputText: "Lululu3@"
+- tapOn: { id: "loginButton" }
+- waitForAnimationToEnd
+- assertVisible: "Safe Journey Companion"
 - assertVisible:
-    id: "android:id/content"
+      id: "android:id/content"
 - tapOn: ""
 - assertVisible:
-    id: "android:id/content"
-    index: 0
+      id: "android:id/content"
+      index: 0
 - tapOn:
-    point: "50%,50%"
+      point: "50%,50%"
 - assertVisible: "Go back"
 - assertVisible: "Profile"
 - assertVisible: "Change profile photo"
@@ -17,8 +26,8 @@ appId: null
 - assertVisible: "Lulu Orange"
 - assertVisible: "Username"
 - assertVisible:
-    text: "lululemom"
-    index: 0
+      text: "lululemom"
+      index: 0
 - assertVisible: "Availability"
 - assertVisible: "Active"
 - assertVisible: "Date of Birth"

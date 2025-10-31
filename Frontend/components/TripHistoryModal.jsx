@@ -11,13 +11,8 @@ import {
   Dimensions,
   SafeAreaView,
   StatusBar,
-  Animated,
-  Dimensions,
-  SafeAreaView,
-  StatusBar,
-  Animated,
+  Animated
 } from "react-native";
-import { Ionicons } from '@expo/vector-icons';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemedButton } from "@/components/ThemedButton";

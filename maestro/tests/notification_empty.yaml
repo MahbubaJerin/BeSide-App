@@ -1,12 +1,21 @@
-appId: null
+appId: com.anonymous.BeSide
 ---
+- launchApp
+- tapOn: { id: "welcomeLoginButton" }
+- tapOn: { id: "usernameInput" }
+- inputText: "lululemom"
+- tapOn: { id: "passwordInput" }
+- inputText: "Lululu3@"
+- tapOn: { id: "loginButton" }
+- waitForAnimationToEnd
+- assertVisible: "Safe Journey Companion"
 - tapOn:
-    id: "android:id/content"
+      id: "android:id/content"
 - tapOn: ""
 - tapOn:
-    point: "50%,31%"
+      point: "50%,31%"
 - tapOn:
-    point: "50%,49%"
+      point: "50%,49%"
 - tapOn: "📭"
 - tapOn: "No trip requests"
 - tapOn: "New companion requests from nearby users will appear here."
@@ -14,5 +23,5 @@ appId: null
 - tapOn: "✕"
 - tapOn: ""
 - tapOn:
-    point: "50%,49%"
+      point: "50%,49%"
 - tapOn: "Close"

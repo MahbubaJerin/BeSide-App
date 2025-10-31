@@ -1,10 +1,19 @@
-appId: null
+appId: com.anonymous.BeSide
 ---
+- launchApp
+- tapOn: { id: "welcomeLoginButton" }
+- tapOn: { id: "usernameInput" }
+- inputText: "lululemom"
+- tapOn: { id: "passwordInput" }
+- inputText: "Lululu3@"
+- tapOn: { id: "loginButton" }
+- waitForAnimationToEnd
+- assertVisible: "Safe Journey Companion"
 - assertVisible: "BeSide logo"
 - assertVisible: "Your journey, made safer. Join us today"
 - assertVisible: "Your privacy is respected. Your safety is our priority."
 - assertVisible: "Brought to you by — the BeSide team"
 - tapOn:
-    id: "welcomeLoginButton"
+      id: "welcomeLoginButton"
 - tapOn:
-    id: "welcomeRegisterButton"
+      id: "welcomeRegisterButton"

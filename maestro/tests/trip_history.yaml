@@ -1,16 +1,25 @@
-appId: null
+appId: com.anonymous.BeSide
 ---
+- launchApp
+- tapOn: { id: "welcomeLoginButton" }
+- tapOn: { id: "usernameInput" }
+- inputText: "lululemom"
+- tapOn: { id: "passwordInput" }
+- inputText: "Lululu3@"
+- tapOn: { id: "loginButton" }
+- waitForAnimationToEnd
+- assertVisible: "Safe Journey Companion"
 - assertVisible:
-    id: "android:id/content"
+      id: "android:id/content"
 - tapOn: ", History"
 - tapOn:
-    point: "50%,11%"
+      point: "50%,11%"
 - assertVisible: "Trip History"
 - assertVisible: "Your recent journey memories"
 - tapOn:
-    point: "50%,56%"
+      point: "50%,56%"
 - tapOn:
-    point: "50%,46%"
+      point: "50%,46%"
 - assertVisible: ""
 - assertVisible: "No trips yet"
 - assertVisible: "Your completed and cancelled trips will appear here"

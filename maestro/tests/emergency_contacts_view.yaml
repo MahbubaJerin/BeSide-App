@@ -1,0 +1,84 @@
+appId: com.anonymous.BeSide
+---
+# Step 1 — Login and navigate to Emergency Contacts
+- launchApp
+- tapOn: { id: "welcomeLoginButton" }
+- tapOn: { id: "usernameInput" }
+- inputText: "lululemom"
+- tapOn: { id: "passwordInput" }
+- inputText: "Lululu3@"
+- tapOn: { id: "loginButton" }
+- waitForAnimationToEnd
+- assertVisible: "Safe Journey Companion"
+
+# Step 2 — Open Emergency section
+- assertVisible: ", Emergency"
+- tapOn: ", Emergency"
+- assertVisible: "Emergency Contacts"
+
+# Step 3 — Detect contact list state
+- runFlow:
+    when:
+      visible: "No emergency contacts yet"
+    commands:
+    - takeScreenshot:
+        path: maestro/emergency_contacts_empty.png
+    - tapOn: "Add Contact"
+    - assertVisible: "Add Contact"
+    - tapOn: "Name *"
+    - inputText: "Test Contact"
+    - tapOn: "Phone *"
+    - inputText: "+61400000000"
+    - tapOn: "Add Contact"
+    - tapOn: "OK"
+    - assertVisible: "Emergency Contacts"
+    - takeScreenshot:
+        path: maestro/emergency_contact_created.png
+
+# Step 4 — Validate at least one contact card exists
+- assertVisible: "Emergency Contacts"
+- waitForAnimationToEnd
+- takeScreenshot:
+    path: maestro/emergency_contacts_list.png
+
+# Step 5 — Check contact card features (first contact)
+- assertVisible: "Call"
+- assertVisible: "Text"
+- assertVisible: "Email"
+- assertVisible: "Hold \"Text\" for emergency alert"
+- assertVisible: "Primary"
+- assertVisible: ""
+- assertVisible: ""
+
+# Step 6 — Simulate pressing quick-actions
+- tapOn: "Call"
+- pressKey: Back
+- pressKey: Back
+
+
+- tapOn: "Text"
+- waitForAnimationToEnd
+- pressKey: Back
+
+- tapOn: "Email"
+- pressKey: Back
+- pressKey: Back
+
+
+# Step 7 — Open edit screen (verify routing works)
+- tapOn: ""
+- assertVisible: "Edit Contact"
+- tapOn: ""
+
+- takeScreenshot:
+    path: maestro/emergency_contact_edit_screen.png
+- waitForAnimationToEnd
+
+# Step 8 — Verify Delete button appears (no press)
+- tapOn: ""
+- tapOn:
+      text: "Delete"
+      index: 0
+- tapOn: "CANCEL"
+- takeScreenshot:
+    path: maestro/emergency_contact_delete_option.png

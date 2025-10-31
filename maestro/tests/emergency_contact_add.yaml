@@ -1,0 +1,40 @@
+appId: com.anonymous.BeSide
+---
+# Step 1 — Login and open Emergency Contacts page
+- launchApp
+- tapOn: { id: "welcomeLoginButton" }
+- tapOn: { id: "usernameInput" }
+- inputText: "lululemom"
+- tapOn: { id: "passwordInput" }
+- inputText: "Lululu3@"
+- tapOn: { id: "loginButton" }
+- waitForAnimationToEnd
+- assertVisible: "Safe Journey Companion"
+
+# Step 2 — Open Emergency Contacts
+- tapOn: ", Emergency"
+- assertVisible: "Emergency Contacts"
+
+# Step 3 — Open Add Contact screen
+- tapOn: "Add Contact"
+- assertVisible: "Add Contact"
+
+# Step 4 — Fill out new contact
+- tapOn: "Name *"
+- inputText: "Test Person"
+- tapOn: "Phone *"
+- inputText: "+61412345678"
+- tapOn: "Relation"
+- inputText: "Friend"
+- tapOn: "Email"
+- inputText: "friend@example.com"
+- tapOn: "Primary contact"
+- tapOn: "Add Contact"
+
+# Step 5 — Validate success and return
+- waitForAnimationToEnd
+- tapOn: "OK"
+- assertVisible: "Emergency Contacts"
+- takeScreenshot:
+    path: maestro/screenshots/emergency_contact_add_success.png
+- assertVisible: "Test Person"

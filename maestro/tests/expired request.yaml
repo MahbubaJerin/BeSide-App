@@ -1,4 +1,4 @@
-appId: null
+appId: com.anonymous.BeSide
 ---
 - tapOn:
     point: "56%,83%"
