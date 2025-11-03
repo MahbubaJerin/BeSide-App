@@ -73,6 +73,8 @@ app.use(`${baseUrl}/sos`, sosRoutes); // ✅ Add this line
 // Additional route mounting for the new API structure
 app.use("/api/trip", tripRoutes);
 
+// health check for Render
+app.get("/healthz", (req, res) => res.send("ok"));
 
 app.all("*", (req, res, next) => {
   next(new AppError(`Cannot find ${req.originalUrl} on this server!`, 404));
