@@ -1,21 +1,15 @@
 // config.js
-<<<<<<< HEAD
 // Configuration for both development and production environments
-
-import Constants from 'expo-constants';
 
 const getBaseUrl = () => {
   // Check if we're in development mode
   if (__DEV__) {
-    // For development, you can use either:
-    // 1. Your local IP address (replace with your actual IP)
-    // return "http://192.168.1.100:5000"; // Replace 192.168.1.100 with your actual IP
-    
-    // 2. Use Railway URL for development testing
-    return "https://beside-production.up.railway.app";
-    
-    // 3. If using adb reverse for Android emulator
+    // For development, you can choose:
+    // 1. Local backend (if running locally)
     // return "http://localhost:5000";
+    
+    // 2. Railway URL for development testing (recommended)
+    return "https://beside-production.up.railway.app";
   } else {
     // Production - always use Railway URL
     return "https://beside-production.up.railway.app";
@@ -56,25 +50,6 @@ export const NETWORK_CONFIG = {
   RETRY_ATTEMPTS: 3,
   RETRY_DELAY: 1000,
 };
-=======
-// Environment-aware configuration
-
-// Determine which backend to use
-let BASE_URL;
-
-if (__DEV__) {
-  // Development: Local backend with adb reverse
-  // Run: adb reverse tcp:5000 tcp:5000
-  BASE_URL = "http://localhost:5000/";
-} else {
-  // Production: Railway backend
-  BASE_URL = "https://beside-production.up.railway.app/";
-}
-
-// If you also have Socket.IO (or another realtime service) on 3001,
-// run: adb reverse tcp:3001 tcp:3001  and uncomment below.
-// export const SOCKET_URL = __DEV__ ? 'http://localhost:3001/' : 'https://beside-production.up.railway.app/';
->>>>>>> fb729e44932fd7cf31724828a82b50fbe05e50c2
 
 // Optional default export (works if some files do import config from './config')
 export default {
