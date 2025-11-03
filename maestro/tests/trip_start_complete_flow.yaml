@@ -1,0 +1,74 @@
+- tapOn: Final Journey
+- tapOn: Traveling with nammu
+- tapOn: 10.1 km • 15 mins
+- assertVisible: Google Map
+- tapOn: Follow the green route to your destination
+- tapOn: Stay together with your companion during the journey
+- tapOn: , End Trip
+- assertVisible:
+    id: android:id/button2
+- tapOn: Are you sure you want to end this trip? You will need to wait for your companion to also confirm before the trip is completed.
+- tapOn:
+    text: End Trip
+    index: 0
+- assertVisible:
+    text: END TRIP
+    index: 1
+- tapOn:
+    text: END TRIP
+    index: 1
+- tapOn: 🎉 Trip Completed!
+- tapOn: Both users have confirmed the trip has ended. Thank you for traveling with BeSide!
+- assertVisible:
+    id: android:id/button1
+- tapOn: VIEW TRIP HISTORY
+- tapOn:
+    point: 50%,58%
+- tapOn:
+    point: 19%,28%
+- tapOn:
+    point: 50%,28%
+- tapOn:
+    point: 81%,28%
+- tapOn: Trip History
+- tapOn: Your recent journey memories
+- tapOn:
+    point: 50%,67%
+- tapOn:
+    point: 17%,67%
+- tapOn: Successful Journey!
+- tapOn:
+    point: 50%,77%
+- tapOn:
+    text: Completed
+    index: 1
+- tapOn:
+    point: 15%,42%
+- tapOn:
+    text: Today
+    index: 0
+- tapOn:
+    text: 121 Exhibition Street, Melbourne VIC, Australia
+    index: 0
+- tapOn: Mon, Nov 3 • 4:59:53 pm
+- tapOn:
+    text: "From: 8 Cole Street, Hawthorn East VIC, Australia"
+    index: 0
+- tapOn:
+    text: By Walk destination
+    index: 0
+- tapOn: Journey completed with companion
+- tapOn:
+    text: 
+    index: 0
+- tapOn:
+    text: 
+    index: 0
+- tapOn:
+    text: 
+    index: 0
+- tapOn: Journey completed with companion
+- tapOn: nammu
+- tapOn: Travel companion
+- tapOn: 
+- tapOn: 

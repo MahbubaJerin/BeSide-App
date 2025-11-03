@@ -16,19 +16,25 @@ appId: com.anonymous.BeSide
 - assertVisible: "Emergency Contacts"
 
 # Step 3 — Open Add Contact screen
-- tapOn: "Add Contact"
+- tapOn: ""
 - assertVisible: "Add Contact"
 
 # Step 4 — Fill out new contact
 - tapOn: "Name *"
+- tapOn: "Jane Doe"
 - inputText: "Test Person"
 - tapOn: "Phone *"
+- tapOn: "+61 4xx xxx xxx"
 - inputText: "+61412345678"
 - tapOn: "Relation"
+- tapOn: "Sister, Friend…"
 - inputText: "Friend"
 - tapOn: "Email"
+- tapOn: "jane@example.com"
 - inputText: "friend@example.com"
 - tapOn: "Primary contact"
+- tapOn:
+      point: "88%,63%"
 - tapOn: "Add Contact"
 
 # Step 5 — Validate success and return
