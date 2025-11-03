@@ -13,13 +13,20 @@ process.on("uncaughtException", (err) => {
 
 const port = process.env.PORT || 3000;
 
-const server = app.listen(port, async () => {
+// Railway deployment configuration
+const server = app.listen(port, '0.0.0.0', async () => {
   console.log(`🚀 [SERVER] Server running on port ${port}`);
+  console.log(`🌍 [SERVER] Environment: ${process.env.NODE_ENV}`);
   console.log(`📍 [SERVER] Location tracking system initialized`);
   console.log(`🔍 [SERVER] Companion search APIs ready`);
   console.log(`🧹 [SERVER] Location cleanup service started`);
-
-  await connectDb();
+  
+  try {
+    await connectDb();
+    console.log(`✅ [DATABASE] MongoDB connected successfully`);
+  } catch (error) {
+    console.error(`❌ [DATABASE] Connection failed:`, error.message);
+  }
 });
 
 process.on("unhandledRejection", (err) => {

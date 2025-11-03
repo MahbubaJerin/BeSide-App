@@ -5,18 +5,21 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/BeSide.png",
-
     "scheme": "myapp",
-    "deepLinks": ["myapp://"],
+    "deepLinks": [
+      "myapp://"
+    ],
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
+<<<<<<< HEAD
+=======
 
+>>>>>>> fb729e44932fd7cf31724828a82b50fbe05e50c2
     "splash": {
       "image": "./assets/images/BeSide.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.BeSide",
@@ -24,26 +27,39 @@
         "googleMapsApiKey": "AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw"
       }
     },
-
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/BeSide.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.anonymous.BeSide",
+      "versionCode": 1,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
+      "minSdkVersion": 21,
+      "buildToolsVersion": "34.0.0",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyDFwWtCQPY8KaiHVahvSr5jldGGFzbMDVw"
         }
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
+      "networkSecurityConfig": "network_security_config"
     },
-
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/BeSide.png"
     },
-
     "plugins": [
       "expo-router",
       [
@@ -65,11 +81,17 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
         }
-      ]
+      ],
+      "./plugins/withNetworkSecurityConfig.js"
     ],
-
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9fe0564b-a2f9-4a32-afb5-a793aa162810"
+      }
     }
   }
 }

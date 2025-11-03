@@ -45,32 +45,71 @@ app.use(mongoSanitize());
 
 app.use(xss());
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",")
-  : ["http://localhost:3000"];
-
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.indexOf(origin) === -1) {
-        return callback(new AppError("CORS policy violation", 403), false);
-      }
+// Railway deployment CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // In production, allow specific origins
+    if (process.env.NODE_ENV === 'production') {
+      const allowedOrigins = [
+        'https://beside-production.up.railway.app',
+        'exp://192.168.1.100:8081', // Your local IP for Expo dev
+        'myapp://', // Your app scheme
+        /^exp:\/\/.*/, // Any Expo development URL
+        /^https:\/\/.*\.ngrok\.io$/, // Allow ngrok URLs for testing
+      ];
+      
+      const isAllowed = allowedOrigins.some(allowedOrigin => {
+        if (typeof allowedOrigin === 'string') return allowedOrigin === origin;
+        return allowedOrigin.test(origin);
+      });
+      
+      if (isAllowed) return callback(null, true);
+      return callback(new AppError("CORS policy violation", 403), false);
+    } else {
+      // In development, allow all origins
       return callback(null, true);
-    },
-    credentials: true,
-  })
-);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+};
+
+app.use(cors(corsOptions));
+
+// Railway health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+    port: process.env.PORT || 3000
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: 'BeSide API is running!',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV
+  });
+});
 
 const baseUrl = "/api/v1";
 app.use(`${baseUrl}/auth`, authRoutes);
 app.use(`${baseUrl}/user`, userRoutes);
 app.use(`${baseUrl}/trip`, tripRoutes);
 app.use(`${baseUrl}/location`, locationRoutes);
-app.use(`${baseUrl}/sos`, sosRoutes); // ✅ Add this line
+app.use(`${baseUrl}/sos`, sosRoutes);
 
-// Additional route mounting for the new API structure
+// Additional route mounting for compatibility
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/trips", tripRoutes);
 app.use("/api/trip", tripRoutes);
 
 
