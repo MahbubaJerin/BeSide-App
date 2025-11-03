@@ -1,7 +1,7 @@
 // config.js
 // Dev over USB with Expo Go + adb reverse tcp:5000 tcp:5000
 
-export const BASE_URL = 'http://localhost:5000/';
+export const BASE_URL = "https://beside-production.up.railway.app/";
 
 // If you also have Socket.IO (or another realtime service) on 3001,
 // run: adb reverse tcp:3001 tcp:3001  and uncomment below.
