@@ -6,8 +6,8 @@ let BASE_URL;
 
 if (__DEV__) {
   // Development: Local backend with adb reverse
-  // Run: adb reverse tcp:5001 tcp:5001
-  BASE_URL = "http://localhost:5001/";
+  // Run: adb reverse tcp:5000 tcp:5000
+  BASE_URL = "http://localhost:5000/";
 } else {
   // Production: Railway backend
   BASE_URL = "https://beside-backend-2pdx.onrender.com";
